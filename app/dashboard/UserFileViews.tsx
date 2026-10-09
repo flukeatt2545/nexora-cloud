@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { API_BASE } from "../runtime";
 import { useEscape, useScrollLock } from "./useScrollLock";
+import { errorText, type Ask, type Notify } from "./types";
 import "./hosting-view.css";
 
 async function api<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -40,7 +41,7 @@ type Draft = { name: string; isVisible: boolean; sortOrder: number };
 type VisibilityFilter = "" | "visible" | "hidden";
 
 // /admin/file-categories: the categories users can filter the file library by.
-export function UserFileCategoriesView({ notify, ask }: { notify: any; ask: any }) {
+export function UserFileCategoriesView({ notify, ask }: { notify: Notify; ask: Ask }) {
   const [categories, setCategories] = useState<UserFileCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -55,20 +56,18 @@ export function UserFileCategoriesView({ notify, ask }: { notify: any; ask: any 
   const [saving, setSaving] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
 
-  const load = useCallback(async () => {
+  const fetchCategories = useCallback(() => api<{ items: UserFileCategory[] }>("/api/admin/user-file-categories")
+    .then((data) => setCategories(data.items || []))
+    .catch((e) => setLoadError((e instanceof Error && e.message) || "โหลดหมวดหมู่ไม่สำเร็จ"))
+    .finally(() => setLoading(false)), []);
+
+  useEffect(() => { fetchCategories(); }, [fetchCategories]);
+  // After a change, or "ลองใหม่": show loading and fetch again.
+  const load = useCallback(() => {
     setLoading(true);
     setLoadError("");
-    try {
-      const data = await api<{ items: UserFileCategory[] }>("/api/admin/user-file-categories");
-      setCategories(data.items || []);
-    } catch (e: any) {
-      setLoadError(e.message || "โหลดหมวดหมู่ไม่สำเร็จ");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+    return fetchCategories();
+  }, [fetchCategories]);
 
   const ordered = useMemo(
     () => [...categories].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "th")),
@@ -144,8 +143,8 @@ export function UserFileCategoriesView({ notify, ask }: { notify: any; ask: any 
       }
       setEditingId(null);
       await load();
-    } catch (e: any) {
-      notify({ kind: "error", text: e.message || "บันทึกไม่สำเร็จ" });
+    } catch (e) {
+      notify({ kind: "error", text: errorText(e) || "บันทึกไม่สำเร็จ" });
     } finally {
       setSaving(false);
     }
@@ -162,8 +161,8 @@ export function UserFileCategoriesView({ notify, ask }: { notify: any; ask: any 
     try {
       await update(category, { isVisible: !category.isVisible });
       notify({ kind: "success", text: category.isVisible ? `ซ่อน “${category.name}” แล้ว` : `แสดง “${category.name}” แล้ว` });
-    } catch (e: any) {
-      notify({ kind: "error", text: e.message || "เปลี่ยนสถานะไม่สำเร็จ" });
+    } catch (e) {
+      notify({ kind: "error", text: errorText(e) || "เปลี่ยนสถานะไม่สำเร็จ" });
     } finally {
       markBusy(category.id, false);
     }
@@ -181,8 +180,8 @@ export function UserFileCategoriesView({ notify, ask }: { notify: any; ask: any 
     try {
       await update(category, { sortOrder: mine });
       await update(other, { sortOrder: theirs });
-    } catch (e: any) {
-      notify({ kind: "error", text: e.message || "ย้ายลำดับไม่สำเร็จ" });
+    } catch (e) {
+      notify({ kind: "error", text: errorText(e) || "ย้ายลำดับไม่สำเร็จ" });
       await load();
     } finally {
       markBusy(category.id, false);
@@ -226,8 +225,8 @@ export function UserFileCategoriesView({ notify, ask }: { notify: any; ask: any 
       const copied = await navigator.clipboard.writeText(`${window.location.origin}${r.shareUrl}`).then(() => true, () => false);
       notify({ kind: "success", text: copied ? `คัดลอกลิงก์แชร์ “${category.name}” แล้ว ใช้ได้ 7 วัน` : `สร้างลิงก์แชร์ “${category.name}” แล้ว แต่คัดลอกไม่ได้` });
       setCategories((prev) => prev.map((item) => (item.id === category.id ? { ...item, activeShareCount: (item.activeShareCount || 0) + 1 } : item)));
-    } catch (e: any) {
-      notify({ kind: "error", text: e.message || "สร้างลิงก์ไม่สำเร็จ" });
+    } catch (e) {
+      notify({ kind: "error", text: errorText(e) || "สร้างลิงก์ไม่สำเร็จ" });
     } finally {
       markBusy(category.id, false);
     }

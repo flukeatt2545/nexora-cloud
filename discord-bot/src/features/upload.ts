@@ -1,5 +1,8 @@
 import axios from "axios";
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { EmbedBuilder, SlashCommandBuilder, type Attachment, type ChatInputCommandInteraction } from "discord.js";
+import type { AxiosProgressEvent } from "axios";
+import { recordActivity } from "./activity-log";
+import { describeError, errorStatus } from "./errors";
 
 const API_URL = (process.env.NEXORA_API_URL || "http://api:8080").replace(/\/+$/, "");
 const BOT_SECRET = (process.env.BOT_INTERNAL_SECRET || "").trim();
@@ -51,10 +54,10 @@ function progressEmbed(phase: string, pct: number) {
     .setColor(0x5865f2);
 }
 
-export async function handleUploadCommand(interaction: any): Promise<void> {
+export async function handleUploadCommand(interaction: ChatInputCommandInteraction): Promise<void> {
   // NOTE: index.ts must route commandName === "upload" here WITHOUT admin/scope
   // gating (everyone in the guild may use it), after beginPrivateReply().
-  const attachments: any[] = [];
+  const attachments: Attachment[] = [];
   for (let i = 1; i <= MAX_FILES; i++) {
     const att = interaction.options.getAttachment(`file${i}`);
     if (att) attachments.push(att);
@@ -107,7 +110,7 @@ export async function handleUploadCommand(interaction: any): Promise<void> {
     await updateProgress("กำลังเตรียมอัปโหลด...", 0, true);
 
     // Phase 1: download from Discord CDN (0–50%).
-    const totalBytes = attachments.reduce((s: number, a: any) => s + (Number(a.size) || 0), 0);
+    const totalBytes = attachments.reduce((s: number, a: Attachment) => s + (Number(a.size) || 0), 0);
     let downloadedBytes = 0;
     const form = new FormData();
     form.append("guild_id", guildId);
@@ -117,10 +120,10 @@ export async function handleUploadCommand(interaction: any): Promise<void> {
     for (let i = 0; i < attachments.length; i++) {
       const att = attachments[i];
       const phase = `กำลังดาวน์โหลดรูปที่ ${i + 1}/${attachments.length}`;
-      const res = await axios.get(att.url, {
+      const res = await axios.get<ArrayBuffer>(att.url, {
         responseType: "arraybuffer",
         timeout: 60000,
-        onDownloadProgress: (e: any) => {
+        onDownloadProgress: (e: AxiosProgressEvent) => {
           const loaded = downloadedBytes + (Number(e?.loaded) || 0);
           const pct = totalBytes > 0 ? (loaded / totalBytes) * DOWNLOAD_SHARE : 0;
           void updateProgress(phase, pct);
@@ -142,7 +145,7 @@ export async function handleUploadCommand(interaction: any): Promise<void> {
       },
       timeout: 120000,
       maxBodyLength: Infinity,
-      onUploadProgress: (e: any) => {
+      onUploadProgress: (e: AxiosProgressEvent) => {
         const total = Number(e?.total) || 0;
         const frac = total > 0 ? Number(e?.loaded || 0) / total : 0;
         void updateProgress("กำลังอัปโหลดขึ้นเซิร์ฟเวอร์...", DOWNLOAD_SHARE + frac * (100 - DOWNLOAD_SHARE));
@@ -161,7 +164,7 @@ export async function handleUploadCommand(interaction: any): Promise<void> {
         .setColor(0x5865f2)
     );
     embeds[0].setFooter({ text: `อัปโหลดโดย ${username}` }).setTimestamp();
-    interaction.recordBotActivity?.({
+    recordActivity(interaction, {
       outcome: "success",
       result: `อัปโหลดรูปสำเร็จ ${items.length} ไฟล์`,
     });
@@ -169,9 +172,9 @@ export async function handleUploadCommand(interaction: any): Promise<void> {
       content: `อัปโหลดสำเร็จ **${items.length} รูป**`,
       embeds: embeds.slice(0, 10),
     });
-  } catch (error: any) {
-    console.error("[ERROR] /upload", error?.response?.status || "", error?.message || error);
-    interaction.recordBotActivity?.({ outcome: "failure", result: "อัปโหลดรูปไม่สำเร็จ", details: String(error?.message || "unknown").slice(0, 200) });
+  } catch (error) {
+    console.error("[ERROR] /upload", errorStatus(error) || "", describeError(error));
+    recordActivity(interaction, { outcome: "failure", result: "อัปโหลดรูปไม่สำเร็จ", details: String((error instanceof Error && error.message) || "unknown").slice(0, 200) });
     await interaction.editReply({
       embeds: [notice("อัปโหลดไม่สำเร็จ", "ลองอีกครั้ง หากยังไม่ได้ให้ผู้ดูแลตรวจสอบ")],
     });

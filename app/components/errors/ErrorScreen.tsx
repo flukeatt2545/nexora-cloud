@@ -3,6 +3,9 @@
 import { LockKeyhole, RotateCw, Home } from "lucide-react";
 import "./error-screen.css";
 
+// The links here reload the whole page on purpose: after a crash the app's state is not trusted,
+// so client-side navigation (next/link) would carry the broken state along.
+/* eslint-disable @next/next/no-html-link-for-pages */
 export default function ErrorScreen({ status, reset }: { status: number; reset?: () => void }) {
   const copy = status === 404 ? { title: "ไม่พบหน้าที่ต้องการ", message: "หน้านี้อาจถูกย้ายหรือลบไปแล้ว" } : { title: "ระบบมีปัญหา", message: "ลองอีกครั้งในอีกสักครู่" };
   return <div className="nexora-error-screen">

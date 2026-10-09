@@ -2,8 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MockHostingBackend,
-  WorkspaceSession,
-  computeLineDiff
+  WorkspaceSession
 } from './harness.mjs';
 
 // ============================================================================

@@ -12,9 +12,6 @@ import { readFileSync } from 'node:fs';
 // PART 1: FileIcon & Language Detection Stress Testing (25+ Extensions & Specials)
 // ============================================================================
 
-// Extract the logic from FileIcon.tsx directly to test fidelity
-const fileIconSource = readFileSync('app/components/code-workspace/FileIcon.tsx', 'utf8');
-
 // We test both the specification source code in FileIcon.tsx and runtime behavior
 function detectLanguage(filePathOrName) {
   if (!filePathOrName) return "plaintext";

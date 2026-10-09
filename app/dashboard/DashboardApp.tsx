@@ -1,11 +1,11 @@
 "use client";
 
 import {
-  Activity, AlertCircle, ArrowRight, Ban, Bell, Calendar, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Clock, Cloud, Database, FileImage, Folder, Home, KeyRound, LayoutDashboard,
-  Info, LogOut, Megaphone, Menu, Moon, MoreHorizontal, Pencil, Save, Search, Send, Settings, ShieldAlert, ShieldCheck, SlidersHorizontal, Sun, Trash2, User, TriangleAlert, Star, Heart, Gift,
-  UserCog, Users, UserPlus, X, Monitor, Smartphone, Globe, Copy, Upload, Maximize2, LayoutGrid, List, UploadCloud, FolderOpen, RefreshCw, FileText, Code, File as FileIcon, Download, Eye, Check, CheckCircle, CheckCircle2, Store, Package, PlayCircle, StopCircle, Zap, Plus, WalletCards, ReceiptText, TrendingUp, Share2, Server, ListChecks, CheckCheck, Link2, Mail, Bot, EyeOff, PauseCircle, Minus
+  Activity, ArrowRight, Ban, Bell, Calendar, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Clock, Cloud, Database, FileImage, Folder, KeyRound, LayoutDashboard,
+  Info, LogOut, Megaphone, Menu, Moon, Pencil, Save, Search, Send, Settings, ShieldAlert, ShieldCheck, SlidersHorizontal, Sun, Trash2, User, TriangleAlert, Star, Heart, Gift,
+  UserCog, Users, UserPlus, X, Monitor, Smartphone, Globe, Copy, Upload, Maximize2, LayoutGrid, List, UploadCloud, FolderOpen, RefreshCw, FileText, Code, Download, Eye, Check, CheckCircle, CheckCircle2, Store, Package, PlayCircle, StopCircle, Zap, Plus, WalletCards, ReceiptText, TrendingUp, Share2, Server, ListChecks, CheckCheck, Link2, Mail, Bot, EyeOff, PauseCircle, Minus
 } from "lucide-react";
-import { FormEvent, Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { FormEvent, Fragment, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Cropper, { type Area } from "react-easy-crop";
 import { createPortal } from "react-dom";
 import { useEscape, useScrollLock } from "./useScrollLock";
@@ -29,6 +29,7 @@ import DiscordBotView from "./DiscordBotView";
 import MailSettingsPanel from "./MailSettingsPanel";
 import SmartImage from "../components/SmartImage";
 import StoreClosedNotice from "../components/StoreClosedNotice";
+import Link from "next/link";
 
 // Admin pages about selling: they show a notice while the store is switched off.
 const STORE_VIEWS = new Set<string>(["store-categories", "store-products", "store-orders", "store-sales", "topups", "topup-transactions", "topup-settings"]);
@@ -60,9 +61,14 @@ type SettingsData = {
 };
 type LockdownState = { enabled:boolean; startedAt?:string|null; expiresAt?:string|null; privateReason?:string; source?:string; actor?:string };
 type ConfirmRequest = { title: string; message: string; confirmLabel?: string; danger?: boolean; action: () => void | Promise<void> };
+/** How a marquee looks (colours, icon, direction, speed); stored with the announcement as is. */
+type MarqueeMeta = Record<string, string | number | boolean | undefined> & {
+  icon?: string; iconColor?: string; textColor?: string; borderColor?: string; backgroundColor?: string;
+  borderColorEnabled?: boolean; backgroundColorEnabled?: boolean; direction?: string; repeatCount?: number; speed?: number;
+};
 type Announcement = {
   id: number; title: string; message: string; imageUrl?: string; customColor?: string; kind: "banner" | "popup" | "marquee";
-    meta?: Record<string, any>;
+    meta?: MarqueeMeta;
   placement: "homepage" | "login" | "both"; severity: "info" | "success" | "warning" | "error";
   buttonLabel: string; buttonUrl: string; active: boolean; startsAt?: string; endsAt?: string;
   createdAt: string; updatedAt: string;
@@ -110,15 +116,13 @@ const targetTypeLabel: Record<string, string> = {
 function formatLogTarget(log: LogItem): string {
   if (!log.targetType) return "—";
   const typeName = targetTypeLabel[log.targetType] || log.targetType;
-  let meta = log.metadata as any;
-  if (typeof meta === "string") {
-    try { meta = JSON.parse(meta); } catch { meta = null; }
-  }
+  const meta = logMeta(log);
   // A bulk action names many targets; show how many instead of a long list.
-  if (meta && typeof meta === "object" && Number(meta.count) > 1) return `${typeName} ${Number(meta.count).toLocaleString("th-TH")} รายการ`;
+  if (meta && Number(meta.count) > 1) return `${typeName} ${Number(meta.count).toLocaleString("th-TH")} รายการ`;
   let name = "";
-  if (meta && typeof meta === "object") {
-    name = meta.db_name || meta.dbName || meta.site_name || meta.siteName || meta.username || meta.title || meta.name || meta.address || "";
+  if (meta) {
+    const value = meta.db_name || meta.dbName || meta.site_name || meta.siteName || meta.username || meta.title || meta.name || meta.address || "";
+    name = typeof value === "string" ? value : String(value);
   }
   // The API looks the name up by id when the entry did not store it (still there if not deleted).
   if (!name && log.targetName) name = log.targetName;
@@ -718,7 +722,7 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
           ) : (
             <div className="auth-check-actions">
               <button type="button" className="btn-auth-retry" onClick={() => window.location.reload()}>ลองใหม่</button>
-              <a href="/" className="btn-auth-secondary">กลับหน้าหลัก</a>
+              <Link href="/" className="btn-auth-secondary">กลับหน้าหลัก</Link>
             </div>
           )}
 
@@ -782,7 +786,7 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
       <aside className={`dashboard-sidebar ${menuOpen ? "open" : ""}`}>
         <div className="dashboard-brand"><img src={brandSettings.logoUrl || "/logo-v2.png"} alt="" /><div><strong>{brandSettings.brandName}</strong><span>CONTROL PANEL</span></div><button onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู"><X /></button></div>
         <nav aria-label="เมนูแดชบอร์ด">
-          {me.role !== "user" && <a href="/admin" className={`sidebar-dashboard-link ${view === "overview" ? "active" : ""}`}><LayoutDashboard size={18} /><span>แดชบอร์ด</span><ChevronRight size={15} /></a>}
+          {me.role !== "user" && <Link href="/admin" className={`sidebar-dashboard-link ${view === "overview" ? "active" : ""}`}><LayoutDashboard size={18} /><span>แดชบอร์ด</span><ChevronRight size={15} /></Link>}
           {navGroups.filter((group) => group.show).map((group) => <section className={`sidebar-group ${navOpen[group.key] ? "open" : ""} ${viewNavGroup[view] === group.key ? "current" : ""}`} key={group.key}>
             <button type="button" onClick={() => setNavOpen({ ...navOpen, [group.key]: !navOpen[group.key] })} aria-expanded={navOpen[group.key]}><group.icon size={18} /><span>{group.label}</span><ChevronDown size={15} /></button>
             {navOpen[group.key] && <div>{group.links.filter((item) => item.show !== false).map((item) => {
@@ -813,7 +817,7 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
               <StoreClosedNotice message={storeState.message} note="ลูกค้ามองไม่เห็นร้านค้า แอดมินยังจัดการข้อมูลได้ตามปกติ">
                 {me.role === "superadmin" && (
                   <>
-                    <a href="/admin/settings?tab=general#store-switch">ตั้งค่า</a>
+                    <Link href="/admin/settings?tab=general#store-switch">ตั้งค่า</Link>
                     <button type="button" className="is-primary" onClick={askOpenStore}>เปิดร้านค้า</button>
                   </>
                 )}
@@ -833,7 +837,7 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
           {view === "settings" && <SettingsView notify={setNotice} ask={setConfirmRequest} />}
           {view === "homepage-settings" && <HomepageSettingsView notify={setNotice} />}
           {view === "files" && <FilesView />}
-          {view === "file-system" && <FileLibraryView admin notify={setNotice} ask={setConfirmRequest} />}
+          {view === "file-system" && <FileLibraryView admin ask={setConfirmRequest} />}
           {view === "file-categories" && <UserFileCategoriesView notify={setNotice} ask={setConfirmRequest} />}
           {view === "store-categories" && <StoreCategoriesView notify={setNotice} ask={setConfirmRequest} />}
           {view === "store-products" && <StoreProductsView notify={setNotice} ask={setConfirmRequest} />}
@@ -1017,7 +1021,7 @@ function ProfileView({ me, setMe, notify, ask }: { me: AuthUser; setMe: (user: A
   const [cropImage, setCropImage] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [cropping, setCropping] = useState(false);
   
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -1187,7 +1191,7 @@ function ProfileView({ me, setMe, notify, ask }: { me: AuthUser; setMe: (user: A
                   <button type="button" className="hv-btn hv-btn-danger-ghost" onClick={() => ask({ title: `ยกเลิกการเชื่อม ${provider.name}?`, message: `หลังยกเลิก คุณจะเข้าสู่ระบบด้วย ${provider.name} ไม่ได้จนกว่าจะเชื่อมใหม่`, confirmLabel: "ยกเลิกการเชื่อม", danger: true, action: async () => { await api(`/api/profile/social/${provider.key}`, { method: "DELETE" }); await load(); notify({ kind: "success", text: `ยกเลิกการเชื่อม ${provider.name} แล้ว` }); } })}>ยกเลิก</button>
                 ) : providerOff ? (
                   me.role === "superadmin"
-                    ? <a className="hv-btn" href="/admin/settings?tab=social" title={`เปิดการเข้าสู่ระบบด้วย ${provider.name}`}>เปิดในตั้งค่า</a>
+                    ? <Link className="hv-btn" href="/admin/settings?tab=social" title={`เปิดการเข้าสู่ระบบด้วย ${provider.name}`}>เปิดในตั้งค่า</Link>
                     : <button type="button" className="hv-btn" disabled title={`ผู้ดูแลยังไม่เปิดการเชื่อมด้วย ${provider.name}`}>ยังไม่เปิดใช้</button>
                 ) : (
                   <SocialOAuthButton className="hv-btn" provider={provider.key} mode="connect" ariaLabel={`เชื่อม ${provider.name}`}>เชื่อม</SocialOAuthButton>
@@ -1424,45 +1428,6 @@ function ProfileView({ me, setMe, notify, ask }: { me: AuthUser; setMe: (user: A
   </div>;
 }
 
-function CustomSelectDropdown({ value, onChange, options, style, direction = "down" }: { value: string, onChange: (v: string) => void, options: {value: string, label: string}[], style?: React.CSSProperties, direction?: "down" | "up" }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const selected = options.find(o => o.value === value) || options[0];
-
-  return (
-    <div className="custom-role-select" ref={ref} onClick={() => setOpen(!open)} style={{ zIndex: open ? 100 : 1, ...style }}>
-      <div className="crs-trigger">
-        <span>{selected?.label}</span>
-        <ChevronDown size={14} className={`crs-icon ${open ? "open" : ""}`} />
-      </div>
-      {open && (
-        <div className="crs-dropdown" style={direction === 'up' ? { top: 'auto', bottom: 'calc(100% + 6px)' } : undefined}>
-          {options.map(opt => (
-            <div 
-              key={opt.value} 
-              className={`crs-option ${opt.value === value ? 'selected' : ''}`}
-              onClick={() => onChange(opt.value)}
-            >
-              {opt.label}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function canManageUser(actor: AuthUser, user: ManagedUser) {
   if (user.username === actor.username) return false; // /api/auth/me has no id, so match on the unique username
   if (user.role === "superadmin") return false;
@@ -1588,7 +1553,12 @@ function UsersView({ me, notify, ask }: { me: AuthUser; notify: (notice: { kind:
     const timer = window.setTimeout(() => void load(), typed ? 250 : 0);
     return () => window.clearTimeout(timer);
   }, [load, search]);
-  useEffect(() => { setSelectedIds([]); }, [search, status, role, sort, perPage, page]);
+  const selectionKey = `${search}|${status}|${role}|${sort}|${perPage}|${page}`;
+  const [selectionFor, setSelectionFor] = useState(selectionKey);
+  if (selectionFor !== selectionKey) {
+    setSelectionFor(selectionKey);
+    setSelectedIds([]);
+  }
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -2884,12 +2854,13 @@ function hasRememberedMarqueePalette() {
   return typeof window !== "undefined" && window.localStorage.getItem(MARQUEE_PALETTE_KEY) !== null;
 }
 
-function rememberMarqueePalette(meta: Record<string, any>) {
+function rememberMarqueePalette(meta: MarqueeMeta) {
   if (typeof window === "undefined") return;
   const current = loadMarqueePalette();
   const next = { ...current };
+  // Only the palette is remembered: colours (strings) and the two on/off switches.
   for (const key of Object.keys(DEFAULT_MARQUEE_PALETTE)) {
-    if (meta[key] !== undefined) next[key] = meta[key];
+    if (meta[key] !== undefined) next[key] = meta[key] as string | boolean;
   }
   window.localStorage.setItem(MARQUEE_PALETTE_KEY, JSON.stringify(next));
 }
@@ -3139,12 +3110,12 @@ function AnnouncementsView({ notify, ask }: { notify: (notice: { kind: "success"
         item.kind = "marquee";
         const parts = item.message.split("<!--MARQUEE::");
         item.message = parts[0];
-        try { legacyMeta = JSON.parse(parts[1].replace("-->", "")); } catch (e) {}
+        try { legacyMeta = JSON.parse(parts[1].replace("-->", "")); } catch {}
       } else if (item.customColor && item.customColor.startsWith("MARQUEE::")) {
         item.kind = "marquee";
-        try { legacyMeta = JSON.parse(item.customColor.replace("MARQUEE::", "")); } catch (e) {}
+        try { legacyMeta = JSON.parse(item.customColor.replace("MARQUEE::", "")); } catch {}
       }
-      item.meta = { ...legacyMeta, ...(item.meta || {}) };
+      item.meta = { ...legacyMeta, ...(item.meta || {}) } as MarqueeMeta;
       return item;
     });
     setItems(parsedItems);
@@ -3156,6 +3127,15 @@ function AnnouncementsView({ notify, ask }: { notify: (notice: { kind: "success"
     }
   }), []);
   useEffect(() => { load().catch(() => undefined); }, [load]);
+
+  const onEditorEscape = useEffectEvent(() => {
+    if (cropOpenRef.current) {
+      if (cropUploadingRef.current) return;
+      closeAnnouncementCrop();
+    }
+    else if (imagePreviewOpenRef.current) closeImagePreview();
+    else closeEditor();
+  });
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -3183,12 +3163,7 @@ function AnnouncementsView({ notify, ask }: { notify: (notice: { kind: "success"
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        if (cropOpenRef.current) {
-          if (cropUploadingRef.current) return;
-          closeAnnouncementCrop();
-        }
-        else if (imagePreviewOpenRef.current) closeImagePreview();
-        else closeEditor();
+        onEditorEscape();
         return;
       }
       const focusRoot = cropOpenRef.current ? cropDialogRef.current : imagePreviewOpenRef.current ? imagePreviewDialogRef.current : modalDialogRef.current;
@@ -4070,23 +4045,6 @@ function SettingRow({ title, description, children, column = false, fieldId }: {
     </div>
     <div className="psr-control">{children}</div>
   </div>;
-}
-
-function SettingsSection({ title, description, icon, children, wide = false }: { title: string; description?: string; icon?: React.ReactNode; children: React.ReactNode; wide?: boolean }) {
-  return (
-    <section className={`settings-section${wide ? " settings-section-wide" : ""}`}>
-      <header className="settings-section-head">
-        {icon ? <span className="settings-section-icon" aria-hidden="true">{icon}</span> : null}
-        <div>
-          <h2>{title}</h2>
-          {description ? <p>{description}</p> : null}
-        </div>
-      </header>
-      <div className="settings-section-body premium-settings-card">
-        {children}
-      </div>
-    </section>
-  );
 }
 
 function parseLockdownDuration(value:string):number {
@@ -5233,7 +5191,7 @@ function HomepageSettingsView({ notify }: { notify: (notice: { kind: "success" |
                     {blocked && (
                       <span className="hpv-note">
                         <CircleAlert size={14} aria-hidden="true" />
-                        <span>ร้านค้าปิดอยู่ ส่วนนี้จะยังไม่ขึ้นจนกว่าจะเปิดร้าน <a href="/admin/settings?tab=general#store-switch">ไปเปิดร้านค้า</a></span>
+                        <span>ร้านค้าปิดอยู่ ส่วนนี้จะยังไม่ขึ้นจนกว่าจะเปิดร้าน <Link href="/admin/settings?tab=general#store-switch">ไปเปิดร้านค้า</Link></span>
                       </span>
                     )}
                   </div>
@@ -5456,8 +5414,8 @@ function FilesView() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string; size: number; createdAt: string } | null>(null);
-  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
+  // The blob made for the file being previewed; it is only shown while that file is open.
+  const [previewBlob, setPreviewBlob] = useState<{ src: string; url: string | null } | null>(null);
 
   // Edit file details state
   const [editFile, setEditFile] = useState<{ name: string; url: string; size: number; createdAt: string } | null>(null);
@@ -5467,31 +5425,41 @@ function FilesView() {
 
   const API = API_BASE;
 
+  const previewSrc = previewFile ? (previewFile.url.startsWith("http") ? previewFile.url : `${API}${previewFile.url}`) : "";
+  const previewLoading = Boolean(previewSrc) && previewBlob?.src !== previewSrc;
+  const previewBlobUrl = previewBlob?.src === previewSrc ? previewBlob.url : null;
   useEffect(() => {
-    if (!previewFile) {
-      if (previewBlobUrl) { URL.revokeObjectURL(previewBlobUrl); setPreviewBlobUrl(null); }
-      return;
-    }
-    const src = previewFile.url.startsWith("http") ? previewFile.url : `${API}${previewFile.url}`;
-    setPreviewLoading(true);
-    fetch(src).then(r => r.blob()).then(blob => setPreviewBlobUrl(URL.createObjectURL(blob))).catch(() => setPreviewBlobUrl(null)).finally(() => setPreviewLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewFile]);
+    if (!previewSrc) return;
+    let live = true;
+    let made: string | null = null;
+    fetch(previewSrc).then(r => r.blob())
+      .then(blob => {
+        made = URL.createObjectURL(blob);
+        if (live) setPreviewBlob({ src: previewSrc, url: made });
+        else URL.revokeObjectURL(made);
+      })
+      .catch(() => { if (live) setPreviewBlob({ src: previewSrc, url: null }); });
+    return () => {
+      live = false;
+      if (made) URL.revokeObjectURL(made);
+    };
+  }, [previewSrc]);
 
-  const fetchFiles = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [filesRes, catsRes] = await Promise.all([
-        fetch(`${API}/api/admin/files`, { credentials: "include" }),
-        fetch(`${API}/api/admin/store/categories`, { credentials: "include" }),
-      ]);
-      if (filesRes.ok) { const d = await filesRes.json(); setFiles(d.items || []); }
-      if (catsRes.ok) { const d = await catsRes.json(); setCategories(d.items || d.categories || []); }
-    } catch (err) { console.error("fetch failed", err); }
-    finally { setLoading(false); }
-  }, [API]);
+  const fetchFiles = useCallback(() => Promise.all([
+    fetch(`${API}/api/admin/files`, { credentials: "include" }),
+    fetch(`${API}/api/admin/store/categories`, { credentials: "include" }),
+  ]).then(async ([filesRes, catsRes]) => {
+    if (filesRes.ok) { const d = await filesRes.json(); setFiles(d.items || []); }
+    if (catsRes.ok) { const d = await catsRes.json(); setCategories(d.items || d.categories || []); }
+  }).catch((err) => { console.error("fetch failed", err); })
+    .finally(() => setLoading(false)), [API]);
 
   useEffect(() => { fetchFiles(); }, [fetchFiles]);
+  // Reloads after a change show the spinner again; the first load starts with it on.
+  const reloadFiles = useCallback(() => {
+    setLoading(true);
+    return fetchFiles();
+  }, [fetchFiles]);
 
   const handleCopy = (url: string) => {
     const base = API_BASE || window.location.origin;
@@ -5514,7 +5482,7 @@ function FilesView() {
     setDeleteTargetFile(null);
     try {
       const res = await fetch(`${API}/api/admin/files?filename=${encodeURIComponent(filename)}`, { method: "DELETE", credentials: "include" });
-      if (res.ok) fetchFiles();
+      if (res.ok) reloadFiles();
     } catch (err) { console.error("delete failed", err); }
   };
 
@@ -5607,7 +5575,7 @@ function FilesView() {
 
           <div style={{ display: "flex", gap: "6px" }}>
             <button
-              onClick={() => fetchFiles()}
+              onClick={() => reloadFiles()}
               style={{ height: "42px", padding: "0 12px", borderRadius: "9px", border: "1px solid var(--control-line)", background: "transparent", color: "var(--theme-text-strong)", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px", fontSize: "13px" }}
               title="รีเฟรช"
             >
@@ -5916,7 +5884,7 @@ function FilesView() {
               maxSizeMB={50}
               category={uploadCategory}
               onUploadSuccess={() => {
-                fetchFiles();
+                reloadFiles();
               }}
             />
           </div>
@@ -6005,7 +5973,7 @@ function FilesView() {
             </div>
             <h3 style={{ fontSize: "17px", fontWeight: 700, color: "var(--theme-text-strong)", margin: "0 0 8px" }}>ยืนยันการลบไฟล์</h3>
             <p style={{ fontSize: "13px", color: "var(--control-muted)", margin: "0 0 24px", lineHeight: "1.5" }}>
-              คุณต้องการลบไฟล์ <strong style={{ color: "var(--theme-text-strong)" }}>"{deleteTargetFile}"</strong> ออกจากระบบใช่หรือไม่? <br />
+              คุณต้องการลบไฟล์ <strong style={{ color: "var(--theme-text-strong)" }}>&quot;{deleteTargetFile}&quot;</strong> ออกจากระบบใช่หรือไม่? <br />
               <span style={{ fontSize: "12px", color: "#ff555b" }}>การดำเนินการนี้จะไม่สามารถกู้คืนได้</span>
             </p>
 

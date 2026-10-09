@@ -126,9 +126,9 @@ function WorkspaceContainerContent() {
           document.title = `${site.name || subdomain} — VS Code | NEXORA`;
           window.location.replace(finalUrl);
         }
-      } catch (err: any) {
+      } catch (err) {
         if (isMounted) {
-          setError(err.message || "เกิดข้อผิดพลาดในการเชื่อมต่อพื้นที่เขียนโค้ด");
+          setError((err instanceof Error && err.message) || "เกิดข้อผิดพลาดในการเชื่อมต่อพื้นที่เขียนโค้ด");
         }
       }
     }

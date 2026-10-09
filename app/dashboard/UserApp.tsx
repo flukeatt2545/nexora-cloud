@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Cloud, Eye, EyeOff, FolderOpen, Info, LayoutDashboard, LogOut, Menu, ShieldCheck, User, X, Globe, Smartphone, Monitor, KeyRound, Check, Clock3, Zap, ChevronDown, Coins, Lock, Store, ReceiptText, RefreshCw, ChevronLeft, ChevronRight, Plus, ArrowRight, ArrowUpRight, HardDrive, Server, Activity, ExternalLink, Database, Mail, ShoppingCart, Undo2,
+  Cloud, Eye, EyeOff, FolderOpen, Info, LayoutDashboard, LogOut, Menu, ShieldCheck, User, X, Globe, Smartphone, Monitor, KeyRound, Check, Clock3, Zap, ChevronDown, Coins, Lock, Store, ReceiptText, RefreshCw, ChevronLeft, ChevronRight, Plus, ArrowUpRight, ExternalLink, Database, Mail, ShoppingCart, Undo2,
   FileImage, FileVideo, FileAudio, FileText, FileArchive, File as FileIcon, CircleCheck, Circle, Upload,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -19,6 +19,7 @@ import MailView from "./MailView";
 import "./user-overview.css";
 import SmartImage from "../components/SmartImage";
 import { POINTS_EVENT, broadcastPoints } from "../components/StorePurchase";
+import Link from "next/link";
 
 // Keep types same for now
 type Role = "user" | "admin" | "superadmin";
@@ -77,7 +78,23 @@ function formatRemaining(value?: string | null, now = Date.now()) {
 }
 
 const socialNames: Record<string, string> = { discord: "Discord", google: "Google", github: "GitHub" };
-const socialIcons: Record<string, string> = { discord: "/brands/discord-symbol.svg", google: "/brands/google-g.png", github: "/brands/github-mark.png" };
+
+/** What the Social sign-in page reported in the query string, as a notice (or null when it reported nothing). */
+function socialNotice(search: string): { kind: "success" | "error"; text: string } | null {
+  const params = new URLSearchParams(search);
+  const socialResult = params.get("social");
+  const socialError = params.get("social_error");
+  const provider = socialNames[params.get("provider") || ""] || "บัญชี Social";
+  if (socialResult === "connected") return { kind: "success", text: `เชื่อมต่อ ${provider} เรียบร้อยแล้ว` };
+  if (!socialError) return null;
+  const retryAt = params.get("retry_at");
+  const messages: Record<string, string> = {
+    social_cooldown: `เพื่อความปลอดภัย กรุณารอ ${formatRemaining(retryAt)} ก่อนเปลี่ยนหรือเชื่อมบัญชีอื่น`,
+    social_daily_limit: `วันนี้คุณเปลี่ยนหรือเชื่อมบัญชีครบ 3 ครั้งแล้ว กรุณารอ ${formatRemaining(retryAt)}`,
+    social_already_connected: `${provider} บัญชีนี้เชื่อมกับบัญชี NEXORA อื่นอยู่แล้ว`,
+  };
+  return { kind: "error", text: messages[socialError] || "ยังเชื่อมต่อบัญชีไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" };
+}
 
 function parseUserAgent(ua: string) {
   if (!ua) return { browser: "Unknown Browser", os: "Unknown OS", icon: Globe };
@@ -185,7 +202,7 @@ export default function UserApp({ view }: { view: UserView }) {
     return () => window.removeEventListener(POINTS_EVENT, onPoints);
   }, []);
   const [loading, setLoading] = useState(true);
-  const [notice, setNotice] = useState<FeedbackNotice | null>(null);
+  const [notice, setNotice] = useState<FeedbackNotice | null>(() => (typeof window === "undefined" ? null : socialNotice(window.location.search)));
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -405,7 +422,7 @@ export default function UserApp({ view }: { view: UserView }) {
       })
       .catch(() => window.location.href = "/")
       .finally(() => setLoading(false));
-  }, []);
+  }, [view]);
 
   useEffect(() => {
     if (!notice || notice.persistent) return;
@@ -413,25 +430,11 @@ export default function UserApp({ view }: { view: UserView }) {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  // The notice was read from the URL already (socialNotice); clear it from the address bar.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const socialResult = params.get("social");
-    const socialError = params.get("social_error");
-    if (!socialResult && !socialError && params.get("password_setup") !== "required") return;
+    if (!params.get("social") && !params.get("social_error") && params.get("password_setup") !== "required") return;
     window.history.replaceState({}, "", window.location.pathname);
-    const provider = socialNames[params.get("provider") || ""] || "บัญชี Social";
-    if (socialResult === "connected") {
-      setNotice({ kind: "success", text: `เชื่อมต่อ ${provider} เรียบร้อยแล้ว` });
-      return;
-    }
-    if (!socialError) return;
-    const retryAt = params.get("retry_at");
-    const messages: Record<string, string> = {
-      social_cooldown: `เพื่อความปลอดภัย กรุณารอ ${formatRemaining(retryAt)} ก่อนเปลี่ยนหรือเชื่อมบัญชีอื่น`,
-      social_daily_limit: `วันนี้คุณเปลี่ยนหรือเชื่อมบัญชีครบ 3 ครั้งแล้ว กรุณารอ ${formatRemaining(retryAt)}`,
-      social_already_connected: `${provider} บัญชีนี้เชื่อมกับบัญชี NEXORA อื่นอยู่แล้ว`,
-    };
-    setNotice({ kind: "error", text: messages[socialError] || "ยังเชื่อมต่อบัญชีไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" });
   }, []);
 
   async function logout() {
@@ -447,26 +450,26 @@ export default function UserApp({ view }: { view: UserView }) {
 
       <aside className="user-sidebar" aria-label="เมนูผู้ใช้">
         <div className="usb-head">
-          <a href="/dashboard" className="usb-brand">
+          <Link href="/dashboard" className="usb-brand">
             <img src="/logo-v2.png" alt="" />
             <span>NEXORA <b>CLOUD</b></span>
-          </a>
+          </Link>
           <button type="button" className="usb-close" onClick={() => setMobileNavOpen(false)} aria-label="ปิดเมนู"><X size={20} /></button>
         </div>
 
         <div className="usb-scroll">
           <nav className="usb-nav">
             <p className="usb-nav-label">เมนูหลัก</p>
-            <a href="/dashboard" className={view === "overview" ? "active" : ""} aria-current={view === "overview" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><LayoutDashboard size={18} /><span>ภาพรวม</span></a>
-            {(store.open || view === "store") && <a href="/store" className={view === "store" ? "active" : ""} aria-current={view === "store" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><Store size={18} /><span>ร้านค้า</span></a>}
-            <a href="/hosting" className={view === "hosting" ? "active" : ""} aria-current={view === "hosting" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><Cloud size={18} /><span>เว็บไซต์ของฉัน</span></a>
-            <a href="/files" className={view === "files" ? "active" : ""} aria-current={view === "files" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><FolderOpen size={18} /><span>ไฟล์ของฉัน</span></a>
-            <a href="/mail" className={view === "mail" ? "active" : ""} aria-current={view === "mail" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><Mail size={18} /><span>อีเมล</span>{mailUnread > 0 && <b className="usb-mail-badge">{mailUnread > 99 ? "99+" : mailUnread}</b>}</a>
+            <Link href="/dashboard" className={view === "overview" ? "active" : ""} aria-current={view === "overview" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><LayoutDashboard size={18} /><span>ภาพรวม</span></Link>
+            {(store.open || view === "store") && <Link href="/store" className={view === "store" ? "active" : ""} aria-current={view === "store" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><Store size={18} /><span>ร้านค้า</span></Link>}
+            <Link href="/hosting" className={view === "hosting" ? "active" : ""} aria-current={view === "hosting" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><Cloud size={18} /><span>เว็บไซต์ของฉัน</span></Link>
+            <Link href="/files" className={view === "files" ? "active" : ""} aria-current={view === "files" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><FolderOpen size={18} /><span>ไฟล์ของฉัน</span></Link>
+            <Link href="/mail" className={view === "mail" ? "active" : ""} aria-current={view === "mail" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><Mail size={18} /><span>อีเมล</span>{mailUnread > 0 && <b className="usb-mail-badge">{mailUnread > 99 ? "99+" : mailUnread}</b>}</Link>
 
             <p className="usb-nav-label">บัญชีและการเงิน</p>
-            <a href="/topups" className={view === "topups" ? "active" : ""} aria-current={view === "topups" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><ReceiptText size={18} /><span>ประวัติเติมเงิน</span></a>
-            <a href="/profile" className={view === "profile" ? "active" : ""} aria-current={view === "profile" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><User size={18} /><span>บัญชีของฉัน</span></a>
-            {me.role !== "user" && <a href="/admin" className="usb-admin" onClick={() => setMobileNavOpen(false)}><ShieldCheck size={18} /><span>ระบบแอดมิน</span></a>}
+            <Link href="/topups" className={view === "topups" ? "active" : ""} aria-current={view === "topups" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><ReceiptText size={18} /><span>ประวัติเติมเงิน</span></Link>
+            <Link href="/profile" className={view === "profile" ? "active" : ""} aria-current={view === "profile" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><User size={18} /><span>บัญชีของฉัน</span></Link>
+            {me.role !== "user" && <Link href="/admin" className="usb-admin" onClick={() => setMobileNavOpen(false)}><ShieldCheck size={18} /><span>ระบบแอดมิน</span></Link>}
           </nav>
         </div>
 
@@ -584,7 +587,7 @@ export default function UserApp({ view }: { view: UserView }) {
                   </div>
                 </div>
                 <div className="ud-head-actions">
-                  <a href="/hosting" className="ud-btn"><Cloud size={16} aria-hidden="true" /> จัดการเว็บไซต์</a>
+                  <Link href="/hosting" className="ud-btn"><Cloud size={16} aria-hidden="true" /> จัดการเว็บไซต์</Link>
                   {store.open && (
                     <button type="button" className="ud-btn ud-btn-primary" onClick={() => setShowTopupModal(true)}>
                       <Plus size={16} aria-hidden="true" /> เติมพอยท์
@@ -594,27 +597,27 @@ export default function UserApp({ view }: { view: UserView }) {
               </div>
               <div className="ud-stats">
                 {store.open && (
-                  <a href="/topups" className="ud-stat">
+                  <Link href="/topups" className="ud-stat">
                     <span className="ud-stat-label">พอยท์คงเหลือ</span>
                     <strong className="ud-stat-value">{(me.points ?? 0).toLocaleString("th-TH")}</strong>
-                  </a>
+                  </Link>
                 )}
-                <a href="/hosting" className="ud-stat">
+                <Link href="/hosting" className="ud-stat">
                   <span className="ud-stat-label">เว็บไซต์ออนไลน์</span>
                   <strong className="ud-stat-value">{dashStats.loaded ? <>{dashStats.runningSitesCount.toLocaleString("th-TH")}<small> / {dashStats.sitesCount.toLocaleString("th-TH")}</small></> : <i className="ud-skel" />}</strong>
-                </a>
-                <a href="/files" className="ud-stat">
+                </Link>
+                <Link href="/files" className="ud-stat">
                   <span className="ud-stat-label">พื้นที่ที่ใช้</span>
                   <strong className="ud-stat-value">{dashStats.loaded ? formatBytesCompact(dashStats.usedBytes) : <i className="ud-skel" />}</strong>
-                </a>
-                <a href="/files" className="ud-stat">
+                </Link>
+                <Link href="/files" className="ud-stat">
                   <span className="ud-stat-label">ไฟล์</span>
                   <strong className="ud-stat-value">{dashStats.loaded ? dashStats.filesCount.toLocaleString("th-TH") : <i className="ud-skel" />}</strong>
-                </a>
-                <a href="/mail" className="ud-stat">
+                </Link>
+                <Link href="/mail" className="ud-stat">
                   <span className="ud-stat-label">อีเมลยังไม่อ่าน</span>
                   <strong className={`ud-stat-value${mailUnread > 0 ? " is-accent" : ""}`}>{mailUnread.toLocaleString("th-TH")}</strong>
-                </a>
+                </Link>
               </div>
             </header>
 
@@ -624,38 +627,38 @@ export default function UserApp({ view }: { view: UserView }) {
               <div className="ud-alert" role="alert">
                 <Lock size={17} aria-hidden="true" />
                 <p><strong>ยังไม่ได้ตั้งรหัสผ่าน</strong> <span>ตั้งไว้สำรอง เผื่อเข้าสู่ระบบด้วย Social Login ไม่ได้</span></p>
-                <a href="/profile?password_setup=required">ตั้งรหัสผ่าน <ChevronRight size={15} aria-hidden="true" /></a>
+                <Link href="/profile?password_setup=required">ตั้งรหัสผ่าน <ChevronRight size={15} aria-hidden="true" /></Link>
               </div>
             )}
 
             <nav className="ud-launch" aria-label="ทางลัด">
-              <a href="/hosting" className="ud-tile">
+              <Link href="/hosting" className="ud-tile">
                 <span className="ud-tile-icon" aria-hidden="true"><Cloud size={19} /></span>
                 <span className="ud-tile-text"><strong>เว็บไซต์</strong><small>โดเมนและ SSL</small></span>
-              </a>
+              </Link>
               <a href="https://nove666.pro" target="_blank" rel="noopener noreferrer" className="ud-tile">
                 <span className="ud-tile-icon" aria-hidden="true"><Database size={19} /></span>
                 <span className="ud-tile-text"><strong>ฐานข้อมูล <ArrowUpRight size={13} aria-hidden="true" /></strong><small>phpMyAdmin</small></span>
               </a>
-              <a href="/files" className="ud-tile">
+              <Link href="/files" className="ud-tile">
                 <span className="ud-tile-icon" aria-hidden="true"><FolderOpen size={19} /></span>
                 <span className="ud-tile-text"><strong>คลังไฟล์</strong><small>อัปโหลดและแชร์</small></span>
-              </a>
-              <a href="/mail" className="ud-tile">
+              </Link>
+              <Link href="/mail" className="ud-tile">
                 <span className="ud-tile-icon" aria-hidden="true"><Mail size={19} /></span>
                 <span className="ud-tile-text"><strong>อีเมล</strong><small>{mailUnread > 0 ? `ยังไม่อ่าน ${mailUnread.toLocaleString("th-TH")} ฉบับ` : "กล่องจดหมาย"}</small></span>
                 {mailUnread > 0 && <b className="ud-tile-badge">{mailUnread > 99 ? "99+" : mailUnread}</b>}
-              </a>
+              </Link>
               {store.open && (
-                <a href="/store" className="ud-tile">
+                <Link href="/store" className="ud-tile">
                   <span className="ud-tile-icon" aria-hidden="true"><Store size={19} /></span>
                   <span className="ud-tile-text"><strong>ร้านค้า</strong><small>แพ็กเกจและสินค้า</small></span>
-                </a>
+                </Link>
               )}
-              <a href="/profile" className="ud-tile">
+              <Link href="/profile" className="ud-tile">
                 <span className="ud-tile-icon" aria-hidden="true"><User size={19} /></span>
                 <span className="ud-tile-text"><strong>บัญชีของฉัน</strong><small>รหัสผ่าน อุปกรณ์</small></span>
-              </a>
+              </Link>
             </nav>
 
             <div className="ud-main">
@@ -663,7 +666,7 @@ export default function UserApp({ view }: { view: UserView }) {
                 <section className="ud-panel" aria-labelledby="ud-sites-title">
                   <header className="ud-panel-head">
                     <h2 id="ud-sites-title"><Cloud size={17} aria-hidden="true" /> เว็บไซต์ของฉัน {dashStats.loaded && dashStats.sitesCount > 0 && <span className="ud-count">{dashStats.sitesCount.toLocaleString("th-TH")}</span>}</h2>
-                    {dashStats.sitesCount > 0 && <a href="/hosting" className="ud-more">ดูทั้งหมด <ChevronRight size={15} aria-hidden="true" /></a>}
+                    {dashStats.sitesCount > 0 && <Link href="/hosting" className="ud-more">ดูทั้งหมด <ChevronRight size={15} aria-hidden="true" /></Link>}
                   </header>
                   {!dashStats.loaded ? (
                     <ul className="ud-rows" aria-busy="true" aria-label="กำลังโหลด">
@@ -676,10 +679,10 @@ export default function UserApp({ view }: { view: UserView }) {
                         return (
                           <li key={site.id} className="ud-row">
                             <i className={`ud-dot is-${site.status}`} aria-hidden="true" />
-                            <a href="/hosting" className="ud-row-main">
+                            <Link href="/hosting" className="ud-row-main">
                               <strong>{site.name || site.subdomain}</strong>
                               <small>{domain}</small>
-                            </a>
+                            </Link>
                             <span className={`ud-status is-${site.status}`}>{siteStatusLabel[site.status] || site.status}</span>
                             {site.status === "running" && (
                               <a href={`https://${domain}`} target="_blank" rel="noopener noreferrer" className="ud-row-open" aria-label={`เปิด ${domain} ในแท็บใหม่`}>
@@ -697,7 +700,7 @@ export default function UserApp({ view }: { view: UserView }) {
                         <strong>ยังไม่มีเว็บไซต์</strong>
                         <p>สร้างเว็บไซต์แรกได้ในไม่กี่นาที ได้ที่อยู่ .nkn02.com พร้อม SSL</p>
                       </div>
-                      <a href="/hosting" className="ud-btn ud-btn-primary"><Plus size={16} aria-hidden="true" /> สร้างเว็บไซต์</a>
+                      <Link href="/hosting" className="ud-btn ud-btn-primary"><Plus size={16} aria-hidden="true" /> สร้างเว็บไซต์</Link>
                     </div>
                   )}
                 </section>
@@ -705,7 +708,7 @@ export default function UserApp({ view }: { view: UserView }) {
                 <section className="ud-panel" aria-labelledby="ud-files-title">
                   <header className="ud-panel-head">
                     <h2 id="ud-files-title"><FolderOpen size={17} aria-hidden="true" /> ไฟล์ล่าสุด</h2>
-                    {dashStats.filesCount > 0 && <a href="/files" className="ud-more">คลังไฟล์ <ChevronRight size={15} aria-hidden="true" /></a>}
+                    {dashStats.filesCount > 0 && <Link href="/files" className="ud-more">คลังไฟล์ <ChevronRight size={15} aria-hidden="true" /></Link>}
                   </header>
                   {!dashStats.loaded ? (
                     <ul className="ud-rows" aria-busy="true" aria-label="กำลังโหลด">
@@ -718,10 +721,10 @@ export default function UserApp({ view }: { view: UserView }) {
                         return (
                           <li key={file.id} className="ud-row">
                             <span className="ud-file-icon" aria-hidden="true"><FileTypeIcon size={17} /></span>
-                            <a href="/files" className="ud-row-main">
+                            <Link href="/files" className="ud-row-main">
                               <strong>{file.name}</strong>
                               <small>{formatBytesCompact(file.size)}</small>
-                            </a>
+                            </Link>
                             <time className="ud-row-time" dateTime={file.createdAt}>{formatShortDate(file.createdAt)}</time>
                           </li>
                         );
@@ -734,14 +737,14 @@ export default function UserApp({ view }: { view: UserView }) {
                         <strong>ยังไม่มีไฟล์</strong>
                         <p>อัปโหลดไฟล์เก็บไว้ แล้วแชร์เป็นลิงก์ให้คนอื่นได้</p>
                       </div>
-                      <a href="/files" className="ud-btn"><Upload size={16} aria-hidden="true" /> อัปโหลดไฟล์</a>
+                      <Link href="/files" className="ud-btn"><Upload size={16} aria-hidden="true" /> อัปโหลดไฟล์</Link>
                     </div>
                   )}
                 </section>
                 <section className="ud-panel" aria-labelledby="ud-mail-title">
                   <header className="ud-panel-head">
                     <h2 id="ud-mail-title"><Mail size={17} aria-hidden="true" /> อีเมลของฉัน</h2>
-                    <a href="/mail" className="ud-more">เปิดกล่องจดหมาย <ChevronRight size={15} aria-hidden="true" /></a>
+                    <Link href="/mail" className="ud-more">เปิดกล่องจดหมาย <ChevronRight size={15} aria-hidden="true" /></Link>
                   </header>
                   {mailboxes.length > 0 ? (
                     <ul className="ud-boxes">
@@ -749,7 +752,7 @@ export default function UserApp({ view }: { view: UserView }) {
                         const percent = box.quotaBytes > 0 ? Math.min(100, (box.usedBytes / box.quotaBytes) * 100) : 0;
                         return (
                           <li key={box.id}>
-                            <a href="/mail">
+                            <Link href="/mail">
                               <span className="ud-box-line">
                                 <strong>{box.address}</strong>
                                 {box.unread > 0 && <b className="ud-box-unread">{box.unread > 99 ? "99+" : box.unread}</b>}
@@ -760,13 +763,13 @@ export default function UserApp({ view }: { view: UserView }) {
                                   <small>{formatBytesCompact(box.usedBytes)} / {formatBytesCompact(box.quotaBytes)}</small>
                                 </span>
                               )}
-                            </a>
+                            </Link>
                           </li>
                         );
                       })}
                     </ul>
                   ) : (
-                    <p className="ud-panel-note">ยังไม่มีกล่องอีเมล · <a href="/mail">สร้างกล่องแรก</a></p>
+                    <p className="ud-panel-note">ยังไม่มีกล่องอีเมล · <Link href="/mail">สร้างกล่องแรก</Link></p>
                   )}
                 </section>
 
@@ -807,7 +810,7 @@ export default function UserApp({ view }: { view: UserView }) {
                   <section className="ud-panel ud-wallet" aria-labelledby="ud-wallet-title">
                     <header className="ud-panel-head">
                       <h2 id="ud-wallet-title"><Coins size={17} aria-hidden="true" /> เติมเงินล่าสุด</h2>
-                      <a href="/topups" className="ud-more">ประวัติ <ChevronRight size={15} aria-hidden="true" /></a>
+                      <Link href="/topups" className="ud-more">ประวัติ <ChevronRight size={15} aria-hidden="true" /></Link>
                     </header>
                     {dashStats.recentTopups.length > 0 ? (
                       <ul className="ud-tx">
@@ -834,7 +837,7 @@ export default function UserApp({ view }: { view: UserView }) {
                 {dashStats.loaded && !showSetup && <section className="ud-panel" aria-labelledby="ud-account-title">
                   <header className="ud-panel-head">
                     <h2 id="ud-account-title"><ShieldCheck size={17} aria-hidden="true" /> ความปลอดภัย</h2>
-                    <a href="/profile" className="ud-more">จัดการ <ChevronRight size={15} aria-hidden="true" /></a>
+                    <Link href="/profile" className="ud-more">จัดการ <ChevronRight size={15} aria-hidden="true" /></Link>
                   </header>
                   <dl className="ud-facts">
                     <div>
@@ -914,24 +917,36 @@ function UserTopupHistoryView({ onTopup, refreshKey }: { onTopup?: () => void; r
   const [result, setResult] = useState<PointsHistoryResponse | null>(null);
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<PointsFilter>("all");
-  const [loadingHistory, setLoadingHistory] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [historyError, setHistoryError] = useState("");
+  // "ลองอีกครั้ง" bumps this to load the same page again.
+  const [attempt, setAttempt] = useState(0);
+  const [loadedKey, setLoadedKey] = useState("");
+  const historyKey = `${filter}:${page}:${refreshKey}:${attempt}`;
+  const loadingHistory = loadedKey !== historyKey;
+  const historyUrl = `/api/store/points-history?type=${filter}&page=${page}&perPage=10`;
 
-  const loadHistory = useCallback(async (quiet = false) => {
-    if (quiet) setRefreshing(true); else setLoadingHistory(true);
-    setHistoryError("");
+  useEffect(() => {
+    let current = true;
+    api<PointsHistoryResponse>(historyUrl)
+      .then((next) => { if (current) { setResult(next); setHistoryError(""); } })
+      .catch((error) => { if (current) setHistoryError((error as Error).message || "โหลดประวัติพอยท์ไม่สำเร็จ"); })
+      .finally(() => { if (current) setLoadedKey(historyKey); });
+    return () => { current = false; };
+  }, [historyUrl, historyKey]);
+
+  // The refresh button keeps the list on screen while it reloads.
+  async function refreshHistory() {
+    setRefreshing(true);
     try {
-      setResult(await api<PointsHistoryResponse>(`/api/store/points-history?type=${filter}&page=${page}&perPage=10`));
+      setResult(await api<PointsHistoryResponse>(historyUrl));
+      setHistoryError("");
     } catch (error) {
       setHistoryError((error as Error).message || "โหลดประวัติพอยท์ไม่สำเร็จ");
     } finally {
-      setLoadingHistory(false);
       setRefreshing(false);
     }
-  }, [filter, page]);
-
-  useEffect(() => { loadHistory(); }, [loadHistory, refreshKey]);
+  }
 
   const totalPages = Math.max(1, Math.ceil((result?.total || 0) / (result?.perPage || 10)));
   const money = (value: number) => Number(value || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -948,7 +963,7 @@ function UserTopupHistoryView({ onTopup, refreshKey }: { onTopup?: () => void; r
         <h1>ประวัติพอยท์</h1>
       </div>
       <div className="uth-heading-actions">
-        <button type="button" className="uth-icon-btn" onClick={() => loadHistory(true)} disabled={refreshing} aria-label="รีเฟรชประวัติ" title="รีเฟรช"><RefreshCw size={19} className={refreshing ? "topup-spinner" : ""} /></button>
+        <button type="button" className="uth-icon-btn" onClick={() => void refreshHistory()} disabled={refreshing} aria-label="รีเฟรชประวัติ" title="รีเฟรช"><RefreshCw size={19} className={refreshing ? "topup-spinner" : ""} /></button>
         {onTopup && <button type="button" className="uth-cta" onClick={onTopup}><Zap size={18} /> เติมเงิน</button>}
       </div>
     </header>
@@ -980,9 +995,9 @@ function UserTopupHistoryView({ onTopup, refreshKey }: { onTopup?: () => void; r
         </div>
       </div>
 
-      {historyError ? <div className="uth-message error"><Info size={26} /><strong>โหลดข้อมูลไม่สำเร็จ</strong><span>{historyError}</span><button type="button" className="uth-ghost-btn" onClick={() => loadHistory()}>ลองอีกครั้ง</button></div>
+      {historyError && !loadingHistory ? <div className="uth-message error"><Info size={26} /><strong>โหลดข้อมูลไม่สำเร็จ</strong><span>{historyError}</span><button type="button" className="uth-ghost-btn" onClick={() => setAttempt((value) => value + 1)}>ลองอีกครั้ง</button></div>
         : loadingHistory ? <div className="uth-message"><RefreshCw className="topup-spinner" size={26} /><span>กำลังโหลดรายการ</span></div>
-        : !result?.items.length ? <div className="uth-message empty"><ReceiptText size={34} /><strong>{emptyText.title}</strong><span>{emptyText.body}</span>{!onTopup ? null : filter === "spend" ? <a className="uth-cta" href="/store"><Store size={18} /> ไปที่ร้านค้า</a> : <button type="button" className="uth-cta" onClick={onTopup}><Zap size={18} /> เติมเงินครั้งแรก</button>}</div>
+        : !result?.items.length ? <div className="uth-message empty"><ReceiptText size={34} /><strong>{emptyText.title}</strong><span>{emptyText.body}</span>{!onTopup ? null : filter === "spend" ? <Link className="uth-cta" href="/store"><Store size={18} /> ไปที่ร้านค้า</Link> : <button type="button" className="uth-cta" onClick={onTopup}><Zap size={18} /> เติมเงินครั้งแรก</button>}</div>
         : <ul className="uth-items">{result.items.map((item) => <li className="uth-item" key={`${item.kind}-${item.id}`}>
           <span className={`uth-item-mark ${tone(item)}`} aria-hidden="true">
             {item.kind === "purchase" ? <ShoppingCart size={17} /> : item.kind === "refund" ? <Undo2 size={17} /> : item.status === "completed" ? <Check size={17} /> : item.status === "pending" ? <Clock3 size={17} /> : <X size={17} />}
@@ -1017,11 +1032,16 @@ function UserProfileView({ me, setMe, notify, ask }: { me: AuthUser; setMe: (use
   const [social, setSocial] = useState<SocialAccount[]>([]);
   const [socialPolicy, setSocialPolicy] = useState<SocialPolicy>({ canConnect: false, remainingToday: 0 });
   const socialAvailable = useSocialAvailability();
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [form, setForm] = useState({ displayName: me.displayName || "", email: me.email || "" });
   
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(!me.passwordEnabled);
+  const [passwordWasEnabled, setPasswordWasEnabled] = useState(me.passwordEnabled);
+  if (passwordWasEnabled !== me.passwordEnabled) {
+    setPasswordWasEnabled(me.passwordEnabled);
+    if (!me.passwordEnabled) setShowPasswordModal(true);
+  }
   const [showCurrentPass, setShowCurrentPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
@@ -1031,9 +1051,6 @@ function UserProfileView({ me, setMe, notify, ask }: { me: AuthUser; setMe: (use
     api<{ items: SocialAccount[]; policy: SocialPolicy }>("/api/profile/social").then((x) => { setSocial(x?.items || []); setSocialPolicy(x?.policy || { canConnect: false, remainingToday: 0 }); }),
   ]), []);
   useEffect(() => { load().catch(() => undefined); }, [load]);
-  useEffect(() => {
-    if (!me.passwordEnabled) setShowPasswordModal(true);
-  }, [me.passwordEnabled]);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);

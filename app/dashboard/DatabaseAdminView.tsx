@@ -1,21 +1,61 @@
 import {
   ArrowRightLeft, Check, ChevronDown, Copy, Database, ExternalLink, KeyRound, Lock,
-  PauseCircle, PlayCircle, Plus, RefreshCw, Search, ShieldAlert, Trash2, X,
-  Bot, Sparkles, Link2, UserCheck, Edit3, Users, CheckCircle2, Clock, FileCode, Unlink,
+  PauseCircle, PlayCircle, Plus, RefreshCw, Search, Trash2, X,
+  Bot, Sparkles, Edit3, Users, CheckCircle2, Clock, FileCode, Unlink,
   Globe, Code2, HardDrive,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { API_BASE } from "../runtime";
 import { useEscape, useScrollLock } from "./useScrollLock";
+import { errorText, type Ask, type Notify, type Viewer } from "./types";
 import "./hosting-view.css";
 import "./db-admin-view.css";
 
 type DatabaseAdminViewProps = {
-  me: any;
-  notify: (n: any) => void;
-  ask: (r: any) => void;
+  me: Viewer;
+  notify: Notify;
+  ask: Ask;
 };
+
+/** A MySQL database as /api/admin/hosting/databases lists it; newPass is only known right after it was set. */
+type Db = {
+  id: string;
+  dbName: string;
+  dbUser: string;
+  host: string;
+  port: number;
+  engine?: string;
+  siteName?: string;
+  siteSubdomain?: string;
+  ownerUsername?: string;
+  ownerName?: string;
+  ownerDisplayName?: string;
+  status: string;
+  sizeBytes?: number;
+  newPass?: string;
+};
+
+/** A student code and what it opens: a database, a site, and the Discord account that claimed it. */
+type Mapping = {
+  id: number;
+  studentCode: string;
+  studentName?: string;
+  ownerName?: string;
+  notes?: string;
+  dbName?: string;
+  dbUser?: string;
+  dbPublicId?: string;
+  siteId?: number;
+  siteName?: string;
+  siteSubdomain?: string;
+  sitePublicId?: string;
+  discordUserId?: string;
+  discordUsername?: string;
+};
+
+type SiteOption = { id: string; name: string; subdomain: string };
+type UserOption = { id: number; username: string; displayName?: string };
 
 function formatBytes(bytes: number = 0): string {
   if (!bytes || bytes <= 0) return "0 B";
@@ -25,13 +65,13 @@ function formatBytes(bytes: number = 0): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-function siteLabel(db: any): string {
+function siteLabel(db: Pick<Db, "siteName" | "siteSubdomain">): string {
   if (db?.siteName && String(db.siteName).trim()) return db.siteName;
   if (db?.siteSubdomain) return `${db.siteSubdomain}.nkn02.com`;
   return "ไม่ได้ผูกกับเว็บไซต์";
 }
 
-function CustomUserSelect({ users, me, value, onChange }: { users: any[]; me: any; value: string; onChange: (val: string) => void }) {
+function CustomUserSelect({ users, me, value, onChange }: { users: UserOption[]; me: Viewer; value: string; onChange: (val: string) => void }) {
   const [open, setOpen] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
@@ -121,12 +161,12 @@ function CustomUserSelect({ users, me, value, onChange }: { users: any[]; me: an
 }
 
 export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminViewProps) {
-  const [dbs, setDbs] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const [dbs, setDbs] = useState<Db[]>([]);
+  const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
-  const [selectedDb, setSelectedDb] = useState<any | null>(null);
+  const [selectedDb, setSelectedDb] = useState<Db | null>(null);
   // Rows ticked for a bulk suspend/restore, and rows whose status change is in flight.
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set());
@@ -136,15 +176,15 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
   const [createUsername, setCreateUsername] = useState("");
   const [createSubmitting, setCreateSubmitting] = useState(false);
 
-  const [transferTargetDb, setTransferTargetDb] = useState<any | null>(null);
+  const [transferTargetDb, setTransferTargetDb] = useState<Db | null>(null);
   const [transferUsername, setTransferUsername] = useState("");
   const [transferSubmitting, setTransferSubmitting] = useState(false);
 
   // Student DB Mappings state (for Discord Bot & Fast Student Access)
   const [adminTab, setAdminTab] = useState<"databases" | "mappings">("databases");
-  const [mappings, setMappings] = useState<any[]>([]);
+  const [mappings, setMappings] = useState<Mapping[]>([]);
   const [mappingsLoading, setMappingsLoading] = useState(false);
-  const [sites, setSites] = useState<any[]>([]);
+  const [sites, setSites] = useState<SiteOption[]>([]);
   const [sitesLoading, setSitesLoading] = useState(false);
   const [mappingSearch, setMappingSearch] = useState("");
   const [mappingFilter, setMappingFilter] = useState<"all" | "bound" | "unbound">("all");
@@ -168,20 +208,75 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
     notes: "",
   });
 
-  // Search refetches after typing pauses; the first load (empty search) goes straight away.
   const dbRequestRef = useRef(0);
+  const loadDbs = useCallback(async () => {
+    const request = ++dbRequestRef.current;
+    setLoading(true);
+    try {
+      const q = new URLSearchParams();
+      if (search.trim()) q.set("q", search.trim());
+      const res = await fetch(API_BASE + "/api/admin/hosting/databases?" + q.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error("ไม่สามารถโหลดฐานข้อมูลได้");
+      const data = await res.json();
+      // A slower reply to an older search must not replace the newer list.
+      if (request === dbRequestRef.current) setDbs(data.items || []);
+    } catch (err) {
+      if (request === dbRequestRef.current) notify({ kind: "error", text: errorText(err) });
+    } finally {
+      if (request === dbRequestRef.current) setLoading(false);
+    }
+  }, [search, notify]);
+
+  const loadMappings = useCallback(async () => {
+    setMappingsLoading(true);
+    try {
+      const res = await fetch(API_BASE + "/api/admin/student-mappings", { credentials: "include" });
+      if (!res.ok) throw new Error("ไม่สามารถโหลดรายการจับคู่ได้");
+      const data = await res.json();
+      setMappings(data.items || []);
+    } catch (err) {
+      notify({ kind: "error", text: errorText(err) });
+    } finally {
+      setMappingsLoading(false);
+    }
+  }, [notify]);
+
+  const loadSites = useCallback(async () => {
+    setSitesLoading(true);
+    try {
+      const res = await fetch(API_BASE + "/api/hosting/sites?limit=500", { credentials: "include" });
+      if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลเว็บไซต์ได้");
+      const data = await res.json();
+      setSites(data.items || []);
+    } catch (err) {
+      console.warn("loadSites error:", errorText(err));
+    } finally {
+      setSitesLoading(false);
+    }
+  }, []);
+
+  // Search refetches after typing pauses; the first load (empty search) goes straight away.
   useEffect(() => {
-    if (!search.trim()) { loadDbs(); return; }
-    const timer = window.setTimeout(loadDbs, 300);
+    const timer = window.setTimeout(loadDbs, search.trim() ? 300 : 0);
     return () => window.clearTimeout(timer);
-  }, [search]);
-  useEffect(() => { loadUsers(); }, []);
+  }, [search, loadDbs]);
+  // Owners to pick from when creating or moving a database.
   useEffect(() => {
-    if (adminTab === "mappings") {
+    fetch(API_BASE + "/api/admin/users?limit=200", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data) setUsers(data.items || []); })
+      .catch(() => {});
+  }, []);
+
+  // The mapping list loads each time its tab is opened.
+  function showTab(tab: "databases" | "mappings") {
+    if (tab === adminTab) return;
+    setAdminTab(tab);
+    if (tab === "mappings") {
       loadMappings();
       loadSites();
     }
-  }, [adminTab]);
+  }
 
   const boundCount = useMemo(() => mappings.filter((m) => Boolean(m.discordUserId)).length, [mappings]);
   const unboundCount = useMemo(() => mappings.filter((m) => !m.discordUserId).length, [mappings]);
@@ -231,34 +326,6 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
 
   const hasFilters = Boolean(search.trim() || status);
 
-  async function loadMappings() {
-    setMappingsLoading(true);
-    try {
-      const res = await fetch(API_BASE + "/api/admin/student-mappings", { credentials: "include" });
-      if (!res.ok) throw new Error("ไม่สามารถโหลดรายการจับคู่ได้");
-      const data = await res.json();
-      setMappings(data.items || []);
-    } catch (err: any) {
-      notify({ kind: "error", text: err.message });
-    } finally {
-      setMappingsLoading(false);
-    }
-  }
-
-  async function loadSites() {
-    setSitesLoading(true);
-    try {
-      const res = await fetch(API_BASE + "/api/hosting/sites?limit=500", { credentials: "include" });
-      if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลเว็บไซต์ได้");
-      const data = await res.json();
-      setSites(data.items || []);
-    } catch (err: any) {
-      console.warn("loadSites error:", err.message);
-    } finally {
-      setSitesLoading(false);
-    }
-  }
-
   async function submitSaveMapping(e: React.FormEvent) {
     e.preventDefault();
     if (!editingMapping.studentCode.trim()) {
@@ -271,7 +338,7 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
     }
     setMappingSubmitting(true);
     try {
-      const payload: any = {
+      const payload: { studentCode: string; studentName: string; dbPublicId: string; sitePublicId: string; notes: string; id?: number } = {
         studentCode: editingMapping.studentCode.trim(),
         studentName: editingMapping.studentName.trim(),
         dbPublicId: editingMapping.dbPublicId,
@@ -292,14 +359,14 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
       notify({ kind: "success", text: "บันทึกการผูกรหัสสำเร็จ" });
       setShowMappingModal(false);
       loadMappings();
-    } catch (err: any) {
-      notify({ kind: "error", text: err.message });
+    } catch (err) {
+      notify({ kind: "error", text: errorText(err) });
     } finally {
       setMappingSubmitting(false);
     }
   }
 
-  function handleDeleteMapping(mapping: any) {
+  function handleDeleteMapping(mapping: Mapping) {
     ask({
       title: "ลบการผูกรหัส",
       message: `ต้องการลบการผูกรหัส ${mapping.studentCode} (${mapping.dbName || mapping.siteName || mapping.siteSubdomain || "รายการนี้"}) ใช่หรือไม่? (ฐานข้อมูลและเว็บไซต์จะไม่ถูกลบ)`,
@@ -314,14 +381,14 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
           if (!res.ok) throw new Error("ไม่สามารถลบได้");
           notify({ kind: "success", text: "ลบการผูกรหัสเรียบร้อยแล้ว" });
           loadMappings();
-        } catch (err: any) {
-          notify({ kind: "error", text: err.message });
+        } catch (err) {
+          notify({ kind: "error", text: errorText(err) });
         }
       },
     });
   }
 
-  function handleUnlinkSite(mapping: any) {
+  function handleUnlinkSite(mapping: Mapping) {
     ask({
       title: "ปลดการผูกเว็บไซต์",
       message: `ต้องการปลดการผูกเว็บไซต์ (${mapping.siteName || mapping.siteSubdomain}) ออกจากรหัส ${mapping.studentCode} ใช่หรือไม่? (เว็บไซต์จะไม่ถูกลบ)`,
@@ -336,8 +403,8 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
           if (!res.ok) throw new Error("ไม่สามารถปลดการผูกเว็บไซต์ได้");
           notify({ kind: "success", text: "ปลดการผูกเว็บไซต์เรียบร้อยแล้ว" });
           loadMappings();
-        } catch (err: any) {
-          notify({ kind: "error", text: err.message });
+        } catch (err) {
+          notify({ kind: "error", text: errorText(err) });
         }
       },
     });
@@ -354,8 +421,8 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
       if (!res.ok) throw new Error(data.error || "ไม่สามารถตรวจจับได้");
       notify({ kind: "success", text: `ตรวจจับและผูกรหัสฐานข้อมูลอัตโนมัติสำเร็จ ${data.mappedCount || 0} รายการ` });
       loadMappings();
-    } catch (err: any) {
-      notify({ kind: "error", text: err.message });
+    } catch (err) {
+      notify({ kind: "error", text: errorText(err) });
     } finally {
       setAutoDetecting(false);
     }
@@ -372,14 +439,14 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
       if (!res.ok) throw new Error(data.error || "ไม่สามารถตรวจจับเว็บไซต์ได้");
       notify({ kind: "success", text: `ตรวจจับและผูกเว็บไซต์อัตโนมัติสำเร็จ ${data.mappedCount || 0} รายการ` });
       loadMappings();
-    } catch (err: any) {
-      notify({ kind: "error", text: err.message });
+    } catch (err) {
+      notify({ kind: "error", text: errorText(err) });
     } finally {
       setAutoDetectingSites(false);
     }
   }
 
-  function copyMappingEnv(m: any) {
+  function copyMappingEnv(m: Mapping) {
     const envContent = [
       `# NEXORA Cloud MySQL - Student ${m.studentCode}${m.studentName ? ` (${m.studentName})` : ""}`,
       `DB_CONNECTION=mysql`,
@@ -391,7 +458,7 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
     void copyText(envContent, `.env ของรหัส ${m.studentCode}`);
   }
 
-  function handleUnbindDiscord(mapping: any) {
+  function handleUnbindDiscord(mapping: Mapping) {
     ask({
       title: "ปลดการผูกบัญชี Discord",
       message: `ต้องการยกเลิกสิทธิ์ Discord (${mapping.discordUsername || mapping.discordUserId || "บัญชีที่ผูก"}) ของรหัส ${mapping.studentCode} ใช่หรือไม่? บัญชีเดิมจะเข้าฐานข้อมูลไม่ได้อีก ลิงก์เก่าและรหัสผ่านเก่าจะใช้ไม่ได้ และมีแค่บัญชี Discord ใหม่เท่านั้นที่ผูกแทนได้`,
@@ -406,8 +473,8 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
           if (!res.ok) throw new Error("ไม่สามารถปลดการผูกได้");
           notify({ kind: "success", text: "ยกเลิกสิทธิ์และตัดการเข้าฐานข้อมูลเรียบร้อยแล้ว" });
           loadMappings();
-        } catch (err: any) {
-          notify({ kind: "error", text: err.message });
+        } catch (err) {
+          notify({ kind: "error", text: errorText(err) });
         }
       },
     });
@@ -429,42 +496,14 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
           const data = await res.json();
           notify({ kind: "success", text: `ปลดการผูกบัญชี Discord ทั้งหมดเรียบร้อยแล้ว (${data.unboundCount || 0} รายการ)` });
           loadMappings();
-        } catch (err: any) {
-          notify({ kind: "error", text: err.message });
+        } catch (err) {
+          notify({ kind: "error", text: errorText(err) });
         }
       },
     });
   }
 
-  async function loadDbs() {
-    const request = ++dbRequestRef.current;
-    setLoading(true);
-    try {
-      const q = new URLSearchParams();
-      if (search.trim()) q.set("q", search.trim());
-      const res = await fetch(API_BASE + "/api/admin/hosting/databases?" + q.toString(), { credentials: "include" });
-      if (!res.ok) throw new Error("ไม่สามารถโหลดฐานข้อมูลได้");
-      const data = await res.json();
-      // A slower reply to an older search must not replace the newer list.
-      if (request === dbRequestRef.current) setDbs(data.items || []);
-    } catch (err: any) {
-      if (request === dbRequestRef.current) notify({ kind: "error", text: err.message });
-    } finally {
-      if (request === dbRequestRef.current) setLoading(false);
-    }
-  }
-
-  async function loadUsers() {
-    try {
-      const res = await fetch(API_BASE + "/api/admin/users?limit=200", { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data.items || []);
-      }
-    } catch {}
-  }
-
-  function openDetail(db: any) {
+  function openDetail(db: Db) {
     setSelectedDb(db);
   }
 
@@ -503,8 +542,8 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
         sizeBytes: 0,
         newPass: data.dbPass,
       });
-    } catch (err: any) {
-      notify({ kind: "error", text: err.message });
+    } catch (err) {
+      notify({ kind: "error", text: errorText(err) });
     } finally {
       setCreateSubmitting(false);
     }
@@ -532,8 +571,8 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
       setTransferUsername("");
       closeDetail();
       loadDbs();
-    } catch (err: any) {
-      notify({ kind: "error", text: err.message });
+    } catch (err) {
+      notify({ kind: "error", text: errorText(err) });
     } finally {
       setTransferSubmitting(false);
     }
@@ -553,7 +592,7 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
     });
   }
 
-  function nameList(list: any[]) {
+  function nameList(list: Db[]) {
     const names = list.map((d) => d.dbName);
     return names.length > 5 ? `${names.slice(0, 5).join(", ")} และอีก ${names.length - 5} รายการ` : names.join(", ");
   }
@@ -566,7 +605,7 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
     });
   }
 
-  async function changeStatus(list: any[], suspend: boolean) {
+  async function changeStatus(list: Db[], suspend: boolean) {
     const ids = list.map((d) => d.id);
     const verb = suspend ? "ระงับ" : "ปลดระงับ";
     markBusy(ids, true);
@@ -603,14 +642,14 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
       });
       if (selectedDb && ids.includes(selectedDb.id)) closeDetail();
       await loadDbs();
-    } catch (err: any) {
-      notify({ kind: "error", text: err.message });
+    } catch (err) {
+      notify({ kind: "error", text: errorText(err) });
     } finally {
       markBusy(ids, false);
     }
   }
 
-  function confirmStatus(list: any[], suspend: boolean) {
+  function confirmStatus(list: Db[], suspend: boolean) {
     if (!list.length) return;
     const many = list.length > 1;
     const subject = many ? `${list.length} ฐานข้อมูล` : list[0].dbName;
@@ -625,7 +664,7 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
     });
   }
 
-  function handleResetPassword(db: any) {
+  function handleResetPassword(db: Db) {
     ask({
       title: "เปลี่ยนรหัสผ่าน MySQL",
       message: `ระบบจะสร้างรหัสผ่านใหม่ให้ ${db.dbName} ทันที รหัสเดิมจะใช้ไม่ได้ เว็บหรือแอปที่เชื่อมต่ออยู่ต้องเปลี่ยนเป็นรหัสใหม่`,
@@ -641,14 +680,14 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
           if (!res.ok) throw new Error(data.error || "ไม่สามารถเปลี่ยนรหัสผ่านได้");
           notify({ kind: "success", text: "เปลี่ยนรหัสผ่านสำเร็จ" });
           setSelectedDb({ ...db, newPass: data.newPassword });
-        } catch (err: any) {
-          notify({ kind: "error", text: err.message });
+        } catch (err) {
+          notify({ kind: "error", text: errorText(err) });
         }
       },
     });
   }
 
-  function handleDelete(db: any) {
+  function handleDelete(db: Db) {
     ask({
       title: "ลบฐานข้อมูลถาวร",
       message: `ลบ ${db.dbName} แล้วข้อมูลทั้งหมดจะหายไปและกู้คืนไม่ได้`,
@@ -664,14 +703,14 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
           notify({ kind: "success", text: "ลบฐานข้อมูลสำเร็จ" });
           closeDetail();
           loadDbs();
-        } catch (err: any) {
-          notify({ kind: "error", text: err.message });
+        } catch (err) {
+          notify({ kind: "error", text: errorText(err) });
         }
       },
     });
   }
 
-  async function openPhpMyAdmin(db: any) {
+  async function openPhpMyAdmin(db: { id: string }) {
     try {
       const res = await fetch(API_BASE + "/api/admin/hosting/databases/" + db.id + "/phpmyadmin", {
         method: "POST",
@@ -697,8 +736,8 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
       document.body.appendChild(form);
       form.submit();
       form.remove();
-    } catch (err: any) {
-      notify({ kind: "error", text: err.message });
+    } catch (err) {
+      notify({ kind: "error", text: errorText(err) });
     }
   }
 
@@ -723,7 +762,7 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
     }
   }
 
-  function copyAllConnection(db: any, key?: string) {
+  function copyAllConnection(db: Db, key?: string) {
     const pass = db.newPass ? `\nPassword: ${db.newPass}` : "\nPassword: (ใช้รหัสที่สร้างไว้ก่อนหน้า)";
     void copyText(
       `Host: ${db.host}\nPort: ${db.port}\nDatabase: ${db.dbName}\nUsername: ${db.dbUser}${pass}`,
@@ -750,7 +789,7 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
     </ul>
   );
 
-  function openMappingForm(m?: any) {
+  function openMappingForm(m?: Mapping) {
     setEditingMapping(m
       ? { id: m.id, studentCode: m.studentCode, studentName: m.studentName || "", dbPublicId: m.dbPublicId || "", sitePublicId: m.sitePublicId || "", notes: m.notes || "" }
       : { studentCode: "", studentName: "", dbPublicId: "", sitePublicId: "", notes: "" });
@@ -789,10 +828,10 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
       </header>
 
       <nav className="hv-tabs dbv-tabs" role="tablist" aria-label="มุมมอง">
-        <button type="button" role="tab" aria-selected={!isMappings} className={!isMappings ? "is-active" : ""} onClick={() => setAdminTab("databases")}>
+        <button type="button" role="tab" aria-selected={!isMappings} className={!isMappings ? "is-active" : ""} onClick={() => showTab("databases")}>
           <Database size={16} aria-hidden="true" /> ฐานข้อมูล <b>{dbs.length}</b>
         </button>
-        <button type="button" role="tab" aria-selected={isMappings} className={isMappings ? "is-active" : ""} onClick={() => setAdminTab("mappings")}>
+        <button type="button" role="tab" aria-selected={isMappings} className={isMappings ? "is-active" : ""} onClick={() => showTab("mappings")}>
           <Bot size={16} aria-hidden="true" /> จับคู่รหัส Discord {mappings.length > 0 && <b>{mappings.length}</b>}
         </button>
       </nav>
@@ -924,7 +963,7 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
                       </div>
                       <div className="hv-row-actions dbv-map-actions">
                         {m.dbPublicId ? (
-                          <button type="button" className="hv-btn hv-icon-btn is-sm" onClick={() => openPhpMyAdmin({ id: m.dbPublicId, dbName: m.dbName })} title="เปิด phpMyAdmin" aria-label="เปิด phpMyAdmin">
+                          <button type="button" className="hv-btn hv-icon-btn is-sm" onClick={() => openPhpMyAdmin({ id: m.dbPublicId || "" })} title="เปิด phpMyAdmin" aria-label="เปิด phpMyAdmin">
                             <ExternalLink size={15} aria-hidden="true" />
                           </button>
                         ) : null}
@@ -1185,7 +1224,7 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
                       <button
                         type="button"
                         className={`dbv-copy${copiedKey === "Password" ? " is-done" : ""}`}
-                        onClick={() => void copyText(selectedDb.newPass, "รหัสผ่าน", "Password")}
+                        onClick={() => void copyText(selectedDb.newPass || "", "รหัสผ่าน", "Password")}
                         aria-label="คัดลอกรหัสผ่าน"
                         title="คัดลอกรหัสผ่าน"
                       >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import type { CSSProperties, ImgHTMLAttributes, ReactNode } from "react";
 import NoCoverArt from "./NoCoverArt";
 
@@ -75,15 +75,17 @@ export default function SmartImage({
   }, [onError, onLoad, settle]);
 
   // Images served from cache (or finished before hydration) never fire onLoad/onError.
-  useEffect(() => {
-    const image = imgRef.current;
-    if (!image || !src || !image.complete) return;
+  const checkFinished = useEffectEvent((image: HTMLImageElement) => {
     if (image.naturalWidth > 0) handleLoaded(image);
     else {
       settle("error");
       onError?.();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    const image = imgRef.current;
+    if (!image || !src || !image.complete) return;
+    checkFinished(image);
   }, [src]);
 
   const wrapperClasses = ["smart-img", `is-${status}`, compact ? "is-compact" : "", wrapperClassName || ""].filter(Boolean).join(" ");
@@ -92,7 +94,7 @@ export default function SmartImage({
   return (
     <span className={wrapperClasses} style={wrapperStyles} data-status={status} aria-busy={status === "loading" || undefined}>
       {status !== "error" && src && (
-        // eslint-disable-next-line @next/next/no-img-element
+         
         <img
           {...rest}
           ref={imgRef}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ArrowDownToLine, ArrowRight, Check, ChevronDown, Clock3, Disc3, FileAudio, HelpCircle, Link2, ListMusic, LoaderCircle, Music2, Pencil, Plus, SlidersHorizontal, X } from 'lucide-react'
 import { createJob, downloadURL, getHealth, getJob, inspectMedia, type Inspection, type Job } from './api'
 import { Modal } from './components/Modal'
@@ -85,17 +85,32 @@ export default function App() {
     return () => { active = false; window.clearInterval(timer) }
   }, [])
   useEffect(() => () => controllerRef.current?.abort(), [])
+  // A finished job is announced once: from the poll, or right away when it was already done.
+  function finishJob(done: Job) {
+    if (finishedID.current === done.id) return
+    if (done.status === 'completed') {
+      finishedID.current = done.id
+      notify('แปลงไฟล์เรียบร้อย พร้อมดาวน์โหลดแล้ว')
+      setModal('complete')
+    } else if (done.status === 'failed') {
+      finishedID.current = done.id
+      notify(done.error || 'แปลงไฟล์ไม่สำเร็จ กรุณาลองใหม่', 'error')
+    }
+  }
+  const onFinished = useEffectEvent((done: Job) => finishJob(done))
+  const jobId = job?.id
+  const jobStatus = job?.status
   useEffect(() => {
-    if (!job || ['completed', 'failed'].includes(job.status)) return
+    if (!jobId || !jobStatus || ['completed', 'failed'].includes(jobStatus)) return
     let active = true
     let timer: number
     let warned = false
     const poll = async () => {
       try {
-        const next = await getJob(job.id)
+        const next = await getJob(jobId)
         if (!active) return
         setJob(next)
-        if (next.status === 'completed' || next.status === 'failed') return
+        if (next.status === 'completed' || next.status === 'failed') { onFinished(next); return }
       } catch {
         if (active && !warned) { notify('การเชื่อมต่อขัดข้อง กำลังลองอ่านสถานะใหม่', 'error'); warned = true }
       }
@@ -103,18 +118,7 @@ export default function App() {
     }
     timer = window.setTimeout(poll, 500)
     return () => { active = false; window.clearTimeout(timer) }
-  }, [job?.id, job?.status, notify])
-  useEffect(() => {
-    if (!job || finishedID.current === job.id) return
-    if (job.status === 'completed') {
-      finishedID.current = job.id
-      notify('แปลงไฟล์เรียบร้อย พร้อมดาวน์โหลดแล้ว')
-      setModal('complete')
-    } else if (job.status === 'failed') {
-      finishedID.current = job.id
-      notify(job.error || 'แปลงไฟล์ไม่สำเร็จ กรุณาลองใหม่', 'error')
-    }
-  }, [job, notify])
+  }, [jobId, jobStatus, notify])
 
   async function handleInspect(event: FormEvent) {
     event.preventDefault()
@@ -158,6 +162,7 @@ export default function App() {
     try {
       const created = await createJob({url: inspectedURL, format, quality, ...metadata, tracks: inspection.kind === 'playlist' ? [...selected] : undefined})
       setJob(created); notify('เพิ่มงานในคิวแล้ว กำลังเตรียมไฟล์ให้คุณ')
+      finishJob(created)
     } catch (cause) {
       notify(cause instanceof Error ? cause.message : 'เริ่มงานไม่สำเร็จ', 'error')
     } finally { setIsStarting(false) }

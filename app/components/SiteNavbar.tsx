@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { POINTS_EVENT } from "./StorePurchase";
+import Link from "next/link";
 
 /** Fired after signing in on the same page so the navbar reloads the session. */
 export const SESSION_EVENT = "nexora:session";
@@ -109,10 +110,10 @@ export default function SiteNavbar({
       )}
       <nav className="navbar" aria-label="เมนูหลัก">
         <div className="container nav-inner">
-          <a className="brand" href="/" aria-label={`${brandName || "NEXORA CLOUD"} หน้าหลัก`}>
+          <Link className="brand" href="/" aria-label={`${brandName || "NEXORA CLOUD"} หน้าหลัก`}>
             <img className="brand-logo" src={settings?.logoUrl || "/logo-v2.png"} alt="" />
             <span>{brandName || <>NEXORA <b>CLOUD</b></>}</span>
-          </a>
+          </Link>
           {hasNavLinks && (
             <button
               className="hamburger icon-button"
@@ -132,9 +133,9 @@ export default function SiteNavbar({
           <div className={`nav-links ${menuOpen ? "open" : ""}`}>
             {/* Home / share / login / register live in homepage cards — keep navbar light. */}
             {storeVisible && (
-              <a href="/store" className={active === "store" ? "active" : undefined} onClick={() => { setMenuOpen(false); setAccountOpen(false); }}>
+              <Link href="/store" className={active === "store" ? "active" : undefined} onClick={() => { setMenuOpen(false); setAccountOpen(false); }}>
                 <span className="nav-link-with-icon"><ShoppingCart size={15} aria-hidden="true" />ร้านค้า</span>
-              </a>
+              </Link>
             )}
 
             {showGuestActions && (
@@ -180,12 +181,12 @@ export default function SiteNavbar({
                       </div>
                     </div>
                     <div className="account-divider" />
-                    <a role="menuitem" className="account-link" href="/" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><Home size={17} />หน้าหลัก</a>
+                    <Link role="menuitem" className="account-link" href="/" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><Home size={17} />หน้าหลัก</Link>
                     <a role="menuitem" className="account-link" href={sessionUser.role === "user" ? "/profile" : "/admin/profile"} onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><UserRound size={17} />โปรไฟล์ของฉัน</a>
-                    <a role="menuitem" className="account-link" href="/dashboard" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><LayoutDashboard size={17} />แดชบอร์ด</a>
-                    <a role="menuitem" className="account-link" href="/files" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><FolderOpen size={17} />ไฟล์ของฉัน</a>
+                    <Link role="menuitem" className="account-link" href="/dashboard" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><LayoutDashboard size={17} />แดชบอร์ด</Link>
+                    <Link role="menuitem" className="account-link" href="/files" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><FolderOpen size={17} />ไฟล์ของฉัน</Link>
                     {(sessionUser.role === "admin" || sessionUser.role === "superadmin") && (
-                      <a role="menuitem" className="account-link" href="/admin" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><ShieldCheck size={17} />แดชบอร์ดผู้ดูแล</a>
+                      <Link role="menuitem" className="account-link" href="/admin" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><ShieldCheck size={17} />แดชบอร์ดผู้ดูแล</Link>
                     )}
                     <div className="account-divider" />
                     <button type="button" role="menuitem" className="account-logout" onClick={() => { void logout(); }}><LogOut size={17} />ออกจากระบบ</button>

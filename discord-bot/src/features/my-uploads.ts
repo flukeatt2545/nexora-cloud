@@ -1,5 +1,7 @@
 import axios from "axios";
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { EmbedBuilder, SlashCommandBuilder, type ChatInputCommandInteraction } from "discord.js";
+import { recordActivity } from "./activity-log";
+import { describeError, errorStatus } from "./errors";
 
 const API_URL = (process.env.NEXORA_API_URL || "http://api:8080").replace(/\/+$/, "");
 const BOT_SECRET = (process.env.BOT_INTERNAL_SECRET || "").trim();
@@ -36,7 +38,7 @@ function shortName(name: string, max = 40): string {
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
 
-export async function handleMyUploadsCommand(interaction: any): Promise<void> {
+export async function handleMyUploadsCommand(interaction: ChatInputCommandInteraction): Promise<void> {
   // NOTE: index.ts must route commandName === "my-uploads" here WITHOUT
   // admin/scope gating (everyone in the guild may use it), after beginPrivateReply().
   const user = interaction.user;
@@ -78,7 +80,7 @@ export async function handleMyUploadsCommand(interaction: any): Promise<void> {
     embeds[0]
       .setFooter({ text: `ประวัติการอัปโหลดของ ${username} (${items.length} รูปล่าสุด)` })
       .setTimestamp();
-    interaction.recordBotActivity?.({
+    recordActivity(interaction, {
       outcome: "success",
       result: `แสดงรูปที่เคยอัปโหลดล่าสุด ${items.length} รูป`,
     });
@@ -86,9 +88,9 @@ export async function handleMyUploadsCommand(interaction: any): Promise<void> {
       content: `เจอ **${items.length} รูป** ที่คุณเคยอัปโหลด\nอยากลบรูปไหน ใช้คำสั่ง "/gallery" เพื่อเปิดหน้าจัดการ`,
       embeds: embeds.slice(0, 10),
     });
-  } catch (error: any) {
-    console.error("[ERROR] /my-uploads", error?.response?.status || "", error?.message || error);
-    interaction.recordBotActivity?.({ outcome: "failure", result: "ดึงประวัติการอัปโหลดไม่สำเร็จ ระบบหลังบ้านไม่ตอบสนอง", details: String(error?.message || "unknown").slice(0, 200) });
+  } catch (error) {
+    console.error("[ERROR] /my-uploads", errorStatus(error) || "", describeError(error));
+    recordActivity(interaction, { outcome: "failure", result: "ดึงประวัติการอัปโหลดไม่สำเร็จ ระบบหลังบ้านไม่ตอบสนอง", details: String((error instanceof Error && error.message) || "unknown").slice(0, 200) });
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()

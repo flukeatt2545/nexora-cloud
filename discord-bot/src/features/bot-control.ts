@@ -1,5 +1,15 @@
 import axios from "axios";
-import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import {
+  EmbedBuilder,
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+  type APIInteractionGuildMember,
+  type ChatInputCommandInteraction,
+  type Client,
+  type Guild,
+  type GuildMember,
+} from "discord.js";
+import { recordActivity } from "./activity-log";
 
 const API_URL = (process.env.NEXORA_API_URL || "http://localhost:8080").replace(/\/+$/, "");
 const BOT_SECRET = (process.env.BOT_INTERNAL_SECRET || "").trim();
@@ -23,22 +33,33 @@ export const commandScopeLabels: Record<string,string> = {
   "lockdown.status":"ดูสถานะล็อกดาว", "lockdown.manage":"ล็อกหรือปลดเว็บไซต์", "lockdown.access":"เข้าหน้าควบคุมฉุกเฉิน",
 };
 
-export function botMemberRoleIds(interaction: any): string[] {
-  const roles = interaction.member?.roles;
-  return (Array.isArray(roles) ? roles : [...(roles?.cache?.keys() || [])]).filter((id: string) => /^\d{17,20}$/.test(id));
+/** Who is asking: an interaction, or a message's author and member for prefix commands. */
+export type BotSubject = {
+  user?: { id: string } | null;
+  member?: GuildMember | APIInteractionGuildMember | null;
+};
+
+/** Role ids of the member; an uncached member arrives from the API with plain id strings. */
+function memberRoles(subject: BotSubject): string[] {
+  const roles = subject.member?.roles;
+  return Array.isArray(roles) ? roles : [...(roles?.cache.keys() || [])];
+}
+
+export function botMemberRoleIds(interaction: BotSubject): string[] {
+  return memberRoles(interaction).filter((id: string) => /^\d{17,20}$/.test(id));
 }
 
 export function botControlScope(sub: string): string {
   return sub.endsWith("user") ? "bot.users" : sub.endsWith("role") ? "bot.roles" : `bot.${sub}`;
 }
 
-export function matchesBotSubjects(interaction: any, subjects: {users: string[]; roles: string[]}) {
+export function matchesBotSubjects(interaction: BotSubject, subjects: {users: string[]; roles: string[]}) {
   if (subjects.users.includes(String(interaction.user?.id || ""))) return true;
-  const roles = interaction.member?.roles;
-  return subjects.roles.some(id => Array.isArray(roles) ? roles.includes(id) : Boolean(roles?.cache?.has(id)));
+  const roles = memberRoles(interaction);
+  return subjects.roles.some(id => roles.includes(id));
 }
 
-export async function canUseBotScope(interaction: any, scope: string, isAdmin: boolean): Promise<boolean> {
+export async function canUseBotScope(interaction: BotSubject, scope: string, isAdmin: boolean): Promise<boolean> {
   // Bulk / multi unblock shares the single-unblock permission.
   if (scope === "crowdsec.unban-all" || scope === "crowdsec.unban-select") scope = "crowdsec.unban";
   if (!commandScopeLabels[scope]) return false;
@@ -115,23 +136,14 @@ export async function updateBotAccess(actorId: string, body: Record<string, stri
   return cache.state;
 }
 
-export async function canUseBotCommands(interaction: any, isAdmin: boolean): Promise<boolean> {
-  if (isAdmin) return true;
-  try {
-    const state = await loadBotAccess();
-    if (state.accessMode === "everyone") return true;
-    return matchesBotSubjects(interaction,state);
-  } catch (error: any) {
-    console.error("[ERROR] Bot access check:", error?.message || error);
-    return false;
-  }
-}
-
 function safeDiscordLabel(value: string) {
 	return value.replace(/[\\*_~`|>]/g, (character) => "\\" + character).replace(/@/g, "＠").trim();
 }
 
-export async function botSubjectLabels(interaction: any, ids: string[], type: "user" | "role") {
+/** Where names are looked up: the server for roles and members, the client for users who left. */
+export type LabelSource = { guild: Guild | null; client: Client };
+
+export async function botSubjectLabels(interaction: LabelSource, ids: string[], type: "user" | "role") {
 	return Promise.all(ids.map(async (id) => {
 		try {
 			if (type === "role") {
@@ -148,7 +160,7 @@ export async function botSubjectLabels(interaction: any, ids: string[], type: "u
 	}));
 }
 
-export async function botAccessStateEmbed(state: AccessState, interaction: any) {
+export async function botAccessStateEmbed(state: AccessState, interaction: LabelSource) {
 	const users = await botSubjectLabels(interaction, state.users, "user");
 	const roles = await botSubjectLabels(interaction, state.roles, "role");
 	const userList = users.length ? users.join("\n") : "ยังไม่มี";
@@ -166,7 +178,7 @@ export async function botAccessStateEmbed(state: AccessState, interaction: any) 
     .setTimestamp();
 }
 
-export async function handleBotControlCommand(interaction: any, applyPresence: () => Promise<void>): Promise<void> {
+export async function handleBotControlCommand(interaction: ChatInputCommandInteraction, applyPresence: () => Promise<void>): Promise<void> {
   const sub = interaction.options.getSubcommand();
   let state: AccessState;
   if (sub === "status") {
@@ -185,6 +197,6 @@ export async function handleBotControlCommand(interaction: any, applyPresence: (
       discordId: subject.id,
     }, botMemberRoleIds(interaction));
   }
-  interaction.recordBotActivity?.({ outcome: "success", result: sub === "status" ? "อ่านการตั้งค่าปัจจุบันแล้ว ไม่มีการเปลี่ยนสิทธิ์" : "บันทึกการตั้งค่าบอตแล้ว", details: `ใครใช้คำสั่งได้: ${state.accessMode === "everyone" ? "ทุกคนในเซิร์ฟเวอร์" : "เฉพาะรายชื่อที่อนุญาต"}\nสถานะบอตในรายชื่อสมาชิก: ${state.visibility === "hidden" ? "ซ่อน" : "แสดง"}\nรายชื่อที่อนุญาต: ${state.users.length} ผู้ใช้ · ${state.roles.length} ยศ` });
+  recordActivity(interaction, { outcome: "success", result: sub === "status" ? "อ่านการตั้งค่าปัจจุบันแล้ว ไม่มีการเปลี่ยนสิทธิ์" : "บันทึกการตั้งค่าบอตแล้ว", details: `ใครใช้คำสั่งได้: ${state.accessMode === "everyone" ? "ทุกคนในเซิร์ฟเวอร์" : "เฉพาะรายชื่อที่อนุญาต"}\nสถานะบอตในรายชื่อสมาชิก: ${state.visibility === "hidden" ? "ซ่อน" : "แสดง"}\nรายชื่อที่อนุญาต: ${state.users.length} ผู้ใช้ · ${state.roles.length} ยศ` });
 	await interaction.editReply({ embeds: [await botAccessStateEmbed(state, interaction)] });
 }

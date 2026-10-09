@@ -16,6 +16,12 @@ import {
   Routes,
   TextInputBuilder,
   TextInputStyle,
+  type ChatInputCommandInteraction,
+  type Message,
+  type MessageComponentInteraction,
+  type RepliableInteraction,
+  type SendableChannels,
+  type StringSelectMenuBuilder,
 } from "discord.js";
 import path from "path";
 import fs from "fs";
@@ -29,13 +35,13 @@ import {
   refreshCrowdSecCache,
 } from "./features/crowdsec";
 import {
-  canUseBotCommands,
   handleBotControlCommand,
   loadBotAccess,
 } from "./features/bot-control";
 import { buildBotPanelPayload, handleBotPanelComponent } from "./features/bot-panel";
 import { handlePanelAction, resetPanelMainMenu } from "./features/panel-actions";
-import { observeBotActivity } from "./features/activity-log";
+import { observeBotActivity, recordActivity } from "./features/activity-log";
+import { apiErrorField, describeError, errorStatus } from "./features/errors";
 import { botControlScope, botMemberRoleIds, canUseBotScope } from "./features/bot-control";
 import { handleLockdownCommand } from "./features/lockdown";
 import { handleUploadCommand } from "./features/upload";
@@ -120,6 +126,12 @@ function checkRateLimit(userId: string): { allowed: boolean; waitSeconds?: numbe
   return { allowed: true };
 }
 
+/** What the API sends back with a one-time link; the name and code say whose it is. */
+type TicketInfo = { studentCode?: string; studentName?: string; expiresAt?: string };
+type DbTicket = TicketInfo & { url: string };
+type WorkspaceTicket = TicketInfo & { ticket?: string; cUrl?: string; url?: string; workspaceUrl?: string };
+type StudentMapping = { studentCode: string; dbName: string; studentName?: string; ownerName?: string; discordUserId?: string };
+
 // API helper to request student database SSO ticket
 async function fetchStudentTicket(
   studentCode: string,
@@ -128,7 +140,7 @@ async function fetchStudentTicket(
   isAdmin: boolean = false
 ) {
   try {
-    const res = await axios.post(
+    const res = await axios.post<DbTicket>(
       `${API_URL}/api/internal/bot/student-db-ticket`,
       {
         studentCode: studentCode.trim(),
@@ -142,14 +154,14 @@ async function fetchStudentTicket(
         timeout: 10000,
       }
     );
-    return { ok: true, data: res.data };
-  } catch (err: any) {
-    return { ok: false, ...safeBotApiError(err) };
+    return { ok: true as const, data: res.data };
+  } catch (err) {
+    return { ok: false as const, ...safeBotApiError(err) };
   }
 }
 
-function safeBotApiError(err: any): { error: string; code: string } {
-  const code = typeof err?.response?.data?.code === "string" ? err.response.data.code : "";
+function safeBotApiError(err: unknown): { error: string; code: string } {
+  const code = apiErrorField(err, "code");
   return { error: "เปิดไม่ได้ในตอนนี้", code };
 }
 
@@ -178,9 +190,10 @@ function registerAgainRow(kind: "db" | "workspace") {
 }
 
 // ---- activity log: report exactly what happened for /db and /code style requests ----
-function ticketKindOf(interaction: any): "db" | "workspace" {
-  const id = String(interaction?.customId || "");
-  const command = String(interaction?.commandName || "");
+function ticketKindOf(interaction: object): "db" | "workspace" {
+  const { customId, commandName } = interaction as { customId?: string; commandName?: string };
+  const id = String(customId || "");
+  const command = String(commandName || "");
   return /workspace/.test(id) || command === "code" ? "workspace" : "db";
 }
 
@@ -198,20 +211,20 @@ const ticketFailureReasons: Record<string, string> = {
   database_deleted: "ฐานข้อมูลถูกลบแล้ว",
 };
 
-function recordTicketSuccess(interaction: any, data: any) {
+function recordTicketSuccess(interaction: object, data: TicketInfo) {
   const kind = ticketKindOf(interaction);
   const code = String(data?.studentCode || "").trim();
-  interaction.recordBotActivity?.({
+  recordActivity(interaction, {
     outcome: "success",
     result: `ออกลิงก์เปิด${ticketLabel(kind)}ให้แล้ว (ใช้ได้ครั้งเดียว)`,
     target: code ? `รหัส ${code}` : "",
   });
 }
 
-function recordTicketFailure(interaction: any, result: any, studentCode?: string) {
+function recordTicketFailure(interaction: object, result: { code?: string }, studentCode?: string) {
   const kind = ticketKindOf(interaction);
   const code = String(studentCode || "").trim();
-  interaction.recordBotActivity?.({
+  recordActivity(interaction, {
     outcome: "failure",
     result: `ออกลิงก์เปิด${ticketLabel(kind)}ไม่สำเร็จ`,
     target: code ? `รหัส ${code}` : "",
@@ -219,9 +232,9 @@ function recordTicketFailure(interaction: any, result: any, studentCode?: string
   });
 }
 
-function recordTicketRateLimited(interaction: any) {
+function recordTicketRateLimited(interaction: object) {
   const kind = ticketKindOf(interaction);
-  interaction.recordBotActivity?.({
+  recordActivity(interaction, {
     outcome: "failure",
     result: `ขอลิงก์เปิด${ticketLabel(kind)}ถี่เกินไป ระบบให้รอสักครู่`,
   });
@@ -229,18 +242,17 @@ function recordTicketRateLimited(interaction: any) {
 
 function ticketErrorPayload(
   kind: "db" | "workspace",
-  result: { error?: string; code?: string; ok?: boolean; data?: unknown },
-  studentCode: string | undefined,
+  result: { error?: string; code?: string },
   discordUserId: string
 ) {
   if (result.code === "student_access_revoked" || result.code === "student_code_bound_to_other") {
     boundUsersCache.delete(discordUserId);
   }
-  return kind === "db" ? getErrorPayload(result, studentCode) : getWorkspaceErrorPayload(result, studentCode);
+  return kind === "db" ? getErrorPayload(result) : getWorkspaceErrorPayload(result);
 }
 
 // Helper to build context-aware, security-conscious error embeds
-function getErrorPayload(result: { error?: string; code?: string }, _studentCode?: string) {
+function getErrorPayload(result: { error?: string; code?: string }) {
   let title = "เปิดไม่ได้ในตอนนี้";
   let description = "ลองใหม่อีกครั้ง หรือติดต่อผู้ดูแล";
   let components: ActionRowBuilder<ButtonBuilder>[] = [];
@@ -280,7 +292,7 @@ async function fetchStudentWorkspaceTicket(
   isAdmin: boolean = false
 ) {
   try {
-    const res = await axios.post(
+    const res = await axios.post<WorkspaceTicket>(
       `${API_URL}/api/internal/bot/student-workspace-ticket`,
       {
         studentCode: studentCode.trim(),
@@ -294,14 +306,14 @@ async function fetchStudentWorkspaceTicket(
         timeout: 10000,
       }
     );
-    return { ok: true, data: res.data };
-  } catch (err: any) {
-    return { ok: false, ...safeBotApiError(err) };
+    return { ok: true as const, data: res.data };
+  } catch (err) {
+    return { ok: false as const, ...safeBotApiError(err) };
   }
 }
 
 // Helper to build context-aware, security-conscious workspace error embeds
-function getWorkspaceErrorPayload(result: { error?: string; code?: string }, _studentCode?: string) {
+function getWorkspaceErrorPayload(result: { error?: string; code?: string }) {
   let title = "เปิดไม่ได้ในตอนนี้";
   let description = "ลองใหม่อีกครั้ง หรือติดต่อผู้ดูแล";
   let components: ActionRowBuilder<ButtonBuilder>[] = [];
@@ -324,7 +336,7 @@ function getWorkspaceErrorPayload(result: { error?: string; code?: string }, _st
   return { embeds: [userNoticeEmbed(title, description)], components };
 }
 
-function ticketOwnerText(data: any): string {
+function ticketOwnerText(data: TicketInfo): string {
   const name = String(data?.studentName || "").trim();
   const code = String(data?.studentCode || "").trim();
   if (name && code) return `${name} · รหัส ${code}`;
@@ -344,7 +356,7 @@ function ticketExpiryText(expiresAt?: unknown): string {
   }).format(when) + " น.";
 }
 
-function successDescription(data: any): string {
+function successDescription(data: TicketInfo): string {
   const owner = ticketOwnerText(data);
   const expiry = ticketExpiryText(data?.expiresAt);
   return [owner ? `ของ ${owner}` : "", `ลิงก์หมดอายุ ${expiry}`, "กดปุ่มด้านล่างได้เลย"]
@@ -353,7 +365,7 @@ function successDescription(data: any): string {
 }
 
 // Build the Workspace Ephemeral Result Embed (Clean, Human-crafted, 0 Emojis)
-function buildWorkspaceSuccessPayload(data: any) {
+function buildWorkspaceSuccessPayload(data: WorkspaceTicket) {
   const embed = new EmbedBuilder()
     .setTitle("เปิดพื้นที่เขียนโค้ดได้แล้ว")
     .setColor(0x6366f1)
@@ -408,7 +420,7 @@ function buildErrorPayload(title: string, message: string) {
 }
 
 // Build the Ephemeral Result Embed (Clean, Human-crafted, Responsive across all devices)
-function buildSuccessPayload(data: any) {
+function buildSuccessPayload(data: DbTicket) {
   const embed = new EmbedBuilder()
     .setTitle("เปิดฐานข้อมูลได้แล้ว")
     .setColor(0x10b981)
@@ -438,7 +450,8 @@ async function refreshLocalCache() {
     });
     boundUsersCache.clear();
     validStudentCodes.clear();
-    for (const item of res.data?.items || []) {
+    const items: StudentMapping[] = res.data?.items || [];
+    for (const item of items) {
       const code = String(item.studentCode).trim();
       validStudentCodes.add(code);
       if (item.discordUserId) {
@@ -446,13 +459,17 @@ async function refreshLocalCache() {
       }
     }
     console.log(`[CACHE] Refreshed: ${validStudentCodes.size} student codes, ${boundUsersCache.size} bound discord users.`);
-  } catch (err: any) {
-    console.warn("[WARN] Failed to refresh mappings cache:", err.message);
+  } catch (err) {
+    console.warn("[WARN] Failed to refresh mappings cache:", describeError(err));
   }
 }
 
 // Helper to detect 3-digit student code from member nickname, display name, or username
-function detectStudentCodeFromMember(member: any, user: any, codes: Set<string>): string | null {
+/** A server member as discord.js caches it (nickname) or as the API sends it (nick). */
+type NamedMember = { nickname?: string | null; nick?: string | null };
+type NamedUser = { displayName?: string; globalName?: string | null; username?: string };
+
+function detectStudentCodeFromMember(member: NamedMember | null | undefined, user: NamedUser, codes: Set<string>): string | null {
   const candidates: string[] = [];
 
   // 1. Server Nickname
@@ -596,7 +613,7 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`[READY] Logged in as ${c.user.tag}`);
   try {
     await syncNexoraBotPresence();
-  } catch (error) {
+  } catch {
     console.error("[ERROR] Failed to set Nexora bot presence");
   }
   setInterval(() => {
@@ -606,12 +623,12 @@ client.once(Events.ClientReady, async (c) => {
   if (crowdSecConfigured()) {
     try {
       await refreshCrowdSecCache();
-    } catch (error: any) {
-      console.error("[ERROR] CrowdSec cache warmup:", error?.message || error);
+    } catch (error) {
+      console.error("[ERROR] CrowdSec cache warmup:", describeError(error));
     }
     setInterval(() => {
-      void refreshCrowdSecCache().catch((error: any) => {
-        console.error("[ERROR] CrowdSec cache refresh:", error?.message || error);
+      void refreshCrowdSecCache().catch((error: unknown) => {
+        console.error("[ERROR] CrowdSec cache refresh:", describeError(error));
       });
     }, 15000);
   }
@@ -635,36 +652,37 @@ async function safeDelete(action?: () => Promise<unknown>) {
   }
 }
 
-async function clearLastPrivateReply(userId: string) {
-  const prev = lastPrivateReplies.get(userId);
-  lastPrivateReplies.delete(userId);
-  await safeDelete(prev);
-}
-
 function rememberPrivateReply(userId: string, deleter: () => Promise<void>) {
   lastPrivateReplies.set(userId, deleter);
 }
 
-function rememberInteractionReply(interaction: any) {
+function rememberInteractionReply(interaction: Replyable) {
   rememberPrivateReply(String(interaction.user?.id || ""), async () => {
     await interaction.deleteReply();
   });
 }
 
-function isEphemeralMessage(message: any): boolean {
-  if (!message) return false;
-  if (typeof message.flags?.has === "function") {
-    return message.flags.has(MessageFlags.Ephemeral);
-  }
-  return Boolean((message.flags?.bitfield ?? message.flags ?? 0) & 64);
+function isEphemeralMessage(message: Message | null | undefined): message is Message {
+  return Boolean(message?.flags.has(MessageFlags.Ephemeral));
 }
 
-async function deleteIfEphemeralMessage(message: any) {
+async function deleteIfEphemeralMessage(message: Message | null | undefined) {
   if (!isEphemeralMessage(message)) return;
   await safeDelete(() => message.delete());
 }
 
-async function beginPrivateReply(interaction: any) {
+/** Anything the bot can answer privately; MessageComponentInteraction covers buttons and menus alike. */
+type Replyable = RepliableInteraction | MessageComponentInteraction;
+
+/** The message a button or form was on; slash commands have none. */
+function sourceMessage(interaction: Replyable) {
+  return "message" in interaction ? interaction.message : null;
+}
+
+/** What the bot sends privately: a short text, notices, and link buttons. */
+type PrivatePayload = { content?: string; embeds?: EmbedBuilder[]; components?: ActionRowBuilder<ButtonBuilder>[] };
+
+async function beginPrivateReply(interaction: Replyable) {
   const prev = lastPrivateReplies.get(interaction.user.id);
   lastPrivateReplies.delete(interaction.user.id);
   if (!interaction.deferred && !interaction.replied) {
@@ -672,10 +690,10 @@ async function beginPrivateReply(interaction: any) {
   }
   rememberInteractionReply(interaction);
   void safeDelete(prev);
-  void deleteIfEphemeralMessage(interaction.message);
+  void deleteIfEphemeralMessage(sourceMessage(interaction));
 }
 
-async function sendPrivateReply(interaction: any, payload: any) {
+async function sendPrivateReply(interaction: Replyable, payload: PrivatePayload) {
   const prev = lastPrivateReplies.get(interaction.user.id);
   lastPrivateReplies.delete(interaction.user.id);
   if (interaction.deferred || interaction.replied) {
@@ -685,18 +703,18 @@ async function sendPrivateReply(interaction: any, payload: any) {
   }
   rememberInteractionReply(interaction);
   void safeDelete(prev);
-  void deleteIfEphemeralMessage(interaction.message);
+  void deleteIfEphemeralMessage(sourceMessage(interaction));
 }
 
-async function showPrivateModal(interaction: any, modal: any) {
+async function showPrivateModal(interaction: MessageComponentInteraction | ChatInputCommandInteraction, modal: ModalBuilder) {
   const prev = lastPrivateReplies.get(interaction.user.id);
   lastPrivateReplies.delete(interaction.user.id);
   await interaction.showModal(modal);
   void safeDelete(prev);
-  void deleteIfEphemeralMessage(interaction.message);
+  void deleteIfEphemeralMessage(sourceMessage(interaction));
 }
 
-async function sendReplaceableNotice(channel: any, userId: string, content: string) {
+async function sendReplaceableNotice(channel: SendableChannels, userId: string, content: string) {
   const key = `${channel.id}:${userId}`;
   const prev = lastGuildNotices.get(key);
   lastGuildNotices.delete(key);
@@ -710,7 +728,7 @@ async function sendReplaceableNotice(channel: any, userId: string, content: stri
   }, 10000);
 }
 
-async function replaceDirectMessage(userId: string, send: () => Promise<any>) {
+async function replaceDirectMessage(userId: string, send: () => Promise<Message>) {
   const prev = lastPrivateReplies.get(userId);
   lastPrivateReplies.delete(userId);
   const sent = await send();
@@ -722,7 +740,14 @@ async function replaceDirectMessage(userId: string, send: () => Promise<any>) {
   void safeDelete(prev);
 }
 
-async function replaceChannelPanel(channel: any, payload: any) {
+/** A panel the bot posts in a channel: one embed, its buttons or menu, and maybe a picture. */
+type PanelPayload = {
+  embeds: EmbedBuilder[];
+  components: ActionRowBuilder<ButtonBuilder | StringSelectMenuBuilder>[];
+  files?: AttachmentBuilder[];
+};
+
+async function replaceChannelPanel(channel: SendableChannels, payload: PanelPayload) {
   const title = payload.embeds?.[0]?.data?.title;
   if (title === "แผงควบคุม NEXORA" && channel.messages?.fetch) {
     const recent = await channel.messages.fetch({ limit: 50 });
@@ -740,7 +765,7 @@ async function replaceChannelPanel(channel: any, payload: any) {
   return sent;
 }
 
-async function replyPrivilegedOnly(interaction: any) {
+async function replyPrivilegedOnly(interaction: Replyable) {
   await sendPrivateReply(interaction, { content: PRIVILEGED_ONLY_MESSAGE });
 }
 
@@ -767,7 +792,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   const launcherId = "customId" in interaction ? interaction.customId : "";
   const launcherScope = ["btn_request_db","modal_student_db"].includes(launcherId) ? "db" : ["btn_request_workspace","modal_student_workspace"].includes(launcherId) ? "code" : "";
-  if (launcherScope && !await canUseBotScope(interaction,launcherScope,isAdmin)) {
+  if (launcherScope && interaction.isRepliable() && !await canUseBotScope(interaction,launcherScope,isAdmin)) {
     await sendPrivateReply(interaction,{content:"คุณไม่มีสิทธิ์ใช้คำสั่งนี้"});
     return;
   }
@@ -795,7 +820,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
           if (!result.ok) {
             recordTicketFailure(interaction, result, boundCode);
-            await interaction.editReply(ticketErrorPayload("db", result, boundCode, interaction.user.id));
+            await interaction.editReply(ticketErrorPayload("db", result, interaction.user.id));
             return;
           }
 
@@ -835,7 +860,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
           if (!result.ok) {
             recordTicketFailure(interaction, result, boundCode);
-            await interaction.editReply(ticketErrorPayload("workspace", result, boundCode, interaction.user.id));
+            await interaction.editReply(ticketErrorPayload("workspace", result, interaction.user.id));
             return;
           }
 
@@ -892,7 +917,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       if (!result.ok) {
         recordTicketFailure(interaction, result, studentCode);
-        await interaction.editReply(ticketErrorPayload("db", result, studentCode, interaction.user.id));
+        await interaction.editReply(ticketErrorPayload("db", result, interaction.user.id));
         return;
       }
 
@@ -931,7 +956,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       studentCode = studentCode.trim();
       if (!studentCode) {
-        (interaction as any).recordBotActivity?.({ outcome: "failure", result: "ขอลิงก์เปิดพื้นที่เขียนโค้ดไม่สำเร็จ", details: "สาเหตุ: ผู้ใช้ไม่ได้กรอกรหัส" });
+        recordActivity(interaction, { outcome: "failure", result: "ขอลิงก์เปิดพื้นที่เขียนโค้ดไม่สำเร็จ", details: "สาเหตุ: ผู้ใช้ไม่ได้กรอกรหัส" });
         await interaction.editReply(
           buildErrorPayload("รหัสไม่ถูกต้อง", "กรอกรหัส 3 ตัวท้ายอีกครั้ง")
         );
@@ -947,7 +972,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       if (!result.ok) {
         recordTicketFailure(interaction, result, studentCode);
-        await interaction.editReply(ticketErrorPayload("workspace", result, studentCode, interaction.user.id));
+        await interaction.editReply(ticketErrorPayload("workspace", result, interaction.user.id));
         return;
       }
 
@@ -990,8 +1015,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await beginPrivateReply(interaction);
       try {
         await handleBotControlCommand(interaction, syncNexoraBotPresence);
-      } catch (error: any) {
-        console.error("[ERROR] /bot-control:", error?.message || error);
+      } catch (error) {
+        console.error("[ERROR] /bot-control:", describeError(error));
         await interaction.editReply({ content: "บันทึกการตั้งค่าไม่สำเร็จ ลองใหม่อีกครั้ง" });
       }
       return;
@@ -1004,8 +1029,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await beginPrivateReply(interaction);
       try {
         await handleGalleryCommand(interaction);
-      } catch (error: any) {
-        console.error("[ERROR] /gallery:", error?.message || error);
+      } catch (error) {
+        console.error("[ERROR] /gallery:", describeError(error));
         await interaction.editReply({ content: "ขอลิงก์ไม่สำเร็จ ลองใหม่อีกครั้ง" });
       }
       return;
@@ -1015,8 +1040,8 @@ if (commandName === "my-uploads") {
       await beginPrivateReply(interaction);
       try {
         await handleMyUploadsCommand(interaction);
-      } catch (error: any) {
-        console.error("[ERROR] /my-uploads:", error?.message || error);
+      } catch (error) {
+        console.error("[ERROR] /my-uploads:", describeError(error));
         await interaction.editReply({ content: "ดูประวัติไม่สำเร็จ ลองใหม่อีกครั้ง" });
       }
       return;
@@ -1026,8 +1051,8 @@ if (commandName === "upload") {
       await beginPrivateReply(interaction);
       try {
         await handleUploadCommand(interaction);
-      } catch (error: any) {
-        console.error("[ERROR] /upload:", error?.message || error);
+      } catch (error) {
+        console.error("[ERROR] /upload:", describeError(error));
         await interaction.editReply({ content: "อัปโหลดไม่สำเร็จ ลองใหม่อีกครั้ง" });
       }
       return;
@@ -1062,7 +1087,7 @@ if (["db","code"].includes(commandName) && !await canUseBotScope(interaction,com
 
             if (!result.ok) {
               recordTicketFailure(interaction, result, boundCode);
-              await interaction.editReply(ticketErrorPayload("db", result, boundCode, interaction.user.id));
+              await interaction.editReply(ticketErrorPayload("db", result, interaction.user.id));
               return;
             }
 
@@ -1100,7 +1125,7 @@ if (["db","code"].includes(commandName) && !await canUseBotScope(interaction,com
 
       if (!result.ok) {
         recordTicketFailure(interaction, result, codeOption);
-        await interaction.editReply(ticketErrorPayload("db", result, codeOption, interaction.user.id));
+        await interaction.editReply(ticketErrorPayload("db", result, interaction.user.id));
         return;
       }
 
@@ -1137,7 +1162,7 @@ if (["db","code"].includes(commandName) && !await canUseBotScope(interaction,com
 
             if (!result.ok) {
               recordTicketFailure(interaction, result, boundCode);
-              await interaction.editReply(ticketErrorPayload("workspace", result, boundCode, interaction.user.id));
+              await interaction.editReply(ticketErrorPayload("workspace", result, interaction.user.id));
               return;
             }
 
@@ -1175,7 +1200,7 @@ if (["db","code"].includes(commandName) && !await canUseBotScope(interaction,com
 
       if (!result.ok) {
         recordTicketFailure(interaction, result, codeOption);
-        await interaction.editReply(ticketErrorPayload("workspace", result, codeOption, interaction.user.id));
+        await interaction.editReply(ticketErrorPayload("workspace", result, interaction.user.id));
         return;
       }
 
@@ -1271,7 +1296,7 @@ if (["db","code"].includes(commandName) && !await canUseBotScope(interaction,com
             headers: actorHeaders,
             timeout: 10000,
           });
-          const items = res.data?.items || [];
+          const items: StudentMapping[] = res.data?.items || [];
           if (items.length === 0) {
             await interaction.editReply({
               content: "ยังไม่มีรายการผูกรหัส เพิ่มได้จากเมนู ‘ผูกรหัสกับฐานข้อมูล’",
@@ -1279,7 +1304,7 @@ if (["db","code"].includes(commandName) && !await canUseBotScope(interaction,com
             return;
           }
 
-          const lines = items.slice(0, 25).map((item: any) =>
+          const lines = items.slice(0, 25).map((item) =>
             `- รหัส **${item.studentCode}** -> DB: \`${item.dbName}\` (${item.studentName || item.ownerName || "-"})`
           );
 
@@ -1290,7 +1315,7 @@ if (["db","code"].includes(commandName) && !await canUseBotScope(interaction,com
             .setFooter({ text: "จัดการรายการทั้งหมดได้ที่ https://nkn02.com/admin/databases" });
 
           await interaction.editReply({ embeds: [listEmbed] });
-        } catch (err: any) {
+        } catch {
           await interaction.editReply({
             content: "โหลดรายการไม่สำเร็จ ลองใหม่อีกครั้ง",
           });
@@ -1320,7 +1345,7 @@ if (["db","code"].includes(commandName) && !await canUseBotScope(interaction,com
           await interaction.editReply({
             content: `บันทึกการผูกรหัส **${code}** กับฐานข้อมูล \`${database}\` เรียบร้อยแล้ว`,
           });
-        } catch (err: any) {
+        } catch {
           await interaction.editReply({
             content: "บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง",
           });
@@ -1345,7 +1370,7 @@ if (["db","code"].includes(commandName) && !await canUseBotScope(interaction,com
           await interaction.editReply({
             content: res.data?.message || `ปลดการผูก Discord ของรหัส **${code}** เรียบร้อยแล้ว`,
           });
-        } catch (err: any) {
+        } catch {
           await interaction.editReply({
             content: "ปลดการผูกไม่สำเร็จ ลองใหม่อีกครั้ง",
           });
@@ -1375,14 +1400,14 @@ if (["db","code"].includes(commandName) && !await canUseBotScope(interaction,com
       await beginPrivateReply(interaction);
       try {
         await handleLockdownCommand(interaction);
-      } catch (error:any) {
-        console.error("[ERROR] /lockdown:", error?.response?.status || "", error?.message || error);
-        await interaction.editReply({ content:error?.response?.data?.error || error?.message || "ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง",embeds:[] });
+      } catch (error) {
+        console.error("[ERROR] /lockdown:", errorStatus(error) || "", describeError(error));
+        await interaction.editReply({ content:apiErrorField(error, "error") || (error instanceof Error && error.message) || "ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง",embeds:[] });
       }
       return;
     }
   }
-} catch (fatalErr: any) {
+} catch (fatalErr) {
   console.error("[ERROR] Unhandled interaction error:", fatalErr);
   try {
     if (interaction.isRepliable()) {
@@ -1478,7 +1503,7 @@ client.on(Events.MessageCreate, async (message) => {
           const noticeContent = dmSent
             ? `<@${message.author.id}> พิมพ์รหัส 3 ตัวท้ายมาในข้อความส่วนตัวได้เลย`
             : `<@${message.author.id}> พิมพ์ \`${prefix} 123\` หรือใช้ ${isWorkspace ? "/code" : "/db"}`;
-          await sendReplaceableNotice(message.channel, message.author.id, noticeContent);
+          if (message.channel.isSendable()) await sendReplaceableNotice(message.channel, message.author.id, noticeContent);
         } catch {}
         return;
       }
@@ -1495,7 +1520,7 @@ client.on(Events.MessageCreate, async (message) => {
         if (!result.ok) {
           try {
             await replaceDirectMessage(message.author.id, () =>
-              message.author.send(ticketErrorPayload("workspace", result, code, message.author.id))
+              message.author.send(ticketErrorPayload("workspace", result, message.author.id))
             );
           } catch {}
           return;
@@ -1518,7 +1543,7 @@ client.on(Events.MessageCreate, async (message) => {
           const noticeContent = dmSent
             ? `<@${message.author.id}> ส่งให้ในข้อความส่วนตัวแล้ว`
             : `<@${message.author.id}> เปิดรับข้อความส่วนตัวก่อน หรือใช้ /code`;
-          await sendReplaceableNotice(message.channel, message.author.id, noticeContent);
+          if (message.channel.isSendable()) await sendReplaceableNotice(message.channel, message.author.id, noticeContent);
         } catch {}
       } else {
         const result = await fetchStudentTicket(
@@ -1531,7 +1556,7 @@ client.on(Events.MessageCreate, async (message) => {
         if (!result.ok) {
           try {
             await replaceDirectMessage(message.author.id, () =>
-              message.author.send(ticketErrorPayload("db", result, code, message.author.id))
+              message.author.send(ticketErrorPayload("db", result, message.author.id))
             );
           } catch {}
           return;
@@ -1554,7 +1579,7 @@ client.on(Events.MessageCreate, async (message) => {
           const noticeContent = dmSent
             ? `<@${message.author.id}> ส่งให้ในข้อความส่วนตัวแล้ว`
             : `<@${message.author.id}> เปิดรับข้อความส่วนตัวก่อน หรือใช้ /db`;
-          await sendReplaceableNotice(message.channel, message.author.id, noticeContent);
+          if (message.channel.isSendable()) await sendReplaceableNotice(message.channel, message.author.id, noticeContent);
         } catch {}
       }
       return;
@@ -1603,7 +1628,7 @@ client.on(Events.MessageCreate, async (message) => {
     );
     if (!result.ok) {
       await replaceDirectMessage(message.author.id, () =>
-        message.reply(ticketErrorPayload("workspace", result, code, message.author.id))
+        message.reply(ticketErrorPayload("workspace", result, message.author.id))
       );
       return;
     }
@@ -1620,7 +1645,7 @@ client.on(Events.MessageCreate, async (message) => {
     );
     if (!result.ok) {
       await replaceDirectMessage(message.author.id, () =>
-        message.reply(ticketErrorPayload("db", result, code, message.author.id))
+        message.reply(ticketErrorPayload("db", result, message.author.id))
       );
       return;
     }

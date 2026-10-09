@@ -2,9 +2,7 @@
 import assert from 'node:assert/strict';
 import {
   MockHostingBackend,
-  WorkspaceSession,
-  detectLanguage,
-  computeLineDiff
+  WorkspaceSession
 } from './harness.mjs';
 
 // ============================================================================

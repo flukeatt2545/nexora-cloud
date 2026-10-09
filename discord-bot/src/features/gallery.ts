@@ -5,7 +5,10 @@ import {
   ButtonStyle,
   EmbedBuilder,
   SlashCommandBuilder,
+  type ChatInputCommandInteraction,
 } from "discord.js";
+import { recordActivity } from "./activity-log";
+import { describeError, errorStatus } from "./errors";
 
 const API_URL = (process.env.NEXORA_API_URL || "http://api:8080").replace(/\/+$/, "");
 const BOT_SECRET = (process.env.BOT_INTERNAL_SECRET || "").trim();
@@ -14,7 +17,7 @@ export const galleryCommand = new SlashCommandBuilder()
   .setName("gallery")
   .setDescription("รับลิงก์แกลเลอรีรูปของคุณ (ดูและลบรูปได้ ไม่ต้องล็อกอิน)");
 
-export async function handleGalleryCommand(interaction: any): Promise<void> {
+export async function handleGalleryCommand(interaction: ChatInputCommandInteraction): Promise<void> {
   // NOTE: index.ts must route commandName === "gallery" here WITHOUT admin/scope
   // gating (everyone in the guild may use it), after beginPrivateReply().
   const user = interaction.user;
@@ -33,7 +36,7 @@ export async function handleGalleryCommand(interaction: any): Promise<void> {
       });
       const items = hist.data?.items || [];
       if (!items.length) {
-        interaction.recordBotActivity?.({
+        recordActivity(interaction, {
           outcome: "success",
           result: "ยังไม่ได้ออกลิงก์ เพราะผู้ใช้ยังไม่เคยอัปโหลดรูป",
         });
@@ -49,10 +52,10 @@ export async function handleGalleryCommand(interaction: any): Promise<void> {
         });
         return;
       }
-    } catch (checkErr: any) {
+    } catch (checkErr) {
       // Non-fatal: if the check itself fails, fall through and issue the
       // ticket anyway rather than blocking the user.
-      console.warn("[WARN] /gallery upload check failed, continuing:", checkErr?.message || checkErr);
+      console.warn("[WARN] /gallery upload check failed, continuing:", describeError(checkErr));
     }
 
     const res = await axios.post(
@@ -76,7 +79,7 @@ export async function handleGalleryCommand(interaction: any): Promise<void> {
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setLabel("เปิดแกลเลอรีของฉัน").setStyle(ButtonStyle.Link).setURL(url)
     );
-    interaction.recordBotActivity?.({
+    recordActivity(interaction, {
       outcome: "success",
       result: "ออกลิงก์เข้าแกลเลอรีให้แล้ว (ใช้ได้ครั้งเดียว หมดอายุใน 10 นาที)",
     });
@@ -86,9 +89,9 @@ export async function handleGalleryCommand(interaction: any): Promise<void> {
         "ลิงก์นี้ใช้ได้ครั้งเดียว หมดอายุใน 10 นาที ไม่ต้องล็อกอิน",
       components: [row],
     });
-  } catch (error: any) {
-    console.error("[ERROR] /gallery", error?.response?.status || "", error?.message || error);
-    interaction.recordBotActivity?.({ outcome: "failure", result: "ออกลิงก์แกลเลอรีไม่สำเร็จ ระบบหลังบ้านไม่ตอบสนอง", details: String(error?.message || "unknown").slice(0, 200) });
+  } catch (error) {
+    console.error("[ERROR] /gallery", errorStatus(error) || "", describeError(error));
+    recordActivity(interaction, { outcome: "failure", result: "ออกลิงก์แกลเลอรีไม่สำเร็จ ระบบหลังบ้านไม่ตอบสนอง", details: String((error instanceof Error && error.message) || "unknown").slice(0, 200) });
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()

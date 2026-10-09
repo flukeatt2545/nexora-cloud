@@ -263,7 +263,7 @@ export function DiscordVoiceMessages({ notify }: { notify: Notice }) {
               <div className={`dvm-embed${tab === "panel" ? "" : " is-log"}`}>
                 {form.title.trim() && <strong>{form.title}</strong>}
                 {form.body.trim() && <p>{form.body}</p>}
-                {/* eslint-disable-next-line @next/next/no-img-element -- a local blob preview */}
+                { }
                 {imageUrl && <img src={imageUrl} alt="" />}
                 {hasImage && !imageUrl && <span className="dvm-image-wait">กำลังโหลดรูป...</span>}
                 {!form.title.trim() && !form.body.trim() && !hasImage && <p className="dvm-empty">ยังไม่มีอะไรให้แสดง</p>}

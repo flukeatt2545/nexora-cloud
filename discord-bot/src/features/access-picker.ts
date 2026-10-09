@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ActionRowBuilder, RoleSelectMenuBuilder, UserSelectMenuBuilder } from "discord.js";
+import { ActionRowBuilder, RoleSelectMenuBuilder, UserSelectMenuBuilder, type MessageMentionTypes } from "discord.js";
 
 type PickerSession = { actorId: string; type: "user" | "role"; scope: string; initial: string[]; editable: string[]; expiresAt: number };
 const sessions = new Map<string, PickerSession>();
@@ -15,7 +15,7 @@ export function accessPicker(actorId: string, type: "user" | "role", ids: string
     ? new UserSelectMenuBuilder().setDefaultUsers(editable)
     : new RoleSelectMenuBuilder().setDefaultRoles(editable);
   select.setCustomId(key).setPlaceholder(type === "user" ? "เลือกผู้ใช้ที่อนุญาต" : "เลือกยศที่อนุญาต").setMinValues(0).setMaxValues(25);
-  return { content: "ติ๊กไว้ = มีสิทธิ์\nเพิ่มติ๊กเพื่อให้สิทธิ์ หรือเอาติ๊กออกเพื่อถอนสิทธิ์ บันทึกให้อัตโนมัติเมื่อเลือกเสร็จ" + (ids.length > 25 ? "\nแก้ได้ครั้งละ 25 รายชื่อ รายชื่อที่เหลือยังมีสิทธิ์เหมือนเดิม" : ""), components: [new ActionRowBuilder<any>().addComponents(select)], allowedMentions: {parse: [] as string[]} };
+  return { content: "ติ๊กไว้ = มีสิทธิ์\nเพิ่มติ๊กเพื่อให้สิทธิ์ หรือเอาติ๊กออกเพื่อถอนสิทธิ์ บันทึกให้อัตโนมัติเมื่อเลือกเสร็จ" + (ids.length > 25 ? "\nแก้ได้ครั้งละ 25 รายชื่อ รายชื่อที่เหลือยังมีสิทธิ์เหมือนเดิม" : ""), components: [new ActionRowBuilder<UserSelectMenuBuilder | RoleSelectMenuBuilder>().addComponents(select)], allowedMentions: {parse: [] as MessageMentionTypes[]} };
 }
 
 export function accessPickerScope(key: string, actorId: string): string {

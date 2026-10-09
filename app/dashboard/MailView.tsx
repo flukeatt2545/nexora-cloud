@@ -1,18 +1,11 @@
 "use client";
-/* eslint-disable @next/next/no-html-link-for-pages */
 
 import {
-  Activity,
-  AtSign,
   Archive,
-  Check,
   ChevronLeft,
-  CircleAlert,
-  CloudCog,
   Copy,
   Download,
   File,
-  Globe2,
   Inbox,
   KeyRound,
   Mail,
@@ -21,9 +14,7 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Server,
   Send,
-  ShieldCheck,
   Settings2,
   Smartphone,
   Trash2,
@@ -35,7 +26,6 @@ import {
   FormEvent,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -185,27 +175,6 @@ type Domain = {
   ownerUsername?: string;
   mailboxCount: number;
 };
-type MailHistory = {
-  id: string;
-  from: string;
-  to: string;
-  subject: string;
-  status: string;
-  date: string;
-};
-type ResendSettings = {
-  apiKeyConfigured: boolean;
-  webhookSecretConfigured: boolean;
-  providerConfigured: boolean;
-  source: string;
-  webhookUrl: string;
-};
-type StalwartHealth = {
-  configured: boolean;
-  healthy: boolean;
-  error?: string;
-  publicUrl?: string;
-};
 type ComposeState = {
   draftId?: string;
   to: string;
@@ -282,30 +251,6 @@ function when(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function domainStatusLabel(status: string) {
-  return (
-    {
-      active: "พร้อมใช้งาน",
-      pending_dns: "รอตั้งค่า DNS",
-      pending_approval: "รออนุมัติ",
-      suspended: "ระงับใช้งาน",
-      failed: "ตรวจสอบไม่ผ่าน",
-    }[status] || status.replaceAll("_", " ")
-  );
-}
-
-function deliveryStatusLabel(status: string) {
-  return (
-    {
-      queued: "รอส่ง",
-      sent: "ส่งแล้ว",
-      delivered: "ส่งสำเร็จ",
-      failed: "ส่งไม่สำเร็จ",
-      bounced: "ตีกลับ",
-    }[status] || status
-  );
 }
 
 export default function MailView({ notify }: { notify: Notice }) {

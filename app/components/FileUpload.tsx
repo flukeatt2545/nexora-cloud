@@ -30,6 +30,15 @@ type StagedFile = {
   error?: string;
 };
 
+// Blocked extensions (mirrors backend)
+const BLOCKED_EXTENSIONS = new Set([
+  '.exe', '.bat', '.cmd', '.com', '.msi', '.scr', '.pif',
+  '.vbs', '.vbe', '.js', '.jse', '.wsf', '.wsh', '.ps1', '.psm1',
+  '.sh', '.bash', '.php', '.phtml', '.asp', '.aspx', '.jsp',
+  '.dll', '.sys', '.drv', '.reg', '.inf', '.hta', '.cpl',
+  '.jar', '.class', '.py', '.pyc', '.rb',
+]);
+
 export default function FileUpload({ 
   onUploadSuccess, 
   acceptedTypes = "*", 
@@ -46,14 +55,6 @@ export default function FileUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
 
-  // Blocked extensions (mirrors backend)
-  const blockedExtensions = new Set([
-    '.exe', '.bat', '.cmd', '.com', '.msi', '.scr', '.pif',
-    '.vbs', '.vbe', '.js', '.jse', '.wsf', '.wsh', '.ps1', '.psm1',
-    '.sh', '.bash', '.php', '.phtml', '.asp', '.aspx', '.jsp',
-    '.dll', '.sys', '.drv', '.reg', '.inf', '.hta', '.cpl',
-    '.jar', '.class', '.py', '.pyc', '.rb',
-  ]);
 
   const addFiles = useCallback((incoming?: FileList | File[] | null) => {
     setError(null);
@@ -67,7 +68,7 @@ export default function FileUpload({
         err = `ขนาดไฟล์ต้องไม่เกิน ${maxSizeMB}MB`;
       }
       const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
-      if (blockedExtensions.has(ext)) {
+      if (BLOCKED_EXTENSIONS.has(ext)) {
         err = `ไม่อนุญาตให้อัพโหลดไฟล์ประเภท ${ext}`;
       }
       return {

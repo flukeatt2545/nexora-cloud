@@ -94,7 +94,7 @@ export default function CoverCropper({
         {failed ? (
           <NoCoverArt variant="error" label="โหลดรูปปกไม่ได้" />
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element
+           
           <img src={src} alt="" draggable={false} onError={() => setFailed(true)} onLoad={() => setFailed(false)} style={coverCropStyle(crop)} />
         )}
         <span className="cover-cropper-thirds" aria-hidden="true" />

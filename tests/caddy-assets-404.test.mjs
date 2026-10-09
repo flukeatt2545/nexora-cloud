@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const caddy = readFileSync(new URL("../Caddyfile", import.meta.url), "utf8");
-const hostCaddy = readFileSync(new URL("../deploy/Caddyfile.vps_host", import.meta.url), "utf8");
 const crowdsec = readFileSync(new URL("../deploy/crowdsec-errors.caddy", import.meta.url), "utf8");
 
 test("missing uploaded assets do not pass S3 XML through to HTML navigations", () => {

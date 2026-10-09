@@ -95,7 +95,8 @@ export default function ThemeLoader() {
 
         // File-share pages receive per-file metadata from their server layout.
         // Do not replace it with the site-wide Open Graph values after hydration.
-        if (!/^\/files\/d\/[a-f0-9]{32}$/i.test(pathname || "")) {
+        // Read the address now: the settings arrive after the page may have changed.
+        if (!/^\/files\/d\/[a-f0-9]{32}$/i.test(window.location.pathname)) {
           const description = data.ogDescription || data.siteDescription;
           if (description) {
             updateMetaTag("name", "description", description);

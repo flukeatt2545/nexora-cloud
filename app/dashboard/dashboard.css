@@ -12634,7 +12634,7 @@ textarea.premium-input{resize:none;min-height:104px;line-height:1.6}
 .spf-delivery .spf-btn{min-height:34px}
 .spf-dropzone{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:12px 14px;border:1px dashed var(--control-line);border-radius:8px;background:transparent;color:var(--theme-text-soft);font:inherit;text-align:left;cursor:pointer;transition:border-color .15s,background .15s,color .15s}
 .spf-dropzone:hover{border-color:var(--primary-border);background:var(--theme-hover);color: var(--primary-ink)}
-.spf-dropzone[aria-invalid="true"]{border-color:rgb(var(--danger-rgb) / 0.6)}
+.spf-dropzone.is-invalid,.system-dialog-backdrop .spf-dropzone.is-invalid{border-color:rgb(var(--danger-rgb) / 0.6)}
 .spf-dropzone span{display:grid;gap:2px}
 .spf-dropzone strong{color:var(--theme-text-strong);font-size:13px}
 .spf-dropzone small{font-size:12px}

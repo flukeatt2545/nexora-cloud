@@ -35,12 +35,10 @@ export default function PdfPreview({ url, title }: { url: string; title: string 
         ).toString();
 
         const task = pdfjs.getDocument({ url });
-        loadingTask = task as any;
+        loadingTask = task;
         const document = await task.promise;
-        if (!active) {
-          await (document as any).destroy?.();
-          return;
-        }
+        // Closed meanwhile: the cleanup below already destroyed the loading task and its document.
+        if (!active) return;
 
         for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
           if (!active) break;

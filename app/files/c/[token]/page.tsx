@@ -32,7 +32,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, type TouchEvent as ReactTouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, type TouchEvent as ReactTouchEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { getDocumentTitle, type SiteTitleMode } from "../../../pageTitle";
 import { applyThemeColor } from "../../../themeColor";
 import { API_BASE } from "../../../runtime";
@@ -196,23 +196,35 @@ function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+// The address does not change while this page is open; there is nothing to subscribe to.
+const subscribeNever = () => () => {};
+const readShareToken = () => window.location.pathname.split("/").filter(Boolean).at(-1) || "";
+
+// The list/card choice is remembered in this browser; the server always renders the list.
+function subscribeStorage(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+}
+function storedView(): "table" | "grid" {
+  try { return window.localStorage.getItem(VIEW_KEY) === "grid" ? "grid" : "table"; } catch { return "table"; }
+}
+
 export default function PublicCategoryPage() {
   const [data, setData] = useState<SharedCategory | null>(null);
-  const [errorKind, setErrorKind] = useState<LinkGoneKind>("gone");
+  const [failedKind, setErrorKind] = useState<LinkGoneKind>("gone");
   const [attempt, setAttempt] = useState(0);
   const [notice, setNotice] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [fetching, setLoading] = useState(true);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [query, setQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
-  useEffect(() => {
-    try { if (window.localStorage.getItem(VIEW_KEY) === "grid") setViewMode("grid"); } catch { /* storage blocked */ }
-  }, []);
+  const savedView = useSyncExternalStore(subscribeStorage, storedView, () => "table" as const);
+  const [pickedView, setPickedView] = useState<"table" | "grid" | null>(null);
+  const viewMode = pickedView ?? savedView;
   function chooseView(mode: "table" | "grid") {
-    setViewMode(mode);
+    setPickedView(mode);
     try { window.localStorage.setItem(VIEW_KEY, mode); } catch { /* storage blocked */ }
   }
-  const [activeTab, setActiveTab] = useState<"all" | "image" | "video" | "audio" | "doc" | "archive">("all");
+  const [pickedTab, setActiveTab] = useState<"all" | "image" | "video" | "audio" | "doc" | "archive">("all");
   const [sortBy, setSortBy] = useState<"date_desc" | "date_asc" | "name_asc" | "name_desc" | "size_desc" | "size_asc">("date_desc");
   const [copied, setCopied] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -235,7 +247,12 @@ export default function PublicCategoryPage() {
   const [folderUnlockBusy, setFolderUnlockBusy] = useState(false);
 
   const inFlight = useRef(false);
-  const token = typeof window === "undefined" ? "" : window.location.pathname.split("/").filter(Boolean).at(-1) || "";
+  // The server renders without the address; the token is read once the page runs in the browser.
+  const token = useSyncExternalStore(subscribeNever, readShareToken, () => "");
+  // A token that cannot be a share link is reported at once, without asking the server.
+  const tokenBroken = Boolean(token) && !SHARE_TOKEN.test(token);
+  const loading = fetching && !tokenBroken;
+  const errorKind: LinkGoneKind = tokenBroken ? "broken" : failedKind;
 
   useEffect(() => {
     fetch(`${API_BASE}/api/settings/public`)
@@ -252,14 +269,8 @@ export default function PublicCategoryPage() {
   }, []);
 
   useEffect(() => {
-    if (!token) return;
-    if (!SHARE_TOKEN.test(token)) {
-      setErrorKind("broken");
-      setLoading(false);
-      return;
-    }
+    if (!token || tokenBroken) return;
     let cancelled = false;
-    setLoading(true);
     fetch(`${API_BASE}/api/public/file-categories/${encodeURIComponent(token)}`, { cache: "no-store" })
       .then(async (response) => {
         const payload = await response.json().catch(() => ({}));
@@ -284,7 +295,7 @@ export default function PublicCategoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [token, attempt]);
+  }, [token, tokenBroken, attempt]);
 
   useEffect(() => {
     if (!settings || typeof document === "undefined") return;
@@ -389,9 +400,7 @@ export default function PublicCategoryPage() {
   ] as const).filter((tab) => tab.key === "all" || tab.count > 0);
 
   // A type tab that no longer has files in the selected folder falls back to "all".
-  useEffect(() => {
-    if (activeTab !== "all" && counts[activeTab] === 0) setActiveTab("all");
-  }, [activeTab, counts]);
+  const activeTab = pickedTab !== "all" && counts[pickedTab] === 0 ? "all" : pickedTab;
 
   const filtered = useMemo(() => {
     let list = scoped;
@@ -429,7 +438,12 @@ export default function PublicCategoryPage() {
   const currentPage = Math.min(page, pageCount);
   const pageItems = viewMode === "table" ? filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE) : filtered;
   // A new folder, filter, search or order starts again from page 1.
-  useEffect(() => { setPage(1); }, [selectedFolderId, activeTab, query, sortBy, viewMode]);
+  const pageKey = `${selectedFolderId}|${activeTab}|${query}|${sortBy}|${viewMode}`;
+  const [pageFor, setPageFor] = useState(pageKey);
+  if (pageFor !== pageKey) {
+    setPageFor(pageKey);
+    setPage(1);
+  }
   const listTopRef = useRef<HTMLDivElement>(null);
   // Preview steps through the files in the current view, skipping ones that need a password.
   const lockedFolderIds = useMemo(
@@ -935,7 +949,7 @@ export default function PublicCategoryPage() {
             </>
           ) : (
             <section className="fcs-panel sf-centred">
-              <LinkGone kind={errorKind} noun="โฟลเดอร์" onRetry={() => setAttempt((n) => n + 1)} />
+              <LinkGone kind={errorKind} noun="โฟลเดอร์" onRetry={() => { setLoading(true); setAttempt((n) => n + 1); }} />
             </section>
           )}
         </div>

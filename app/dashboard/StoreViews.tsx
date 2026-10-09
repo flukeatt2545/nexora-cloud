@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useEffectEvent } from "react";
 import { 
   Plus, Minus, Edit2, Trash2, Search, X, 
-  FolderOpen, Package, AlertCircle, Save, Check,
-  Eye, EyeOff, LayoutGrid, Tag, Layers, ChevronUp, ChevronDown,
+  FolderOpen, Package, Check,
+  Tag, Layers, ChevronUp, ChevronDown,
   Bold, Heading2, Link as LinkIcon, List, RemoveFormatting, Image as ImageIcon, Loader2, Upload
 } from "lucide-react";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
@@ -14,6 +14,7 @@ import NoCoverArt from "../components/NoCoverArt";
 import CoverCropper from "../components/CoverCropper";
 import { coverCropStyle, type CoverCrop } from "../lib/coverCrop";
 import { useEscape, useScrollLock } from "./useScrollLock";
+import { errorText, type Ask, type Notify } from "./types";
 
 async function api<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -87,7 +88,7 @@ function LinkThumb({ url, tryImage }: { url: string; tryImage: boolean }) {
   if (!tryImage || failed) {
     return <span className="spf-delivery-icon" aria-hidden="true"><LinkIcon size={15} /></span>;
   }
-  // eslint-disable-next-line @next/next/no-img-element
+   
   return <span className="spf-delivery-icon spp-link-thumb" aria-hidden="true"><img src={url} alt="" loading="lazy" onError={() => setFailed(true)} /></span>;
 }
 
@@ -124,6 +125,13 @@ function isImageLink(value?: string) {
 // ==========================================
 // RICH TEXT EDITOR
 // ==========================================
+/** A toolbar button; mouse down is cancelled so the text selection stays put. */
+function RteTool({ label, icon, onClick, tone = "" }: { label: string; icon: React.ReactNode; onClick: () => void; tone?: string }) {
+  return (
+    <button type="button" className={`rte-tool${tone ? ` ${tone}` : ""}`} onMouseDown={(e) => e.preventDefault()} onClick={onClick} title={label} aria-label={label}>{icon}</button>
+  );
+}
+
 function RichTextEditor({ value, onChange, placeholder, labelledBy }: { value: string, onChange: (val: string) => void, placeholder?: string, labelledBy?: string }) {
   const editorRef = React.useRef<HTMLDivElement>(null);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
@@ -170,19 +178,15 @@ function RichTextEditor({ value, onChange, placeholder, labelledBy }: { value: s
     setLinkModalOpen(false);
   };
 
-  const tool = (label: string, icon: React.ReactNode, action: () => void, tone = "") => (
-    <button type="button" className={`rte-tool${tone ? ` ${tone}` : ""}`} onMouseDown={(e) => e.preventDefault()} onClick={action} title={label} aria-label={label}>{icon}</button>
-  );
-
   return (
     <div className="rte">
       <div className="rte-toolbar" role="toolbar" aria-label="จัดรูปแบบข้อความ">
-        {tool("ตัวหนา", <Bold size={15} />, () => exec("bold"))}
-        {tool("หัวข้อ", <Heading2 size={15} />, () => exec("formatBlock", "H3"))}
-        {tool("รายการ", <List size={15} />, () => exec("insertUnorderedList"))}
+        <RteTool label="ตัวหนา" icon={<Bold size={15} />} onClick={() => exec("bold")} />
+        <RteTool label="หัวข้อ" icon={<Heading2 size={15} />} onClick={() => exec("formatBlock", "H3")} />
+        <RteTool label="รายการ" icon={<List size={15} />} onClick={() => exec("insertUnorderedList")} />
         <span className="rte-sep" aria-hidden="true" />
-        {tool("แทรกลิงก์", <LinkIcon size={15} />, addLink)}
-        {tool("ล้างรูปแบบ", <RemoveFormatting size={15} />, () => exec("removeFormat"), "muted")}
+        <RteTool label="แทรกลิงก์" icon={<LinkIcon size={15} />} onClick={addLink} />
+        <RteTool label="ล้างรูปแบบ" icon={<RemoveFormatting size={15} />} onClick={() => exec("removeFormat")} tone="muted" />
       </div>
       <div
         ref={editorRef}
@@ -222,18 +226,9 @@ function RichTextEditor({ value, onChange, placeholder, labelledBy }: { value: s
 }
 
 // ==========================================
-function StoreCategoryVisibilityBadge({ visible }: { visible: boolean }) {
-  return (
-    <span className={`store-cat-badge ${visible ? "is-visible" : "is-hidden"}`}>
-      <i aria-hidden="true" />
-      {visible ? "แสดงผล" : "ซ่อนอยู่"}
-    </span>
-  );
-}
-
 // STORE CATEGORIES VIEW
 // ==========================================
-export function StoreCategoriesView({ notify, ask }: { notify: any; ask: any }) {
+export function StoreCategoriesView({ notify, ask }: { notify: Notify; ask: Ask }) {
   const [categories, setCategories] = useState<StoreCategory[]>([]);
   const [productCounts, setProductCounts] = useState<Record<number, number> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -246,30 +241,29 @@ export function StoreCategoriesView({ notify, ask }: { notify: any; ask: any }) 
   const [busyId, setBusyId] = useState<number | null>(null);
   const [autoAnimateList] = useAutoAnimate<HTMLUListElement>();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [data, products] = await Promise.all([
-        api<{ items: StoreCategory[] }>("/api/admin/store/categories"),
-        api<{ items: StoreProduct[] }>("/api/admin/store/products").catch(() => null),
-      ]);
-      setCategories(data.items || []);
-      setFailed(false);
-      if (products) {
-        const counts: Record<number, number> = {};
-        for (const product of products.items || []) counts[product.categoryId] = (counts[product.categoryId] || 0) + 1;
-        setProductCounts(counts);
-      }
-    } catch (e: any) {
-      setFailed(true);
-      notify({ kind: "error", text: e.message });
-    } finally {
-      setLoading(false);
+  const load = useCallback(() => Promise.all([
+    api<{ items: StoreCategory[] }>("/api/admin/store/categories"),
+    api<{ items: StoreProduct[] }>("/api/admin/store/products").catch(() => null),
+  ]).then(([data, products]) => {
+    setCategories(data.items || []);
+    setFailed(false);
+    if (products) {
+      const counts: Record<number, number> = {};
+      for (const product of products.items || []) counts[product.categoryId] = (counts[product.categoryId] || 0) + 1;
+      setProductCounts(counts);
     }
-  }, [notify]);
+  }).catch((e) => {
+    setFailed(true);
+    notify({ kind: "error", text: errorText(e) });
+  }).finally(() => setLoading(false)), [notify]);
 
   useEffect(() => {
     load();
+  }, [load]);
+  // Reloading after a change shows "loading" again; the first load starts with it on.
+  const reload = useCallback(() => {
+    setLoading(true);
+    return load();
   }, [load]);
 
   const closeEditor = useCallback(() => { if (!saving) setEditingId(null); }, [saving]);
@@ -297,9 +291,9 @@ export function StoreCategoriesView({ notify, ask }: { notify: any; ask: any }) 
         notify({ kind: "success", text: "บันทึกการแก้ไขเรียบร้อยแล้ว" });
       }
       setEditingId(null);
-      load();
-    } catch (e: any) {
-      notify({ kind: "error", text: e.message });
+      reload();
+    } catch (e) {
+      notify({ kind: "error", text: errorText(e) });
     } finally {
       setSaving(false);
     }
@@ -314,9 +308,9 @@ export function StoreCategoriesView({ notify, ask }: { notify: any; ask: any }) 
     try {
       await update(category, { isVisible: !category.isVisible });
       notify({ kind: "success", text: category.isVisible ? `ซ่อน "${category.name}" จากหน้าร้านแล้ว` : `แสดง "${category.name}" บนหน้าร้านแล้ว` });
-    } catch (e: any) {
+    } catch (e) {
       setCategories((list) => list.map((c) => (c.id === category.id ? { ...c, isVisible: category.isVisible } : c)));
-      notify({ kind: "error", text: e.message });
+      notify({ kind: "error", text: errorText(e) });
     } finally {
       setBusyId(null);
     }
@@ -334,9 +328,9 @@ export function StoreCategoriesView({ notify, ask }: { notify: any; ask: any }) 
     setCategories(renumbered);
     try {
       await Promise.all(changed.map((c) => update(c, { sortOrder: c.sortOrder })));
-    } catch (e: any) {
-      notify({ kind: "error", text: e.message });
-      load();
+    } catch (e) {
+      notify({ kind: "error", text: errorText(e) });
+      reload();
     } finally {
       setBusyId(null);
     }
@@ -357,9 +351,9 @@ export function StoreCategoriesView({ notify, ask }: { notify: any; ask: any }) 
         try {
           await api(`/api/admin/store/categories/${category.id}`, { method: "DELETE" });
           notify({ kind: "success", text: "ลบหมวดหมู่แล้ว" });
-          load();
-        } catch (e: any) {
-          notify({ kind: "error", text: e.message });
+          reload();
+        } catch (e) {
+          notify({ kind: "error", text: errorText(e) });
         }
       },
     });
@@ -523,12 +517,39 @@ export function StoreCategoriesView({ notify, ask }: { notify: any; ask: any }) 
 // ==========================================
 // STORE PRODUCTS VIEW
 // ==========================================
-export function StoreProductsView({ notify, ask }: { notify: any; ask: any }) {
+/** A file in the store library (product files, or covers under store-covers/). */
+type LibraryFile = { key?: string; name?: string; size: number; url?: string };
+type SavedLink = { url: string; label: string };
+
+/** Saved links from this browser. Image links once shared the product list; they belong to covers. */
+function readSavedLinks(): { product: SavedLink[]; cover: SavedLink[]; split: boolean } {
+  if (typeof window === "undefined") return { product: [], cover: [], split: true };
+  const read = (key: string): SavedLink[] => {
+    try {
+      const value = JSON.parse(localStorage.getItem(key) || "[]");
+      return Array.isArray(value) ? value.filter((l) => l && typeof l.url === "string").map((l) => ({ url: l.url, label: String(l.label || l.url) })) : [];
+    } catch {
+      return [];
+    }
+  };
+  let product = read(SAVED_LINKS_KEY);
+  let cover = read(SAVED_COVER_LINKS_KEY);
+  let split = true;
+  try { split = Boolean(localStorage.getItem(SAVED_LINKS_SPLIT_KEY)); } catch {}
+  if (!split) {
+    const moved = product.filter((l) => looksLikeImageLink(l.url) && !cover.some((c) => c.url === l.url));
+    cover = [...cover, ...moved];
+    product = product.filter((l) => !looksLikeImageLink(l.url));
+  }
+  return { product, cover, split };
+}
+
+export function StoreProductsView({ notify, ask }: { notify: Notify; ask: Ask }) {
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [categories, setCategories] = useState<StoreCategory[]>([]);
-  const [files, setFiles] = useState<{ key?: string; name?: string; size: number; url?: string }[]>([]);
+  const [files, setFiles] = useState<LibraryFile[]>([]);
   // Covers have their own library (store-covers/) so the two pickers never mix.
-  const [coverFiles, setCoverFiles] = useState<{ key?: string; name?: string; size: number; url?: string }[]>([]);
+  const [coverFiles, setCoverFiles] = useState<LibraryFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<number | "all">("all");
@@ -542,11 +563,10 @@ export function StoreProductsView({ notify, ask }: { notify: any; ask: any }) {
   const [fileSelectMode, setFileSelectMode] = useState<'files'|'links'>('files');
   const [fileCategoryFilter, setFileCategoryFilter] = useState('all');
   const [fileSearch, setFileSearch] = useState("");
-  const [linkSearch, setLinkSearch] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newLinkLabel, setNewLinkLabel] = useState("");
-  const [savedLinks, setSavedLinks] = useState<{url: string, label: string}[]>([]);
-  const [savedCoverLinks, setSavedCoverLinks] = useState<{url: string, label: string}[]>([]);
+  const [savedLinks, setSavedLinks] = useState<SavedLink[]>(() => readSavedLinks().product);
+  const [savedCoverLinks, setSavedCoverLinks] = useState<SavedLink[]>(() => readSavedLinks().cover);
   const [removeLinkTarget, setRemoveLinkTarget] = useState<{ url: string; label: string } | null>(null);
   const [upload, setUpload] = useState<{ name: string; percent: number } | null>(null);
   const [uploadError, setUploadError] = useState("");
@@ -606,22 +626,27 @@ export function StoreProductsView({ notify, ask }: { notify: any; ask: any }) {
     setShowFileSelect(false);
   }
 
+  const onPickerEscape = useEffectEvent(() => {
+    if (removeLinkTarget) setRemoveLinkTarget(null);
+    else closePicker();
+  });
   useEffect(() => {
     if (!showFileSelect) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      if (removeLinkTarget) setRemoveLinkTarget(null);
-      else closePicker();
+      onPickerEscape();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showFileSelect, removeLinkTarget]);
+  }, [showFileSelect]);
 
   // A new file or link replaces the one the "file missing" error was about.
-  useEffect(() => {
+  const [errorsForFile, setErrorsForFile] = useState(editForm.fileKey);
+  if (errorsForFile !== editForm.fileKey) {
+    setErrorsForFile(editForm.fileKey);
     setErrors((prev) => (prev.fileKey ? { ...prev, fileKey: "" } : prev));
-  }, [editForm.fileKey]);
+  }
 
   useEffect(() => {
     if (editingId === null || showFileSelect) return;
@@ -636,31 +661,15 @@ export function StoreProductsView({ notify, ask }: { notify: any; ask: any }) {
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  // Links used to share one list; store the split (already shown by readSavedLinks) once.
   useEffect(() => {
-    type SavedLink = { url: string; label: string };
-    const read = (key: string): SavedLink[] => {
-      try {
-        const value = JSON.parse(localStorage.getItem(key) || "[]");
-        return Array.isArray(value) ? value.filter((l) => l && typeof l.url === "string").map((l) => ({ url: l.url, label: String(l.label || l.url) })) : [];
-      } catch {
-        return [];
-      }
-    };
-    let product = read(SAVED_LINKS_KEY);
-    let cover = read(SAVED_COVER_LINKS_KEY);
+    const { product, cover, split } = readSavedLinks();
+    if (split) return;
     try {
-      // Links used to share one list. Move the image links to the cover list once.
-      if (!localStorage.getItem(SAVED_LINKS_SPLIT_KEY)) {
-        const moved = product.filter((l) => looksLikeImageLink(l.url) && !cover.some((c) => c.url === l.url));
-        cover = [...cover, ...moved];
-        product = product.filter((l) => !looksLikeImageLink(l.url));
-        localStorage.setItem(SAVED_LINKS_KEY, JSON.stringify(product));
-        localStorage.setItem(SAVED_COVER_LINKS_KEY, JSON.stringify(cover));
-        localStorage.setItem(SAVED_LINKS_SPLIT_KEY, "1");
-      }
+      localStorage.setItem(SAVED_LINKS_KEY, JSON.stringify(product));
+      localStorage.setItem(SAVED_COVER_LINKS_KEY, JSON.stringify(cover));
+      localStorage.setItem(SAVED_LINKS_SPLIT_KEY, "1");
     } catch {}
-    setSavedLinks(product);
-    setSavedCoverLinks(cover);
   }, []);
 
   const storeSavedLinks = (forCover: boolean, links: { url: string; label: string }[]) => {
@@ -685,21 +694,20 @@ export function StoreProductsView({ notify, ask }: { notify: any; ask: any }) {
     setRemoveLinkTarget(null);
   };
 
-  const load = useCallback(async () => {
+  const load = useCallback(() => Promise.all([
+    api<{ items: StoreProduct[] }>("/api/admin/store/products"),
+    api<{ items: StoreCategory[] }>("/api/admin/store/categories"),
+  ]).then(([prodRes, catRes]) => {
+    setProducts(prodRes.items || []);
+    setCategories(catRes.items || []);
+  }).catch((e) => {
+    notify({ kind: "error", text: errorText(e) });
+  }).finally(() => setLoading(false)), [notify]);
+  // Reloading after a change shows "loading" again; the first load starts with it on.
+  const reload = useCallback(() => {
     setLoading(true);
-    try {
-      const [prodRes, catRes] = await Promise.all([
-        api<{ items: StoreProduct[] }>("/api/admin/store/products"),
-        api<{ items: StoreCategory[] }>("/api/admin/store/categories"),
-      ]);
-      setProducts(prodRes.items || []);
-      setCategories(catRes.items || []);
-    } catch (e: any) {
-      notify({ kind: "error", text: e.message });
-    } finally {
-      setLoading(false);
-    }
-  }, [notify]);
+    return load();
+  }, [load]);
 
   // Uploads go straight into the store library (/api/admin/files) and the new file is
   // picked for whatever the picker was opened for.
@@ -758,23 +766,20 @@ export function StoreProductsView({ notify, ask }: { notify: any; ask: any }) {
     setShowFileSelect(false);
   }
 
-  const loadFiles = async () => {
-    try {
-      const [productRes, coverRes] = await Promise.all([
-        api<{ items: any[] }>("/api/admin/files"),
-        api<{ items: any[] }>("/api/admin/files?kind=cover"),
-      ]);
-      setFiles(productRes.items || []);
-      setCoverFiles(coverRes.items || []);
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  const loadFiles = useCallback(() => Promise.all([
+    api<{ items: LibraryFile[] }>("/api/admin/files"),
+    api<{ items: LibraryFile[] }>("/api/admin/files?kind=cover"),
+  ]).then(([productRes, coverRes]) => {
+    setFiles(productRes.items || []);
+    setCoverFiles(coverRes.items || []);
+  }).catch((e) => {
+    console.error(e);
+  }), []);
 
   useEffect(() => {
     load();
     loadFiles();
-  }, [load]);
+  }, [load, loadFiles]);
 
   const handleSave = async () => {
     if (saving) return;
@@ -793,7 +798,7 @@ export function StoreProductsView({ notify, ask }: { notify: any; ask: any }) {
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       requestAnimationFrame(() => {
-        const first = document.querySelector<HTMLElement>(".spf [aria-invalid='true'], .spf .spf-delivery.is-invalid .spf-btn");
+        const first = document.querySelector<HTMLElement>(".spf [aria-invalid='true'], .spf .spf-dropzone.is-invalid, .spf .spf-delivery.is-invalid .spf-btn");
         first?.scrollIntoView({ behavior: "smooth", block: "center" });
         first?.focus({ preventScroll: true });
       });
@@ -811,9 +816,9 @@ export function StoreProductsView({ notify, ask }: { notify: any; ask: any }) {
         notify({ kind: "success", text: "บันทึกข้อมูลสินค้าแล้ว" });
       }
       closeEditor();
-      load();
-    } catch (e: any) {
-      if (e?.code === "product_file_missing") {
+      reload();
+    } catch (e) {
+      if ((e as Error & { code?: string }).code === "product_file_missing") {
         // Point at the field: the file sold with this product is gone from the library.
         const text = `ไม่พบไฟล์ "${(editForm.fileKey || "").trim()}" ในคลังไฟล์แล้ว กด "เปลี่ยน" เพื่อเลือกไฟล์หรือลิงก์ใหม่`;
         setErrors((prev) => ({ ...prev, fileKey: text }));
@@ -821,7 +826,7 @@ export function StoreProductsView({ notify, ask }: { notify: any; ask: any }) {
         notify({ kind: "error", text: "ไฟล์ที่ขายของสินค้านี้หายไปจากคลังไฟล์ กรุณาเลือกไฟล์ใหม่" });
         return;
       }
-      notify({ kind: "error", text: e.message });
+      notify({ kind: "error", text: errorText(e) });
     } finally {
       setSaving(false);
     }
@@ -837,9 +842,9 @@ export function StoreProductsView({ notify, ask }: { notify: any; ask: any }) {
         try {
           await api(`/api/admin/store/products/${id}`, { method: "DELETE" });
           notify({ kind: "success", text: "ลบสินค้าสำเร็จแล้ว" });
-          load();
-        } catch (e: any) {
-          notify({ kind: "error", text: e.message });
+          reload();
+        } catch (e) {
+          notify({ kind: "error", text: errorText(e) });
         }
       },
     });
@@ -1059,12 +1064,12 @@ export function StoreProductsView({ notify, ask }: { notify: any; ask: any }) {
                       <button type="button" className="spf-btn" onClick={() => openPicker("fileKey")}>เปลี่ยน</button>
                     </div>
                   ) : (
-                    <button type="button" className="spf-dropzone" aria-invalid={!!errors.fileKey} onClick={() => openPicker("fileKey")}>
+                    <button type="button" className={`spf-dropzone${errors.fileKey ? " is-invalid" : ""}`} aria-describedby={errors.fileKey ? "spf-file-error" : undefined} onClick={() => openPicker("fileKey")}>
                       <FolderOpen size={20} aria-hidden="true" />
                       <span><strong>เลือกไฟล์หรือใส่ลิงก์</strong><small>จากคลังไฟล์ หรือลิงก์ดาวน์โหลดภายนอก</small></span>
                     </button>
                   )}
-                  {errors.fileKey && <small className="spf-error">{errors.fileKey}</small>}
+                  {errors.fileKey && <small className="spf-error" id="spf-file-error">{errors.fileKey}</small>}
                 </section>
 
                 <section className="spf-section" aria-labelledby="spf-pricing">

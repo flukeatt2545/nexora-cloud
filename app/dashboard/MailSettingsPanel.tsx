@@ -36,14 +36,13 @@ export default function MailSettingsPanel({ notify }: { notify: Notice }) {
   const [busy, setBusy] = useState<"" | "save" | "test" | "sync">("");
   const [copied, setCopied] = useState(false);
 
-  const load = useCallback(async () => {
-    const [settings, health] = await Promise.all([
-      api<ResendSettings>("/api/admin/mail/settings/"),
-      api<StalwartHealth>("/api/admin/mail/stalwart/health").catch(() => ({ configured: false, healthy: false } as StalwartHealth)),
-    ]);
+  const load = useCallback(() => Promise.all([
+    api<ResendSettings>("/api/admin/mail/settings/"),
+    api<StalwartHealth>("/api/admin/mail/stalwart/health").catch(() => ({ configured: false, healthy: false } as StalwartHealth)),
+  ]).then(([settings, health]) => {
     setResend(settings);
     setStalwart(health);
-  }, []);
+  }), []);
   useEffect(() => {
     load().catch((error) => notify({ kind: "error", text: (error as Error).message }));
   }, [load, notify]);
@@ -253,11 +252,10 @@ function MailLogCard({ notify }: { notify: Notice }) {
   const [form, setForm] = useState({ enabled: false, groups: [] as string[], webhookUrl: "", clearWebhook: false });
   const [busy, setBusy] = useState<"" | "save" | "test">("");
 
-  const load = useCallback(async () => {
-    const data = await api<MailLogSettings>("/api/admin/mail/log-settings");
+  const load = useCallback(() => api<MailLogSettings>("/api/admin/mail/log-settings").then((data) => {
     setSaved(data);
     setForm({ enabled: data.enabled, groups: data.groups, webhookUrl: "", clearWebhook: false });
-  }, []);
+  }), []);
   useEffect(() => {
     load().catch((error) => notify({ kind: "error", text: (error as Error).message }));
   }, [load, notify]);

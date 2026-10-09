@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import SmartImage from "./components/SmartImage";
 import NoCoverArt from "./components/NoCoverArt";
 import { coverCropStyle, type CoverCrop } from "./lib/coverCrop";
-import { ArrowRight, ArrowUpDown, Bell, Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Cloud, Eye, EyeOff, FolderOpen, Home, Info, LayoutDashboard, LockKeyhole, LogOut, Menu, Search, ShieldCheck, UserRound, X, Zap, TriangleAlert, Star, Heart, Gift, ShieldCheck as ShieldCheckIcon, CheckCircle, Megaphone, Ban, ShoppingCart, Store } from "lucide-react";
+import { ArrowRight, ArrowUpDown, Bell, Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Cloud, Eye, EyeOff, FolderOpen, Info, LayoutDashboard, LockKeyhole, Search, ShieldCheck, UserRound, X, Zap, TriangleAlert, Star, Heart, Gift, CheckCircle, Megaphone, Ban, ShoppingCart, Store } from "lucide-react";
 import { applyThemeColor } from "./themeColor";
 import StoreClosedNotice, { STORE_CLOSED_DETAIL, STORE_CLOSED_TITLE, storeIsOpen } from "./components/StoreClosedNotice";
 import SocialOAuthButton from "./SocialOAuthButton";
@@ -14,6 +14,7 @@ import { getDocumentTitle, type SiteTitleMode } from "./pageTitle";
 import { API_BASE } from "./runtime";
 import { OwnedPurchaseList, POINTS_EVENT, PurchaseDialog, broadcastPoints, formatPointAmount, type OwnedPurchase } from "./components/StorePurchase";
 import { richTextToPlain } from "./lib/safeHtml";
+import Link from "next/link";
 
 const MARQUEE_ICONS: Record<string, React.ElementType> = {
   Megaphone, Bell, TriangleAlert, Info, Zap, Star, Heart, ShieldCheck, CheckCircle, Gift, Store
@@ -287,7 +288,7 @@ function writePopupSnooze(id: number, expiresAt: number | null) {
 }
 
 function Brand({ settings }: { settings?: PublicSettings | null }) {
-  return <a className="brand" href="/#top" aria-label={`${settings?.brandName || "NEXORA CLOUD"} หน้าหลัก`}><img className="brand-logo" src={settings?.logoUrl || "/logo-v2.png"} alt="" /><span>{settings?.brandName || <>NEXORA <b>CLOUD</b></>}</span></a>;
+  return <Link className="brand" href="/#top" aria-label={`${settings?.brandName || "NEXORA CLOUD"} หน้าหลัก`}><img className="brand-logo" src={settings?.logoUrl || "/logo-v2.png"} alt="" /><span>{settings?.brandName || <>NEXORA <b>CLOUD</b></>}</span></Link>;
 }
 
 let cachedLanIp: string = "";
@@ -346,19 +347,28 @@ function AuthModal({
   settings: PublicSettings | null;
   announcements: Announcement[];
 }) {
-  const [mode, setMode] = useState<AuthMode>(initialMode);
+  const wantedMode: AuthMode = initialMode === "register" && settings && !settings.registrationEnabled ? "login" : initialMode;
+  const [mode, setMode] = useState<AuthMode>(wantedMode);
+  const [modeFor, setModeFor] = useState(wantedMode);
+  if (modeFor !== wantedMode) {
+    setModeFor(wantedMode);
+    setMode(wantedMode);
+  }
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [announcementOpen, setAnnouncementOpen] = useState(true);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (open) setAnnouncementOpen(true);
+  }
   const socialProviders = [
     { provider: "discord", label: "Discord", available: settings?.discordEnabled && settings?.discordConfigured },
     { provider: "google", label: "Google", available: settings?.googleEnabled && settings?.googleConfigured },
     { provider: "github", label: "GitHub", available: settings?.githubEnabled && settings?.githubConfigured },
   ].filter((item) => item.available);
 
-  useEffect(() => setMode(initialMode === "register" && settings && !settings.registrationEnabled ? "login" : initialMode), [initialMode, settings]);
-  useEffect(() => { if (open) setAnnouncementOpen(true); }, [open]);
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
@@ -718,21 +728,14 @@ function HomepageBannerCarousel({ items }: { items: Announcement[] }) {
       const bTime = b.createdAt ? new Date(b.createdAt).getTime() : b.id;
       return aTime - bTime;
     }), [items, failedIds]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [requestedIndex, setCurrentIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-
-  useEffect(() => {
-    if (!slides.length) {
-      setCurrentIndex(0);
-      return;
-    }
-    setCurrentIndex((index) => Math.min(index, slides.length - 1));
-  }, [slides.length]);
+  const currentIndex = slides.length ? Math.min(requestedIndex, slides.length - 1) : 0;
 
   useEffect(() => {
     if (paused || slides.length < 2) return;
     const timer = window.setInterval(() => {
-      setCurrentIndex((index) => (index + 1) % slides.length);
+      setCurrentIndex((index) => (Math.min(index, slides.length - 1) + 1) % slides.length);
     }, 7000);
     return () => window.clearInterval(timer);
   }, [paused, slides.length]);
@@ -963,16 +966,7 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
 
   useEffect(() => {
     if (!popupSnoozeUntil) return;
-    const remaining = popupSnoozeUntil - Date.now();
-
-    if (remaining <= 0) {
-      const popup = homeAnnouncements.find((item) => item.kind === "popup");
-      if (popup) writePopupSnooze(popup.id, null);
-      setPopupSnoozeUntil(0);
-      setHomePopupOpen(true);
-      return;
-    }
-
+    const remaining = Math.max(0, popupSnoozeUntil - Date.now());
     const timer = window.setTimeout(() => {
       const popup = homeAnnouncements.find((item) => item.kind === "popup");
       if (popup) writePopupSnooze(popup.id, null);
@@ -1056,30 +1050,39 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
 
   // /api/auth/me has no numeric id, so the username identifies the signed-in account.
   const sessionUserKey = sessionUser?.username;
-  const loadPurchases = useCallback(async () => {
+  const fetchPurchases = useCallback(() => fetch(`${API_BASE}/api/store/purchases`, { credentials: "include", cache: "no-store" })
+    .then(async (response) => {
+      if (!response.ok) return;
+      const payload = await response.json();
+      setPurchases(Array.isArray(payload.items) ? payload.items : []);
+    })
+    .catch(() => {
+      // Keep the previous list; the store still works without it.
+    })
+    .finally(() => setPurchasesLoading(false)), []);
+
+  const loadPurchases = useCallback(() => {
     if (!sessionUserKey) {
       setPurchases([]);
-      return;
+      return Promise.resolve();
     }
     setPurchasesLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/api/store/purchases`, { credentials: "include", cache: "no-store" });
-      if (response.ok) {
-        const payload = await response.json();
-        setPurchases(Array.isArray(payload.items) ? payload.items : []);
-      }
-    } catch {
-      // Keep the previous list; the store still works without it.
-    } finally {
-      setPurchasesLoading(false);
-    }
-  }, [sessionUserKey]);
+    return fetchPurchases();
+  }, [sessionUserKey, fetchPurchases]);
 
+  // A closed store still lists what the visitor already bought (downloads keep working).
+  const purchasesShown = storeSectionVisibleFor(isStorePage, settings, settingsChecked) || (isStorePage && settingsChecked);
+  // Who the list is for: an account, "" when signed out, null while the list is not shown.
+  const purchasesKey = purchasesShown ? sessionUserKey || "" : null;
+  const [purchasesFor, setPurchasesFor] = useState<string | null | undefined>(undefined);
+  if (purchasesFor !== purchasesKey) {
+    setPurchasesFor(purchasesKey);
+    if (purchasesKey === "") setPurchases([]);
+    else if (purchasesKey) setPurchasesLoading(true);
+  }
   useEffect(() => {
-    // A closed store still lists what the visitor already bought (downloads keep working).
-    if (!storeSectionVisibleFor(isStorePage, settings, settingsChecked) && !(isStorePage && settingsChecked)) return;
-    void loadPurchases();
-  }, [loadPurchases, isStorePage, settings, settingsChecked]);
+    if (purchasesShown && sessionUserKey) void fetchPurchases();
+  }, [fetchPurchases, purchasesShown, sessionUserKey]);
 
   useEffect(() => {
     const onPoints = (event: Event) => {
@@ -1153,18 +1156,6 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
     }
   }
 
-  async function logout() {
-    try {
-      const response = await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" });
-      if (!response.ok) throw new Error();
-      setAccountOpen(false);
-      setSessionUser(null);
-      notify("success", "ออกจากระบบเรียบร้อยแล้ว");
-    } catch {
-      notify("error", "ออกจากระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
-    }
-  }
-
   function startService(product: StoreProduct) {
     // Anyone can open the details; signing in is only needed to actually buy.
     setBuyTarget(product);
@@ -1201,12 +1192,12 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
       {!isStorePage && quickActionsVisible && <section className="container section quick-section" id="services">
         <div className="section-heading"><div><h2>{sessionUser ? "คุณต้องการทำอะไร?" : "เริ่มต้นใช้งาน"}</h2><p>{sessionUser ? "ไปยังงานที่ใช้บ่อยได้ทันที" : "เข้าสู่ระบบเพื่อจัดการไฟล์ บริการ และบัญชีของคุณ"}</p></div></div>
         <div className={`quick-grid user-action-grid ${sessionUser ? "" : "guest-action-grid"}`}>
-          {storeSectionVisible && <a href="/store"><span className="quick-action-icon"><ShoppingCart size={23} /></span><div><h3>เลือกซื้อสินค้า</h3><p>ดูสินค้า แพ็กเกจ และบริการที่พร้อมใช้งาน</p></div><span className="quick-action-arrow" aria-hidden="true"><ChevronRight size={18} strokeWidth={2} /></span></a>}
+          {storeSectionVisible && <Link href="/store"><span className="quick-action-icon"><ShoppingCart size={23} /></span><div><h3>เลือกซื้อสินค้า</h3><p>ดูสินค้า แพ็กเกจ และบริการที่พร้อมใช้งาน</p></div><span className="quick-action-arrow" aria-hidden="true"><ChevronRight size={18} strokeWidth={2} /></span></Link>}
           {sessionUser ? <>
-            {storeOpen && <a href="/topups"><span className="quick-action-icon"><Zap size={23} /></span><div><h3>เติมเงิน Points</h3><p>อัปโหลดสลิปและตรวจสอบประวัติการเติมเงิน</p></div><span className="quick-action-arrow" aria-hidden="true"><ChevronRight size={18} strokeWidth={2} /></span></a>}
-            <a href="/hosting"><span className="quick-action-icon"><Cloud size={23} /></span><div><h3>จัดการโฮสติ้ง</h3><p>ดูเว็บไซต์ โดเมน และบริการ Cloud ของคุณ</p></div><span className="quick-action-arrow" aria-hidden="true"><ChevronRight size={18} strokeWidth={2} /></span></a>
-            <a href="/files"><span className="quick-action-icon"><FolderOpen size={23} /></span><div><h3>ไฟล์ของฉัน</h3><p>อัปโหลดและจัดการไฟล์ส่วนตัวของคุณ</p></div><span className="quick-action-arrow" aria-hidden="true"><ChevronRight size={18} strokeWidth={2} /></span></a>
-            <a href="/dashboard"><span className="quick-action-icon"><LayoutDashboard size={23} /></span><div><h3>แดชบอร์ด</h3><p>ไปยังภาพรวมบัญชีและการใช้งานของคุณ</p></div><span className="quick-action-arrow" aria-hidden="true"><ChevronRight size={18} strokeWidth={2} /></span></a>
+            {storeOpen && <Link href="/topups"><span className="quick-action-icon"><Zap size={23} /></span><div><h3>เติมเงิน Points</h3><p>อัปโหลดสลิปและตรวจสอบประวัติการเติมเงิน</p></div><span className="quick-action-arrow" aria-hidden="true"><ChevronRight size={18} strokeWidth={2} /></span></Link>}
+            <Link href="/hosting"><span className="quick-action-icon"><Cloud size={23} /></span><div><h3>จัดการโฮสติ้ง</h3><p>ดูเว็บไซต์ โดเมน และบริการ Cloud ของคุณ</p></div><span className="quick-action-arrow" aria-hidden="true"><ChevronRight size={18} strokeWidth={2} /></span></Link>
+            <Link href="/files"><span className="quick-action-icon"><FolderOpen size={23} /></span><div><h3>ไฟล์ของฉัน</h3><p>อัปโหลดและจัดการไฟล์ส่วนตัวของคุณ</p></div><span className="quick-action-arrow" aria-hidden="true"><ChevronRight size={18} strokeWidth={2} /></span></Link>
+            <Link href="/dashboard"><span className="quick-action-icon"><LayoutDashboard size={23} /></span><div><h3>แดชบอร์ด</h3><p>ไปยังภาพรวมบัญชีและการใช้งานของคุณ</p></div><span className="quick-action-arrow" aria-hidden="true"><ChevronRight size={18} strokeWidth={2} /></span></Link>
           </> : <>
             <a href="#login" className={settings?.registrationEnabled === false ? "is-primary" : undefined} onClick={(event) => { event.preventDefault(); openAuth("login"); }}><span className="quick-action-icon"><LockKeyhole size={23} /></span><div><h3>เข้าสู่ระบบ</h3><p>เปิดแดชบอร์ดและจัดการบริการของคุณ</p></div><span className="quick-action-arrow" aria-hidden="true"><ChevronRight size={18} strokeWidth={2} /></span></a>
             {settings?.registrationEnabled !== false && <a href="#register" className="is-primary" onClick={(event) => { event.preventDefault(); openAuth("register"); }}><span className="quick-action-icon"><UserRound size={23} /></span><div><h3>สมัครสมาชิก</h3><p>สร้างบัญชีใหม่เพื่อเริ่มใช้งาน NEXORA</p></div><span className="quick-action-arrow" aria-hidden="true"><ChevronRight size={18} strokeWidth={2} /></span></a>}
@@ -1221,8 +1212,8 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
             message={settings?.storeClosedMessage}
             note={sessionUser && purchases.length > 0 ? "สินค้าที่ซื้อแล้วยังดาวน์โหลดได้ตามรายการด้านล่าง" : undefined}
           >
-            {!embedded && <a className="is-primary" href="/">กลับหน้าหลัก</a>}
-            {sessionUser && <a href="/dashboard">ไปแดชบอร์ด</a>}
+            {!embedded && <Link className="is-primary" href="/">กลับหน้าหลัก</Link>}
+            {sessionUser && <Link href="/dashboard">ไปแดชบอร์ด</Link>}
           </StoreClosedNotice>
           {sessionUser && purchases.length > 0 && (
             <div className="store-closed-owned">
@@ -1251,9 +1242,9 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
             </div>
           )}
           {!isStorePage && filtered.length > HOME_PRODUCT_PREVIEW && (
-            <a className="store-view-all" href="/store">
+            <Link className="store-view-all" href="/store">
               ดูทั้งหมด <ArrowRight size={16} aria-hidden="true" />
-            </a>
+            </Link>
           )}
         </div>
         {isStorePage && sessionUser && storeTab === "owned" ? (
@@ -1313,9 +1304,9 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
             </div>
             {!isStorePage && filtered.length > visible && (
               <div className="store-view-all-wrap">
-                <a className="button ghost store-view-all-button" href="/store">
+                <Link className="button ghost store-view-all-button" href="/store">
                   ดูทั้งหมด {filtered.length} รายการ <ArrowRight size={16} aria-hidden="true" />
-                </a>
+                </Link>
               </div>
             )}
           </>

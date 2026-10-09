@@ -4,9 +4,7 @@ import {
   MockHostingBackend,
   WorkspaceSession,
   computeLineDiff,
-  canonicalWorkspacePath,
-  editableWorkspacePath,
-  detectLanguage
+  canonicalWorkspacePath
 } from './harness.mjs';
 
 test('Tier 5 Adversarial: Path Traversal & Unicode Directory Injections', async () => {
@@ -14,7 +12,6 @@ test('Tier 5 Adversarial: Path Traversal & Unicode Directory Injections', async 
     'public/index.php': '<?php echo "ok";',
     'config/app.json': '{"name": "test"}'
   });
-  const session = new WorkspaceSession({ backend });
 
   const traversalAttempts = [
     '../../../etc/passwd',

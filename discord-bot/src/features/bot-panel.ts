@@ -6,8 +6,12 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
   StringSelectMenuBuilder,
+  type AnySelectMenuInteraction,
+  type ButtonInteraction,
+  type MessageComponentInteraction,
 } from "discord.js";
-import { botAccessStateEmbed, botMemberRoleIds, botSubjectLabels, canUseBotScope, commandScopeLabels, loadBotAccess, matchesBotSubjects, updateBotAccess } from "./bot-control";
+import { botAccessStateEmbed, botMemberRoleIds, botSubjectLabels, canUseBotScope, commandScopeLabels, loadBotAccess, matchesBotSubjects, updateBotAccess, type LabelSource } from "./bot-control";
+import { recordActivity } from "./activity-log";
 import { isPanelMainMenu, panelActionMenu } from "./panel-actions";
 import { discordMention } from "./discord-mentions";
 import { accessPicker, accessPickerScope, consumeAccessPicker } from "./access-picker";
@@ -35,7 +39,7 @@ export async function buildBotPanelPayload() {
   return { embeds: [embed], components: [panelActionMenu()] };
 }
 
-async function pickerPayload(interaction: any, actorId: string, type: "user" | "role", state: Awaited<ReturnType<typeof loadBotAccess>>, scope="") {
+async function pickerPayload(interaction: LabelSource, actorId: string, type: "user" | "role", state: Awaited<ReturnType<typeof loadBotAccess>>, scope="") {
   const subjects=scope ? state.commandAccess?.[scope] || {users:[],roles:[]} : state;
   const payload = accessPicker(actorId, type, type === "user" ? subjects.users : subjects.roles,scope);
   const [userLabels,roleLabels]=await Promise.all([botSubjectLabels(interaction,subjects.users,"user"),botSubjectLabels(interaction,subjects.roles,"role")]);
@@ -54,13 +58,14 @@ async function pickerPayload(interaction: any, actorId: string, type: "user" | "
 }
 
 export async function handleBotPanelComponent(
-  interaction: any,
+  interaction: ButtonInteraction | AnySelectMenuInteraction,
   isAdmin: boolean,
   applyPresence: () => Promise<void>,
-  beginReply: (interaction: any) => Promise<void>
+  beginReply: (interaction: MessageComponentInteraction) => Promise<void>
 ): Promise<boolean> {
-  const customId = isPanelMainMenu(String(interaction.customId || "")) && String(interaction.values?.[0] || "").startsWith("bot_panel_")
-    ? interaction.values[0] : String(interaction.customId || "");
+  const values = interaction.isAnySelectMenu() ? interaction.values : [];
+  const customId = isPanelMainMenu(String(interaction.customId || "")) && String(values[0] || "").startsWith("bot_panel_")
+    ? values[0] : String(interaction.customId || "");
   if (!customId.startsWith("bot_panel_")) return false;
   await beginReply(interaction);
   const updateAccess = (actorId: string, body: Record<string,string>) => updateBotAccess(actorId, body, botMemberRoleIds(interaction));
@@ -83,7 +88,7 @@ export async function handleBotPanelComponent(
     return true;
   }
   if (customId === "bot_panel_scope_choose") {
-    const scope=String(interaction.values?.[0]||"");
+    const scope=String(values[0]||"");
     if (!commandScopeLabels[scope]) { await interaction.editReply({content:"เมนูไม่ถูกต้อง",components:[]}); return true; }
     await interaction.editReply({content:`กำหนดสิทธิ์: ${commandScopeLabels[scope]}\nเลือกจัดการผู้ใช้หรือยศ รายชื่อที่ติ๊กไว้คือสิทธิ์ปัจจุบัน`,embeds:[],components:[new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId("bot_panel_scope_users:"+scope).setLabel("เลือกผู้ใช้").setStyle(ButtonStyle.Secondary),new ButtonBuilder().setCustomId("bot_panel_scope_roles:"+scope).setLabel("เลือกยศ").setStyle(ButtonStyle.Secondary))]});
     return true;
@@ -118,14 +123,14 @@ export async function handleBotPanelComponent(
   if (customId === "bot_panel_mode") {
     const state = await loadBotAccess(true);
     await updateAccess(interaction.user.id, { action: "set_mode", value: state.accessMode === "everyone" ? "allowlist" : "everyone" });
-    interaction.recordBotActivity?.({ outcome: "success", result: "เปลี่ยนว่าใครใช้คำสั่งบอตได้แล้ว", details: `ตอนนี้ใช้ได้: ${state.accessMode === "everyone" ? "เฉพาะรายชื่อที่อนุญาต" : "ทุกคนในเซิร์ฟเวอร์"}` });
+    recordActivity(interaction, { outcome: "success", result: "เปลี่ยนว่าใครใช้คำสั่งบอตได้แล้ว", details: `ตอนนี้ใช้ได้: ${state.accessMode === "everyone" ? "เฉพาะรายชื่อที่อนุญาต" : "ทุกคนในเซิร์ฟเวอร์"}` });
     await interaction.editReply({ content: "เปลี่ยนโหมดใช้คำสั่งแล้ว", embeds: [await botAccessStateEmbed(await loadBotAccess(),interaction)], components: [] });
     return true;
   }
   if (customId === "bot_panel_visibility") {
     const state = await loadBotAccess(true);
     await updateAccess(interaction.user.id, { action: "set_visibility", value: state.visibility === "online" ? "hidden" : "online" });
-    interaction.recordBotActivity?.({ outcome: "success", result: "เปลี่ยนการแสดงสถานะบอตแล้ว", details: `ตอนนี้บอต: ${state.visibility === "online" ? "ซ่อนสถานะออนไลน์" : "แสดงสถานะออนไลน์"}` });
+    recordActivity(interaction, { outcome: "success", result: "เปลี่ยนการแสดงสถานะบอตแล้ว", details: `ตอนนี้บอต: ${state.visibility === "online" ? "ซ่อนสถานะออนไลน์" : "แสดงสถานะออนไลน์"}` });
     await applyPresence();
     await interaction.editReply({ content: "บันทึกสถานะบอตแล้ว", embeds: [await botAccessStateEmbed(await loadBotAccess(),interaction)], components: [] });
     return true;
@@ -138,7 +143,7 @@ export async function handleBotPanelComponent(
     try {
       scope=accessPickerScope(customId,interaction.user.id);
       const subjects=scope ? state.commandAccess?.[scope] || {users:[],roles:[]} : state;
-      plan = consumeAccessPicker(customId, interaction.user.id, interaction.values || [], subjectType === "user" ? subjects.users : subjects.roles);
+      plan = consumeAccessPicker(customId, interaction.user.id, values, subjectType === "user" ? subjects.users : subjects.roles);
     }
     catch (error) { await interaction.editReply({content: (error as Error).message, embeds: [await botAccessStateEmbed(state,interaction)], components: []}); return true; }
     const changes: string[] = [];
@@ -151,7 +156,7 @@ export async function handleBotPanelComponent(
         ...(scope ? {scope} : {}),
       });
       changes.push(`${action === "remove" ? "ยกเลิกสิทธิ์" : "อนุญาต"}: ${discordMention(id, subjectType)}`);
-      interaction.recordBotActivity?.({ outcome: "success", result: "อัปเดตสิทธิ์แล้ว", details: (scope ? `เมนู: ${commandScopeLabels[scope]}\n` : "สิทธิ์ใช้บอตทั่วไป\n") + changes.join("\n") });
+      recordActivity(interaction, { outcome: "success", result: "อัปเดตสิทธิ์แล้ว", details: (scope ? `เมนู: ${commandScopeLabels[scope]}\n` : "สิทธิ์ใช้บอตทั่วไป\n") + changes.join("\n") });
     }
     const payload = await pickerPayload(interaction,interaction.user.id, subjectType, state,scope);
     await interaction.editReply({ ...payload, content: `${changes.length ? "อัปเดตสิทธิ์แล้ว" : "รายชื่อเหมือนเดิม"}\n${payload.content}` });

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode, TouchEvent } from "react";
 import { API_BASE } from "../runtime";
 import "./gallery.css";
 import SmartImage from "../components/SmartImage";
+import Link from "next/link";
 
 interface GalleryItem {
   id: number;
@@ -196,13 +197,16 @@ function absoluteUrl(url: string): string {
 
 class ServerError extends Error {}
 
+/** What the gallery API answers with; each call uses only its own fields. */
+type ApiData = { items?: GalleryItem[]; discord_username?: string; error?: string; Error?: string } | null;
+
 async function api(path: string, init?: RequestInit) {
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     ...init,
   });
-  let data: any = null;
+  let data: ApiData = null;
   try {
     data = await res.json();
   } catch {
@@ -263,10 +267,9 @@ function ConfirmDeleteModal({
   onConfirm: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const busyRef = useRef(busy);
-  busyRef.current = busy;
-  const cancelRef = useRef(onCancel);
-  cancelRef.current = onCancel;
+  const onEscape = useEffectEvent(() => {
+    if (!busy) onCancel();
+  });
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -279,7 +282,7 @@ function ConfirmDeleteModal({
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopImmediatePropagation();
-        if (!busyRef.current) cancelRef.current();
+        onEscape();
       } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         e.stopImmediatePropagation();
       } else if (e.key === "Tab" && panelRef.current) {
@@ -354,6 +357,19 @@ function ConfirmDeleteModal({
 
 /* ---------- page ---------- */
 
+function subscribeStorage(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+}
+function storedDensity(): Density {
+  try {
+    const saved = window.localStorage.getItem(DENSITY_KEY);
+    return saved === "s" || saved === "m" || saved === "l" ? saved : "m";
+  } catch {
+    return "m"; // storage can be unavailable
+  }
+}
+
 export default function GalleryPage() {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [username, setUsername] = useState("");
@@ -363,11 +379,14 @@ export default function GalleryPage() {
   const [deleting, setDeleting] = useState(false);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("new");
-  const [density, setDensity] = useState<Density>("m");
+  const savedDensity = useSyncExternalStore(subscribeStorage, storedDensity, () => "m" as const);
+  const [pickedDensity, setDensity] = useState<Density | null>(null);
+  const density = pickedDensity ?? savedDensity;
   const [toasts, setToasts] = useState<ToastData[]>([]);
 
   const lightboxRef = useRef<HTMLDivElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
+  // The thumbnail that opened the viewer; focus goes back to it when the viewer closes.
+  const [opener, setOpener] = useState<HTMLElement | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const toastSeq = useRef(0);
@@ -377,15 +396,6 @@ export default function GalleryPage() {
   }, []);
   const dismissToast = useCallback((id: number) => {
     setToasts((current) => current.filter((t) => t.id !== id));
-  }, []);
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(DENSITY_KEY);
-      if (saved === "s" || saved === "m" || saved === "l") setDensity(saved);
-    } catch {
-      /* storage can be unavailable */
-    }
   }, []);
 
   const changeDensity = (next: Density) => {
@@ -401,7 +411,8 @@ export default function GalleryPage() {
     const { res, data } = await api("/api/gallery/uploads");
     if (res.status === 401) return false;
     if (!res.ok) throw new ServerError();
-    setItems(Array.isArray(data?.items) ? data.items : []);
+    const list = data?.items;
+    setItems(Array.isArray(list) ? list : []);
     return true;
   }, []);
 
@@ -409,7 +420,6 @@ export default function GalleryPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setStatus({ kind: "loading" });
     (async () => {
       try {
         const params = new URLSearchParams(window.location.search);
@@ -463,9 +473,10 @@ export default function GalleryPage() {
     return sorted;
   }, [items, query, sort]);
 
+  const [openedAt] = useState(() => Date.now());
   const groups = useMemo(() => {
     if (sort === "large") return [{ key: "all", label: "", entries: visible }];
-    const now = Date.now();
+    const now = openedAt;
     const todayKey = dayKey(new Date(now).toISOString());
     const yesterdayKey = dayKey(new Date(now - 24 * 3600 * 1000).toISOString());
     const out: { key: string; label: string; entries: GalleryItem[] }[] = [];
@@ -476,7 +487,7 @@ export default function GalleryPage() {
       else out.push({ key, label: dayLabel(key, todayKey, yesterdayKey), entries: [it] });
     }
     return out;
-  }, [visible, sort]);
+  }, [visible, sort, openedAt]);
 
   const totalBytes = useMemo(() => items.reduce((sum, it) => sum + (it.size || 0), 0), [items]);
 
@@ -485,10 +496,10 @@ export default function GalleryPage() {
 
   /* ----- lightbox actions ----- */
 
-  const openItem = (id: number, opener?: HTMLElement | null) => {
-    returnFocusRef.current = opener ?? (document.activeElement as HTMLElement | null);
+  const openItem = useCallback((id: number, from?: HTMLElement | null) => {
+    setOpener(from ?? (document.activeElement as HTMLElement | null));
     setActiveId(id);
-  };
+  }, []);
 
   const closeLightbox = useCallback(() => {
     setActiveId(null);
@@ -503,16 +514,14 @@ export default function GalleryPage() {
   );
 
   // If the active item disappears (filter change, delete), close the viewer.
-  useEffect(() => {
-    if (activeId !== null && activeIndex < 0) closeLightbox();
-  }, [activeId, activeIndex, closeLightbox]);
+  if (activeId !== null && activeIndex < 0) setActiveId(null);
 
   // Keyboard, scroll lock, focus management. Runs only when the viewer opens or closes.
   const isOpen = activeId !== null;
-  const stepRef = useRef(step);
-  stepRef.current = step;
-  const modalOpenRef = useRef(false);
-  modalOpenRef.current = pendingDelete !== null;
+  const onStep = useEffectEvent((dir: 1 | -1) => step(dir));
+  // The confirm dialog owns the keyboard while it is open.
+  const confirmOpen = useEffectEvent(() => pendingDelete !== null);
+  const restoreFocus = useEffectEvent(() => opener?.focus?.());
   useEffect(() => {
     if (!isOpen) return;
     const previousOverflow = document.body.style.overflow;
@@ -521,12 +530,12 @@ export default function GalleryPage() {
     root?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
 
     const onKey = (e: KeyboardEvent) => {
-      if (modalOpenRef.current) return; // the confirm dialog owns the keyboard while it is open
+      if (confirmOpen()) return;
       if (e.key === "Escape") {
         e.preventDefault();
         closeLightbox();
-      } else if (e.key === "ArrowRight") stepRef.current(1);
-      else if (e.key === "ArrowLeft") stepRef.current(-1);
+      } else if (e.key === "ArrowRight") onStep(1);
+      else if (e.key === "ArrowLeft") onStep(-1);
       else if (e.key === "Tab" && root) {
         const focusable = Array.from(
           root.querySelectorAll<HTMLElement>("button:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])"),
@@ -547,7 +556,7 @@ export default function GalleryPage() {
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKey);
-      returnFocusRef.current?.focus?.();
+      restoreFocus();
     };
   }, [isOpen, closeLightbox]);
 
@@ -639,10 +648,10 @@ export default function GalleryPage() {
     <div className="gal">
       <header className="gal-header">
         <div className="gal-wrap gal-header-in">
-          <a className="gal-back" href="/" aria-label="กลับหน้าหลัก">
+          <Link className="gal-back" href="/" aria-label="กลับหน้าหลัก">
             <IconArrowLeft size={16} />
             <span>หน้าหลัก</span>
-          </a>
+          </Link>
           <span className="gal-brand-name">แกลเลอรี</span>
           {username && (
             <div className="gal-user" title={username}>
@@ -774,7 +783,7 @@ export default function GalleryPage() {
               โหลดแกลเลอรีไม่ได้ในตอนนี้
             </h2>
             <p className="gal-state-desc">เซิร์ฟเวอร์ไม่ตอบสนองหรืออินเทอร์เน็ตมีปัญหา ลองใหม่อีกครั้งได้เลย</p>
-            <button type="button" className="gal-btn ghost" onClick={() => setAttempt((n) => n + 1)}>
+            <button type="button" className="gal-btn ghost" onClick={() => { setStatus({ kind: "loading" }); setAttempt((n) => n + 1); }}>
               ลองใหม่
             </button>
           </section>

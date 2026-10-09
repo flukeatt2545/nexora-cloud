@@ -1,8 +1,13 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, LabelBuilder, ModalBuilder, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle } from "discord.js";
+import {
+  ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, LabelBuilder, ModalBuilder, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle,
+  type ChatInputCommandInteraction, type Interaction, type MessageComponentInteraction, type ModalSubmitInteraction,
+} from "discord.js";
 import { activeLocalDecisions, unbanIps } from "./crowdsec";
 import { banDurationOptions, resolvePanelBanDuration } from "./ban-duration";
 import { randomUUID } from "node:crypto";
 import { canUseBotScope } from "./bot-control";
+import { recordActivity } from "./activity-log";
+import { errorCode } from "./errors";
 
 const actions = [
   { id: "db", label: "เปิดฐานข้อมูล", command: "db", fields: ["code"] },
@@ -27,11 +32,11 @@ export function isPanelMainMenu(customId: string) {
   return customId === "panel_action_choose" || customId.startsWith("panel_action_choose:");
 }
 
-export async function resetPanelMainMenu(interaction: any) {
-  if (!isPanelMainMenu(String(interaction.customId || "")) || !interaction.message?.edit) return;
+export async function resetPanelMainMenu(interaction: MessageComponentInteraction) {
+  if (!isPanelMainMenu(String(interaction.customId || "")) || !interaction.message) return;
   // A fresh component ID clears Discord's remembered selection, including after modal cancellation.
   try { await interaction.message.edit({ components: [panelActionMenu()] }); }
-  catch (error) { console.warn("[PANEL] Could not reset main menu", (error as any)?.code || "unknown"); }
+  catch (error) { console.warn("[PANEL] Could not reset main menu", errorCode(error) || "unknown"); }
 }
 
 export function panelActionMenu() {
@@ -48,17 +53,29 @@ export function panelActionMenu() {
     ]));
 }
 
-export async function handlePanelAction(interaction: any, isAdmin: boolean, beginReply: (i: any) => Promise<void>, showModal: (i: any, m: any) => Promise<void>): Promise<any | null> {
+/**
+ * A choice from the control panel. Returns true when it was handled here, null when it is not a panel
+ * action, or a stand-in slash command that the caller runs like the real command.
+ */
+export async function handlePanelAction(
+  interaction: Interaction,
+  isAdmin: boolean,
+  beginReply: (i: MessageComponentInteraction | ModalSubmitInteraction) => Promise<void>,
+  showModal: (i: MessageComponentInteraction, m: ModalBuilder) => Promise<void>,
+): Promise<ChatInputCommandInteraction | true | null> {
+  if (!interaction.isMessageComponent() && !interaction.isModalSubmit()) return null;
   const id = String(interaction.customId || "");
   if (!id.startsWith("panel_action_")) return null;
-  if (isPanelMainMenu(id) && String(interaction.values?.[0] || "").startsWith("bot_panel_")) return null;
-  const requestedId = isPanelMainMenu(id) ? interaction.values?.[0] : id === "panel_action_ip" ? "unban" : id.replace(/^panel_action_(form|run)_/, "");
+  const picked = interaction.isAnySelectMenu() ? interaction.values : [];
+  if (isPanelMainMenu(id) && String(picked[0] || "").startsWith("bot_panel_")) return null;
+  const requestedId = isPanelMainMenu(id) ? picked[0] : id === "panel_action_ip" ? "unban" : id.replace(/^panel_action_(form|run)_/, "");
   const requested = actions.find(action => action.id === requestedId);
   const permitted = isAdmin || (requested && await canUseBotScope(interaction, "scope" in requested && requested.scope ? requested.scope : requested.sub ? `${requested.command}.${requested.sub}` : requested.command, false));
   if (!permitted) { await interaction.reply({ content: "คุณไม่มีสิทธิ์ใช้เมนูนี้", ephemeral: true }); return true; }
-  if (isPanelMainMenu(id)) {
-    if (String(interaction.values?.[0] || "").startsWith("bot_panel_")) return null;
-    const action = actions.find(a => a.id === interaction.values[0]);
+  // The main menu is a select menu, so the forms it opens can be shown from here.
+  if (isPanelMainMenu(id) && interaction.isMessageComponent()) {
+    if (String(picked[0] || "").startsWith("bot_panel_")) return null;
+    const action = actions.find(a => a.id === picked[0]);
     if (!action) { await interaction.reply({ content: "เปิดแผงควบคุมใหม่แล้วลองอีกครั้ง", ephemeral: true }); return true; }
     if (action.id === "unban") {
       await beginReply(interaction);
@@ -91,14 +108,14 @@ export async function handlePanelAction(interaction: any, isAdmin: boolean, begi
     return true;
   }
   if (id === "panel_action_ip") {
-    const ips = ((interaction.values || []) as string[]).map((v) => String(v)).filter(Boolean);
+    const ips = picked.map((v) => String(v)).filter(Boolean);
     if (!ips.length) {
       await interaction.reply({ content: "เลือก IP อย่างน้อย 1 รายการ", ephemeral: true });
       return true;
     }
     await beginReply(interaction);
     const { removed, failed } = await unbanIps(ips);
-    interaction.recordBotActivity?.({
+    recordActivity(interaction, {
       outcome: failed ? "unknown" : "success",
       result: `ปลดบล็อกผ่านแผงควบคุม: สำเร็จ ${removed} IP${failed ? ` · ไม่สำเร็จ ${failed} IP` : ""}`,
     });
@@ -113,7 +130,7 @@ export async function handlePanelAction(interaction: any, isAdmin: boolean, begi
   const action = actions.find(a => a.id === actionId);
   if (!action) { await interaction.reply({ content: "เมนูหมดอายุแล้ว เปิดแผงควบคุมใหม่อีกครั้ง", ephemeral: true }); return true; }
   const values: Record<string, string> = {};
-  if (id === "panel_action_ip") values.ip = interaction.values[0];
+  if (id === "panel_action_ip") values.ip = picked[0];
   else if (interaction.isModalSubmit()) {
     for (const field of action.fields) {
       if ((action.id === "ban" || action.id === "lockdown-enable") && field === "duration" && interaction.fields.fields.has("duration_choice")) {
@@ -127,13 +144,13 @@ export async function handlePanelAction(interaction: any, isAdmin: boolean, begi
       } else values[field] = interaction.fields.getTextInputValue(field).trim();
     }
   }
-  return new Proxy(interaction, { get(target, prop) {
+  return new Proxy<MessageComponentInteraction | ModalSubmitInteraction>(interaction, { get(target, prop) {
     if (prop === "commandName") return action.command;
     if (prop === "customId") return "";
     if (prop === "options") return { getSubcommand: () => action.sub, getString: (key: string) => values[key] || null, getInteger: () => null };
     if (prop === "isChatInputCommand") return () => true;
     if (["isButton", "isAnySelectMenu", "isAutocomplete", "isModalSubmit"].includes(String(prop))) return () => false;
-    const value = Reflect.get(target, prop, target);
+    const value: unknown = Reflect.get(target, prop, target);
     return typeof value === "function" ? value.bind(target) : value;
-  } });
+  } }) as unknown as ChatInputCommandInteraction;
 }

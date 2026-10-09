@@ -1,13 +1,13 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  Activity, Boxes, Check, CircleAlert, CircleCheck, CircleX, Clock3, Code2, ExternalLink, Globe2, Globe, Infinity,
-  Hammer, Play, Plus, RefreshCw, RotateCw, Save, ScrollText, Search,
-  Server, Square, Trash2, UserCog, Users, X, FileArchive, UploadCloud, LayoutTemplate, Database, Hexagon,
-  Cpu, MemoryStick, HardDrive, Network, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Copy,
-  Folder, FileText, ArrowLeft, Download, KeyRound, LockKeyhole
+  Activity, Boxes, Check, CircleAlert, CircleCheck, CircleX, Clock3, Code2, ExternalLink, Globe,
+  Hammer, Play, Plus, RefreshCw, RotateCw, Search,
+  Server, Square, Trash2, Users, X, FileArchive, UploadCloud, LayoutTemplate, Database, Hexagon,
+  ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Copy,
+  Folder,
 } from "lucide-react";
 import { API_BASE } from "../runtime";
 import "./hosting-view.css";
@@ -50,7 +50,6 @@ type SiteOperation = {
 };
 type SiteDetail = { site: HostingSite; members: SiteMember[]; operations: SiteOperation[] };
 type RuntimeLog = { id: number; operationId?: string; stream: string; message: string; createdAt: string };
-type HostingFile = { name: string; path: string; type: "file" | "directory"; size: number };
 type HostingEnvironment = { name: string; value: string; isSecret: boolean; masked: boolean; updatedAt: string };
 type SiteDatabase = { id: string; dbName: string; dbUser: string; dbPass?: string; status: string; host: string; port?: number; engine?: string };
 type SiteForm = {
@@ -215,7 +214,7 @@ function RoleSelect({ value, onChange }: { value: "developer" | "viewer", onChan
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const options = [
+  const options: { value: "developer" | "viewer"; label: string }[] = [
     { value: "developer", label: "นักพัฒนา (แก้ไขได้)" },
     { value: "viewer", label: "ผู้เข้าชม (ดูเท่านั้น)" }
   ];
@@ -234,7 +233,7 @@ function RoleSelect({ value, onChange }: { value: "developer" | "viewer", onChan
             <div 
               key={opt.value} 
               className={`crs-option ${opt.value === value ? 'selected' : ''}`}
-              onClick={() => onChange(opt.value as any)}
+              onClick={() => onChange(opt.value)}
             >
               {opt.label}
             </div>
@@ -420,16 +419,8 @@ export default function HostingView({
   const [deployFile, setDeployFile] = useState<File | null>(null);
   const deployFileInputRef = useRef<HTMLInputElement>(null);
   const [adminUsers, setAdminUsers] = useState<{username: string, displayName: string}[]>([]);
-  const [adminUsersFetched, setAdminUsersFetched] = useState(false);
-  const [filePath, setFilePath] = useState("");
-  const [fileItems, setFileItems] = useState<HostingFile[]>([]);
-  const [fileLoading, setFileLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState("");
-  const [fileContent, setFileContent] = useState("");
-  const [originalFileContent, setOriginalFileContent] = useState("");
-  const [renameFileName, setRenameFileName] = useState("");
-  const [newFolderName, setNewFolderName] = useState("");
-  const fileManagerUploadRef = useRef<HTMLInputElement>(null);
+  // The owner list is fetched once, the first time a dialog needs it.
+  const adminUsersRequested = useRef(false);
   const detailOpenRef = useRef(false);
   const [opPage, setOpPage] = useState(1);
   const [detailTab, setDetailTab] = useState<"overview" | "env" | "database" | "members" | "history" | "logs">("overview");
@@ -439,8 +430,8 @@ export default function HostingView({
     try {
       const result = await hostingApi<{ items: HostingSite[] }>(`/api/hosting/sites?q=${encodeURIComponent(query)}`);
       setSites(result?.items || []);
-    } catch (e: any) {
-      notify({ kind: "error", text: e.message || "เกิดข้อผิดพลาดในการโหลดข้อมูลเว็บไซต์" });
+    } catch (e) {
+      notify({ kind: "error", text: (e instanceof Error && e.message) || "เกิดข้อผิดพลาดในการโหลดข้อมูลเว็บไซต์" });
     } finally {
       setLoading(false);
     }
@@ -468,33 +459,40 @@ export default function HostingView({
     };
   }, [anyDialogOpen]);
 
+  const onEscape = useEffectEvent(() => {
+    // A confirmation on top handles its own Esc.
+    if (document.querySelector(".system-dialog-backdrop.is-confirm")) return;
+    // The .env import sits on top of the site dialog, so it closes first.
+    if (bulkEnvModalOpen) { if (!bulkEnvImporting) setBulkEnvModalOpen(false); }
+    else if (formOpen) closeForm();
+    else { detailOpenRef.current = false; setDetail(null); }
+  });
+  const dialogShown = formOpen || !!detail;
   useEffect(() => {
-    if (!formOpen && !detail) return;
+    if (!dialogShown) return;
     const close = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      // A confirmation on top handles its own Esc.
-      if (document.querySelector(".system-dialog-backdrop.is-confirm")) return;
-      // The .env import sits on top of the site dialog, so it closes first.
-      if (bulkEnvModalOpen) { if (!bulkEnvImporting) setBulkEnvModalOpen(false); }
-      else if (formOpen) closeForm();
-      else { detailOpenRef.current = false; setDetail(null); }
+      if (event.key === "Escape") onEscape();
     };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
-  }, [formOpen, detail, bulkEnvModalOpen, bulkEnvImporting]);
+  }, [dialogShown]);
 
   useEffect(() => {
-    const needsUsers = (formOpen || !!detail) && me?.role !== "user" && !adminUsersFetched;
+    const needsUsers = dialogShown && me?.role !== "user" && !adminUsersRequested.current;
     if (!needsUsers) return;
-    setAdminUsersFetched(true);
+    adminUsersRequested.current = true;
     hostingApi<{ items: { username: string; displayName: string }[] }>("/api/admin/users?limit=200")
       .then((res) => setAdminUsers(res?.items || []))
       .catch(() => undefined);
-  }, [formOpen, detail, me?.role, adminUsersFetched]);
+  }, [dialogShown, me?.role]);
 
-  useEffect(() => {
+  // A new owner typed for one site is not carried over to the next.
+  const detailSiteId = detail?.site.id;
+  const [ownerFor, setOwnerFor] = useState(detailSiteId);
+  if (ownerFor !== detailSiteId) {
+    setOwnerFor(detailSiteId);
     setOwnerUsername("");
-  }, [detail?.site.id]);
+  }
 
   function openCreate() {
     setEditing(null);
@@ -548,12 +546,12 @@ export default function HostingView({
           await hostingApi(`/api/hosting/sites/${siteId}/deploy`, { 
             method: "POST", 
             body: formData, 
-            headers: { "Idempotency-Key": crypto.randomUUID() } as any 
+            headers: { "Idempotency-Key": crypto.randomUUID() },
           });
         } else if (form.initialMethod === "generate") {
           await hostingApi(`/api/hosting/sites/${siteId}/generate`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() } as any,
+            headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
           });
         }
         notify({ kind: "success", text: "สร้างเว็บไซต์แล้ว ระบบกำลังเตรียมเว็บไซต์ให้พร้อมใช้งาน" });
@@ -598,10 +596,10 @@ export default function HostingView({
         setEnvironmentCanManage(false);
       }
       try {
-        const dbInfo = await hostingApi<any>(`/api/hosting/sites/${siteID}/database`);
+        const dbInfo = await hostingApi<{ databases?: SiteDatabase[]; maxDatabases?: number }>(`/api/hosting/sites/${siteID}/database`);
         setSiteDbs(dbInfo?.databases || []);
         setMaxDatabases(dbInfo?.maxDatabases || 1);
-      } catch (e) {
+      } catch {
         setSiteDbs(null);
       }
     } catch (error) {
@@ -724,16 +722,6 @@ export default function HostingView({
     });
   }
 
-  function requestOpenFileManager() {
-    if (!detail || runtimeAction) return;
-    ask({
-      title: "เปิดตัวจัดการไฟล์?",
-      message: `คุณจะสามารถดู แก้ไข อัปโหลด และลบไฟล์ของ "${detail.site.name}" ได้`,
-      confirmLabel: "เปิด",
-      action: () => { void openFileManager(); },
-    });
-  }
-
   async function uploadDeployFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file || !detail) return;
@@ -817,7 +805,7 @@ export default function HostingView({
       if (!line || line.startsWith("#")) continue;
       const eqIdx = line.indexOf("=");
       if (eqIdx <= 0) continue;
-      let name = line.slice(0, eqIdx).trim().toUpperCase().replace(/[^A-Z0-9_]/g, "");
+      const name = line.slice(0, eqIdx).trim().toUpperCase().replace(/[^A-Z0-9_]/g, "");
       let value = line.slice(eqIdx + 1).trim();
       if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
         value = value.slice(1, -1);
@@ -898,184 +886,14 @@ export default function HostingView({
     }
   }
 
-  async function loadHostingFiles(path = filePath) {
-    if (!detail) return;
-    setFileLoading(true);
-    try {
-      const result = await hostingApi<{ path: string; items: HostingFile[] }>(
-        `/api/hosting/sites/${detail.site.id}/files?path=${encodeURIComponent(path)}`,
-      );
-      setFilePath(result.path);
-      setFileItems(result.items);
-      setSelectedFile("");
-      setFileContent("");
-      setOriginalFileContent("");
-    } catch (error) {
-      notify({ kind: "error", text: (error as Error).message });
-    } finally {
-      setFileLoading(false);
-    }
-  }
-
   function openFileManager() {
     if (!detail?.site) return;
-    const sub = detail.site.subdomain || detail.site.domain?.split(".")[0];
+    const sub = detail.site.subdomain;
     const currentHostname = typeof window !== "undefined" ? window.location.hostname : "nkn02.com";
     const baseDomain = currentHostname.includes("localhost") ? "localhost:8088" : "nkn02.com";
     const protocol = typeof window !== "undefined" ? window.location.protocol : "https:";
     const workspaceUrl = `${protocol}//code-${sub}.${baseDomain}`;
     window.open(workspaceUrl, "_blank", "noopener,noreferrer");
-  }
-
-  async function openHostingFile(item: HostingFile) {
-    if (!detail) return;
-    if (item.type === "directory") {
-      await loadHostingFiles(item.path);
-      return;
-    }
-    setFileLoading(true);
-    try {
-      const result = await hostingApi<{ path: string; content: string }>(
-        `/api/hosting/sites/${detail.site.id}/files/content?path=${encodeURIComponent(item.path)}`,
-      );
-      setSelectedFile(result.path);
-      setFileContent(result.content);
-      setOriginalFileContent(result.content);
-      setRenameFileName(result.path.split("/").pop() || "");
-    } catch (error) {
-      notify({ kind: "error", text: (error as Error).message });
-    } finally {
-      setFileLoading(false);
-    }
-  }
-
-  async function saveSelectedFile() {
-    if (!detail || !selectedFile || fileContent === originalFileContent) return;
-    try {
-      const diff = await hostingApi<{ changed: boolean; hunks: { removed: string[]; added: string[] }[] }>(
-        `/api/hosting/sites/${detail.site.id}/files/preview`,
-        { method: "POST", body: JSON.stringify({ path: selectedFile, content: fileContent }) },
-      );
-      const removed = diff.hunks.reduce((sum, hunk) => sum + hunk.removed.length, 0);
-      const added = diff.hunks.reduce((sum, hunk) => sum + hunk.added.length, 0);
-      ask({
-        title: "บันทึกและ Deploy ไฟล์นี้?",
-        message: `${selectedFile} เปลี่ยน ${added} บรรทัด และลบ ${removed} บรรทัด ระบบจะ Deploy เว็บไซต์ใหม่`,
-        confirmLabel: "บันทึกไฟล์",
-        action: async () => {
-          await hostingApi(`/api/hosting/sites/${detail.site.id}/files/content`, mutationOptions("PUT", { path: selectedFile, content: fileContent }));
-          setOriginalFileContent(fileContent);
-          notify({ kind: "success", text: "บันทึกไฟล์แล้ว ระบบกำลัง Deploy เวอร์ชันใหม่" });
-          await reloadDetail(detail.site.id);
-        },
-      });
-    } catch (error) {
-      notify({ kind: "error", text: (error as Error).message });
-    }
-  }
-
-  async function createFolder() {
-    if (!detail || !newFolderName.trim()) return;
-    const target = [filePath, newFolderName.trim()].filter(Boolean).join("/");
-    try {
-      await hostingApi(`/api/hosting/sites/${detail.site.id}/files/folders`, mutationOptions("POST", { path: target }));
-      setNewFolderName("");
-      notify({ kind: "success", text: "สร้างโฟลเดอร์แล้ว ระบบกำลัง Deploy เวอร์ชันใหม่" });
-      await loadHostingFiles(filePath);
-    } catch (error) {
-      notify({ kind: "error", text: (error as Error).message });
-    }
-  }
-
-  async function uploadManagerFile(event: React.ChangeEvent<HTMLInputElement>) {
-    if (!detail) return;
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("path", filePath);
-    setFileLoading(true);
-    try {
-      await hostingApi(`/api/hosting/sites/${detail.site.id}/files/upload`, {
-        method: "POST",
-        headers: { "Idempotency-Key": crypto.randomUUID() },
-        body: formData,
-      });
-      notify({ kind: "success", text: "อัปโหลดไฟล์แล้ว ระบบกำลัง Deploy เวอร์ชันใหม่" });
-      await loadHostingFiles(filePath);
-    } catch (error) {
-      notify({ kind: "error", text: (error as Error).message });
-    } finally {
-      setFileLoading(false);
-      if (fileManagerUploadRef.current) fileManagerUploadRef.current.value = "";
-    }
-  }
-
-  function deleteSelectedFile() {
-    if (!detail || !selectedFile) return;
-    const target = selectedFile;
-    ask({
-      title: "ลบไฟล์นี้?",
-      message: `${target} จะถูกลบและระบบจะ Deploy เว็บไซต์ใหม่`,
-      confirmLabel: "ลบไฟล์",
-      danger: true,
-      action: async () => {
-        await hostingApi(`/api/hosting/sites/${detail.site.id}/files?path=${encodeURIComponent(target)}`, mutationOptions("DELETE"));
-        setSelectedFile("");
-        setFileContent("");
-        setOriginalFileContent("");
-        await loadHostingFiles(filePath);
-        notify({ kind: "success", text: "ลบไฟล์แล้ว" });
-      },
-    });
-  }
-
-  async function renameSelectedFile() {
-    if (!detail || !selectedFile || !renameFileName.trim()) return;
-    const parent = selectedFile.split("/").slice(0, -1).join("/");
-    const target = [parent, renameFileName.trim()].filter(Boolean).join("/");
-    if (target === selectedFile) return;
-    try {
-      await hostingApi(`/api/hosting/sites/${detail.site.id}/files/move`, mutationOptions("POST", { from: selectedFile, to: target }));
-      setSelectedFile(target);
-      setOriginalFileContent(fileContent);
-      notify({ kind: "success", text: "เปลี่ยนชื่อไฟล์แล้ว ระบบกำลัง Deploy เวอร์ชันใหม่" });
-      await loadHostingFiles(filePath);
-    } catch (error) {
-      notify({ kind: "error", text: (error as Error).message });
-    }
-  }
-
-  async function archiveSelectedFile() {
-    if (!detail || !selectedFile) return;
-    try {
-      await hostingApi(`/api/hosting/sites/${detail.site.id}/files/archive`, mutationOptions("POST", {
-        paths: [selectedFile],
-        target: `${selectedFile}.zip`,
-      }));
-      notify({ kind: "success", text: "สร้างไฟล์ ZIP แล้ว ระบบกำลัง Deploy เวอร์ชันใหม่" });
-      await loadHostingFiles(filePath);
-    } catch (error) {
-      notify({ kind: "error", text: (error as Error).message });
-    }
-  }
-
-  async function extractSelectedArchive() {
-    if (!detail || !selectedFile.toLowerCase().endsWith(".zip")) return;
-    const folderName = selectedFile.split("/").pop()?.replace(/\.zip$/i, "") || "archive";
-    const target = [filePath, folderName].filter(Boolean).join("/");
-    try {
-      await hostingApi(`/api/hosting/sites/${detail.site.id}/files/extract`, mutationOptions("POST", { path: selectedFile, target }));
-      notify({ kind: "success", text: "แตกไฟล์ ZIP แล้ว ระบบกำลัง Deploy เวอร์ชันใหม่" });
-      await loadHostingFiles(filePath);
-    } catch (error) {
-      notify({ kind: "error", text: (error as Error).message });
-    }
-  }
-
-  function downloadHostingFile(path: string) {
-    if (!detail) return;
-    window.open(`${API_BASE}/api/hosting/sites/${detail.site.id}/files/download?path=${encodeURIComponent(path)}`, "_blank");
   }
 
   function removeSite(site: HostingSite) {

@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @next/next/no-html-link-for-pages */
 import {
   Check, ChevronLeft, ChevronRight, CircleAlert, CloudCog, Copy, Globe2, Mail, MailPlus, Plus,
   RefreshCw, Search, Send, Settings2, X,
@@ -11,6 +10,7 @@ import { useEscape, useScrollLock } from "./useScrollLock";
 import "./hosting-view.css";
 import "./db-admin-view.css";
 import "./admin-mail-view.css";
+import Link from "next/link";
 
 type Notice = (notice: { kind: "success" | "error"; text: string }) => void;
 type DnsRecord = Record<string, unknown>;
@@ -105,17 +105,16 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
   const [mailbox, setMailbox] = useState({ domainId: "", localPart: "", displayName: "", ownerUsername: "" });
   const [mailboxBusy, setMailboxBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    const [domainData, historyData, health] = await Promise.all([
-      api<{ items: Domain[]; providerConfigured: boolean }>("/api/admin/mail/domains"),
-      api<{ items: MailHistory[] }>("/api/admin/mail/messages"),
-      api<StalwartHealth>("/api/admin/mail/stalwart/health").catch(() => ({ configured: false, healthy: false })),
-    ]);
+  const load = useCallback(() => Promise.all([
+    api<{ items: Domain[]; providerConfigured: boolean }>("/api/admin/mail/domains"),
+    api<{ items: MailHistory[] }>("/api/admin/mail/messages"),
+    api<StalwartHealth>("/api/admin/mail/stalwart/health").catch(() => ({ configured: false, healthy: false })),
+  ]).then(([domainData, historyData, health]) => {
     setDomains(domainData.items || []);
     setConfigured(domainData.providerConfigured);
     setHistory(historyData.items || []);
     setStalwart(health);
-  }, []);
+  }), []);
   useEffect(() => {
     load().catch((error) => notify({ kind: "error", text: (error as Error).message })).finally(() => setLoaded(true));
   }, [load, notify]);
@@ -235,7 +234,7 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
           <button type="button" className="aov-btn" onClick={() => void refresh()} disabled={refreshing} aria-label="รีเฟรชข้อมูล" title="รีเฟรชข้อมูล">
             <RefreshCw size={16} aria-hidden="true" className={refreshing ? "spin" : ""} />
           </button>
-          <a className="aov-btn aov-btn-label" href="/mail"><Mail size={16} aria-hidden="true" /> Webmail</a>
+          <Link className="aov-btn aov-btn-label" href="/mail"><Mail size={16} aria-hidden="true" /> Webmail</Link>
           <button type="button" className="aov-btn aov-btn-label aov-btn-primary" onClick={() => setDialog("domain")}>
             <Plus size={16} aria-hidden="true" /> เพิ่มโดเมน
           </button>
@@ -251,7 +250,7 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
         </span>
         <span className="mx-tally">{domains.length} โดเมน · {counts.mailboxes} กล่อง</span>
         {isSuperadmin && (
-          <a className="mx-settings" href="/admin/settings?tab=mail"><Settings2 size={15} aria-hidden="true" /> ตั้งค่าการเชื่อมต่อ</a>
+          <Link className="mx-settings" href="/admin/settings?tab=mail"><Settings2 size={15} aria-hidden="true" /> ตั้งค่าการเชื่อมต่อ</Link>
         )}
       </div>
 
@@ -484,7 +483,7 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
                     <CircleAlert size={18} aria-hidden="true" />
                     <p>
                       <strong>ยังเพิ่มโดเมนไม่ได้</strong>
-                      <span>{isSuperadmin ? <>ต้องเชื่อมต่อ Resend ก่อนที่ <a href="/admin/settings?tab=mail">ตั้งค่าระบบ → ระบบอีเมล</a></> : "ต้องให้ Superadmin เชื่อมต่อ Resend ก่อน"}</span>
+                      <span>{isSuperadmin ? <>ต้องเชื่อมต่อ Resend ก่อนที่ <Link href="/admin/settings?tab=mail">ตั้งค่าระบบ → ระบบอีเมล</Link></> : "ต้องให้ Superadmin เชื่อมต่อ Resend ก่อน"}</span>
                     </p>
                   </div>
                 )}

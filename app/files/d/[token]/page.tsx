@@ -3,7 +3,7 @@
 import {
   AlertCircle, Check, CheckCircle2, Clock, Copy, Download, ExternalLink, Eye, EyeOff, FileArchive, FileAudio, FileCode, FileImage, FileSpreadsheet, FileText, FileVideo, Lock, QrCode, ShieldCheck, Smartphone, X,
 } from "lucide-react";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getDocumentTitle, type SiteTitleMode } from "../../../pageTitle";
 import { applyThemeColor } from "../../../themeColor";
 import { API_BASE } from "../../../runtime";
@@ -81,24 +81,28 @@ function formatExpiry(value?: string | null) {
   return { primary: exact, secondary: "", status: "active" };
 }
 
+// The address does not change while this page is open; there is nothing to subscribe to.
+const subscribeNever = () => () => {};
+
+function readShareToken() {
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  const filesIdx = parts.indexOf("files");
+  const value = filesIdx >= 0 && parts[filesIdx + 1] === "d" ? parts[filesIdx + 2] || "" : "";
+  return value.toLowerCase();
+}
+
+/** The token from the address; null while rendering on the server. */
 function useShareToken() {
-  const [token, setToken] = useState<string | null>(null);
-  useEffect(() => {
-    const parts = window.location.pathname.split("/").filter(Boolean);
-    const filesIdx = parts.indexOf("files");
-    const value = filesIdx >= 0 && parts[filesIdx + 1] === "d" ? parts[filesIdx + 2] || "" : "";
-    setToken(value.toLowerCase());
-  }, []);
-  return token;
+  return useSyncExternalStore(subscribeNever, readShareToken, () => null);
 }
 
 export default function PublicFileSharePage() {
   const token = useShareToken();
   const [file, setFile] = useState<SharedFile | null>(null);
   const [error, setError] = useState("");
-  const [goneKind, setGoneKind] = useState<LinkGoneKind>("gone");
+  const [failedKind, setGoneKind] = useState<LinkGoneKind>("gone");
   const [attempt, setAttempt] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [fetching, setLoading] = useState(true);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -110,14 +114,12 @@ export default function PublicFileSharePage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
-  const [shareUrl, setShareUrl] = useState("");
+  const shareUrl = useSyncExternalStore(subscribeNever, () => window.location.href, () => "");
   const previewRequest = useRef(0);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setShareUrl(window.location.href);
-    }
-  }, []);
+  // A token that cannot be a share link is reported at once, without asking the server.
+  const tokenBroken = token !== null && !SHARE_TOKEN.test(token);
+  const loading = fetching && !tokenBroken;
+  const goneKind: LinkGoneKind = tokenBroken ? "broken" : failedKind;
 
   useEffect(() => {
     fetch(`${API_BASE}/api/settings/public`)
@@ -134,15 +136,8 @@ export default function PublicFileSharePage() {
   }, []);
 
   useEffect(() => {
-    if (token === null) return;
-    if (!SHARE_TOKEN.test(token)) {
-      setGoneKind("broken");
-      setLoading(false);
-      return;
-    }
+    if (token === null || tokenBroken) return;
     let cancelled = false;
-    setLoading(true);
-    setError("");
     fetch(`${API_BASE}/api/public/files/${encodeURIComponent(token)}`, { credentials: "include", cache: "no-store" })
       .then(async (response) => {
         const payload = await response.json().catch(() => ({}));
@@ -168,7 +163,7 @@ export default function PublicFileSharePage() {
     return () => {
       cancelled = true;
     };
-  }, [token, attempt]);
+  }, [token, tokenBroken, attempt]);
 
   useEffect(() => {
     if (!settings || typeof document === "undefined") return;
@@ -473,7 +468,7 @@ export default function PublicFileSharePage() {
                 )}
               </>
             ) : (
-              <LinkGone kind={goneKind} noun="ไฟล์" onRetry={() => setAttempt((n) => n + 1)} homeLink />
+              <LinkGone kind={goneKind} noun="ไฟล์" onRetry={() => { setLoading(true); setError(""); setAttempt((n) => n + 1); }} homeLink />
             )}
           </div>
 

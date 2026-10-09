@@ -1,5 +1,6 @@
 import axios from "axios";
-import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder, type ChatInputCommandInteraction } from "discord.js";
+import { recordActivity } from "./activity-log";
 import { botMemberRoleIds } from "./bot-control";
 
 const API_URL = (process.env.NEXORA_API_URL || "http://localhost:8080").replace(/\/+$/, "");
@@ -16,7 +17,7 @@ export const lockdownCommand = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName("disable").setDescription("ปลดล็อกเว็บไซต์"))
   .addSubcommand(sub => sub.setName("access").setDescription("รับลิงก์เข้าหน้าควบคุมฉุกเฉิน"));
 
-function requestHeaders(interaction:any) {
+function requestHeaders(interaction:ChatInputCommandInteraction) {
   const isAdmin = interaction.guild?.ownerId === interaction.user.id || Boolean(interaction.memberPermissions?.has?.(PermissionFlagsBits.Administrator));
   return { "Content-Type":"application/json", "X-Bot-Internal-Secret":BOT_SECRET, "X-Bot-Actor-Discord-Id":String(interaction.user.id), "X-Bot-Actor-Discord-Roles":botMemberRoleIds(interaction).join(","), "X-Bot-Actor-Is-Admin":isAdmin ? "true" : "false" };
 }
@@ -55,7 +56,7 @@ export function lockdownStateEmbed(state:LockdownState) {
     ).setFooter({ text:"เว็บลูกค้า ฐานข้อมูล และเมลไม่อยู่ในขอบเขตล็อกดาว" }).setTimestamp();
 }
 
-export async function handleLockdownCommand(interaction:any) {
+export async function handleLockdownCommand(interaction:ChatInputCommandInteraction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "access") {
     const response = await axios.post(`${API_URL}/api/internal/bot/lockdown/access`, {}, { headers:requestHeaders(interaction),timeout:10000 });
@@ -70,6 +71,6 @@ export async function handleLockdownCommand(interaction:any) {
   const durationSeconds = sub === "enable" ? parseLockdownDuration(interaction.options.getString("duration")) : 0;
   const reason = sub === "enable" ? String(interaction.options.getString("reason") || "").trim() : "";
   const response = await axios.post(`${API_URL}/api/internal/bot/lockdown`, { enabled:sub === "enable",durationSeconds,reason }, { headers:requestHeaders(interaction),timeout:10000 });
-  interaction.recordBotActivity?.({ outcome:"success",result:sub === "enable" ? "ปิดเว็บไซต์ชั่วคราวแล้ว ผู้ใช้ทั่วไปจะเข้าเว็บและ API ไม่ได้" : "เปิดเว็บไซต์กลับมาใช้งานได้แล้ว",details:sub === "enable" ? `ปิดนาน: ${describeDuration(durationSeconds)}\nเหตุผล: ${reason || "ไม่ได้ระบุ"}` : "" });
+  recordActivity(interaction, { outcome:"success",result:sub === "enable" ? "ปิดเว็บไซต์ชั่วคราวแล้ว ผู้ใช้ทั่วไปจะเข้าเว็บและ API ไม่ได้" : "เปิดเว็บไซต์กลับมาใช้งานได้แล้ว",details:sub === "enable" ? `ปิดนาน: ${describeDuration(durationSeconds)}\nเหตุผล: ${reason || "ไม่ได้ระบุ"}` : "" });
   await interaction.editReply({ embeds:[lockdownStateEmbed(response.data)],content:"" });
 }

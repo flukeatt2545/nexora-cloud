@@ -5,6 +5,7 @@ import {
   Activity, ArrowRight, Ban, CheckCircle2, ChevronRight, Cloud, Database, ExternalLink, KeyRound, Megaphone,
   History, LogIn, Package, RadioTower, ReceiptText, RefreshCw, ShieldAlert, Store, TrendingUp, Users, WalletCards, Zap,
 } from "lucide-react";
+import Link from "next/link";
 import { API_BASE } from "../runtime";
 
 type Role = "user" | "admin" | "superadmin" | string;
@@ -44,6 +45,9 @@ type LogItem = {
   action: string;
   outcome: string;
   targetId: string;
+  metadata?: unknown;
+  ipAddress?: string;
+  userAgent?: string;
   createdAt: string;
 };
 type Health = { database: string; redis: string; databaseSize: string };
@@ -77,6 +81,29 @@ function ago(value: string, now: number) {
 type LogRow = { key: number; action: string; actor: string; outcome: string; count: number; latest: string };
 type LogDay = { key: string; label: string; rows: LogRow[] };
 
+/**
+ * Who did it. Things done in Discord through a bot have no site account, so the name comes from
+ * the log details: the member's Discord name, or the bot itself when nobody pressed anything
+ * (an empty room it cleared away, someone it moved out of a locked room).
+ */
+function logActor(item: LogItem) {
+  if (item.actorUsername) return item.actorUsername;
+  // A failed sign-in has no actor; the name that was typed is in targetId.
+  if (item.action.startsWith("auth.") && item.targetId) return item.targetId;
+  let meta = item.metadata;
+  if (typeof meta === "string") { try { meta = JSON.parse(meta); } catch { meta = null; } }
+  const m = meta && typeof meta === "object" ? meta as Record<string, unknown> : {};
+  const text = (key: string) => (typeof m[key] === "string" ? (m[key] as string).trim() : "");
+  const name = text("actorName") || text("discordName") || text("userName") || text("deleterName");
+  if (name) return `@${name} (Discord)`;
+  const id = text("discordActor") || text("actorDiscordId");
+  if (id) return `Discord ${id}`;
+  if (item.action === "mail.message.received" && text("from")) return `จาก ${text("from").replace(/^<|>$/g, "")}`;
+  if (item.action.startsWith("discord.") || item.action.startsWith("mail.discord.")) return "บอท Discord";
+  // Someone on the site who was not signed in (the request came with an address or a browser).
+  return item.ipAddress || item.userAgent ? "ไม่ได้เข้าสู่ระบบ" : "ระบบ";
+}
+
 const dayKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 
 /** Newest first: back-to-back entries with the same action, person and result become one row ("×12"), split by day. */
@@ -91,8 +118,7 @@ function groupLogs(items: LogItem[], maxRows: number, now: number): LogDay[] {
     const key = dayKey(created);
     let day = days[days.length - 1];
     const last = day?.key === key ? day.rows[day.rows.length - 1] : undefined;
-    // A failed sign-in has no actor; the name that was typed is in targetId.
-    const actor = item.actorUsername || (item.action.startsWith("auth.") ? item.targetId : "");
+    const actor = logActor(item);
     if (last && last.action === item.action && last.actor === actor && last.outcome === item.outcome) {
       last.count++;
       continue;
@@ -129,6 +155,8 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
   const [health, setHealth] = useState<Slot<Health>>(empty);
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  // Until the first load finishes, "x minutes ago" counts from when the page opened.
+  const [openedAt] = useState(() => Date.now());
   const [activeDay, setActiveDay] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -156,7 +184,7 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
   const series = sales.data?.series || [];
   const peak = Math.max(0, ...series.map((point) => point.revenue));
   const shownDay = activeDay !== null ? series[activeDay] : null;
-  const now = updatedAt || Date.now();
+  const now = updatedAt || openedAt;
   const logDays = useMemo(() => groupLogs(logs.data || [], 6, now), [logs.data, now]);
   const failRate = s && s.logins24h + s.failedLogins24h > 0 ? Math.round((s.failedLogins24h / (s.logins24h + s.failedLogins24h)) * 100) : 0;
 
@@ -239,7 +267,7 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
         <section className="aov-panel aov-sales">
           <header>
             <h2><TrendingUp size={17} aria-hidden="true" className="aov-h-icon" />ยอดขายร้านค้า <span>7 วันล่าสุด</span></h2>
-            <a href="/admin/store/sales">รายงาน<ChevronRight size={14} aria-hidden="true" /></a>
+            <Link href="/admin/store/sales">รายงาน<ChevronRight size={14} aria-hidden="true" /></Link>
           </header>
           {sales.failed ? <PanelError onRetry={load} /> : <>
             <div className="aov-sales-figure" aria-live="polite">
@@ -276,7 +304,7 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
         <section className="aov-panel aov-topups">
           <header>
             <h2><ReceiptText size={17} aria-hidden="true" className="aov-h-icon" />เติมเงินล่าสุด</h2>
-            <a href="/admin/topups/transactions">ทั้งหมด<ChevronRight size={14} aria-hidden="true" /></a>
+            <Link href="/admin/topups/transactions">ทั้งหมด<ChevronRight size={14} aria-hidden="true" /></Link>
           </header>
           {topups.failed ? <PanelError onRetry={load} /> : !t ? <ul className="aov-list">{[0, 1, 2].map((i) => <li key={i}><i className="aov-skel wide" /></li>)}</ul>
             : t.recentTransactions.length === 0 ? <div className="aov-empty">ยังไม่มีรายการเติมเงิน</div>
@@ -301,7 +329,7 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
           <section className="aov-panel aov-logs">
             <header>
               <h2><History size={17} aria-hidden="true" className="aov-h-icon" />กิจกรรมล่าสุด</h2>
-              <a href="/admin/logs">บันทึกทั้งหมด<ChevronRight size={14} aria-hidden="true" /></a>
+              <Link href="/admin/logs">บันทึกทั้งหมด<ChevronRight size={14} aria-hidden="true" /></Link>
             </header>
             {logs.failed ? <PanelError onRetry={load} /> : !logs.data ? <ul className="aov-list">{[0, 1, 2].map((i) => <li key={i}><i className="aov-skel wide" /></li>)}</ul>
               : logDays.length === 0 ? <div className="aov-empty">ยังไม่มีกิจกรรม</div>

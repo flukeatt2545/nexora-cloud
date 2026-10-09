@@ -1,6 +1,11 @@
 import axios from "axios";
 import { isIP } from "node:net";
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from "discord.js";
+import {
+  ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
+  type AutocompleteInteraction, type ChatInputCommandInteraction,
+} from "discord.js";
+import { recordActivity } from "./activity-log";
+import { describeError, errorStatus } from "./errors";
 
 const LAPI_URL = (process.env.CROWDSEC_LAPI_URL || "").replace(/\/+$/, "");
 const MACHINE_USER = (process.env.CROWDSEC_MACHINE_USER || "").trim();
@@ -15,6 +20,9 @@ type CrowdSecDecision = {
   scenario?: string;
   value?: string;
 };
+type CrowdSecAlert = { decisions?: CrowdSecDecision[] };
+/** DELETE /v1/decisions answers with how many decisions it removed. */
+type DeleteResult = { nbDeleted?: string | number } | null;
 
 const scenarioLabels: Record<string, string> = {
   "crowdsecurity/ssh-bruteforce": "ยิงรหัสผ่าน SSH รัว ๆ",
@@ -92,15 +100,15 @@ async function authHeaders(forceRefresh = false): Promise<Record<string, string>
   return { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
 }
 
-async function request(method: string, path: string, data?: unknown): Promise<any> {
+async function request<T>(method: string, path: string, data?: unknown): Promise<T> {
   const url = `${LAPI_URL}${path}`;
   let headers = await authHeaders();
   try {
-    return (await axios.request({ method, url, headers, data, timeout: 30000 })).data;
-  } catch (error: any) {
-    if (error?.response?.status !== 401) throw error;
+    return (await axios.request<T>({ method, url, headers, data, timeout: 30000 })).data;
+  } catch (error) {
+    if (errorStatus(error) !== 401) throw error;
     headers = await authHeaders(true);
-    return (await axios.request({ method, url, headers, data, timeout: 30000 })).data;
+    return (await axios.request<T>({ method, url, headers, data, timeout: 30000 })).data;
   }
 }
 
@@ -170,7 +178,7 @@ export async function unbanIps(ips: string[]): Promise<{ removed: number; failed
     if (!targetIp || seen.has(targetIp)) continue;
     seen.add(targetIp);
     try {
-      const deleted = Number((await request("delete", `/v1/decisions?ip=${encodeURIComponent(targetIp)}`))?.nbDeleted || 0);
+      const deleted = Number((await request<DeleteResult>("delete", `/v1/decisions?ip=${encodeURIComponent(targetIp)}`))?.nbDeleted || 0);
       if (deleted > 0) removed++;
       else failed++;
     } catch {
@@ -184,7 +192,7 @@ export async function unbanIps(ips: string[]): Promise<{ removed: number; failed
 
 export async function activeLocalDecisions(forceRefresh = false): Promise<CrowdSecDecision[]> {
   if (!forceRefresh && Date.now() < decisionCache.expiresAt) return decisionCache.items;
-  const alerts = await request("get", "/v1/alerts?has_active_decision=true&include_capi=false&limit=100");
+  const alerts = await request<CrowdSecAlert[] | null>("get", "/v1/alerts?has_active_decision=true&include_capi=false&limit=100");
   const byIp = new Map<string, CrowdSecDecision>();
   for (const alert of alerts || []) {
     for (const decision of alert.decisions || []) {
@@ -203,7 +211,7 @@ export async function activeLocalDecisions(forceRefresh = false): Promise<CrowdS
 // Fetch every active local decision. This LAPI build rejects the `page` filter,
 // so we read one large page instead of paginating (activeLocalDecisions caps at 100).
 async function fetchAllActiveDecisions(): Promise<CrowdSecDecision[]> {
-  const alerts = await request("get", "/v1/alerts?has_active_decision=true&include_capi=false&limit=1000");
+  const alerts = await request<CrowdSecAlert[] | null>("get", "/v1/alerts?has_active_decision=true&include_capi=false&limit=1000");
   const byIp = new Map<string, CrowdSecDecision>();
   for (const alert of alerts || []) {
     for (const decision of alert.decisions || []) {
@@ -221,7 +229,7 @@ export async function refreshCrowdSecCache(): Promise<void> {
   await activeLocalDecisions(true);
 }
 
-export async function handleCrowdSecAutocomplete(interaction: any, isAdmin: boolean): Promise<boolean> {
+export async function handleCrowdSecAutocomplete(interaction: AutocompleteInteraction, isAdmin: boolean): Promise<boolean> {
   if (interaction.commandName !== "crowdsec" || interaction.options.getSubcommand(false) !== "unban") return false;
   if (!isAdmin || !crowdSecConfigured()) {
     await interaction.respond([]);
@@ -242,14 +250,14 @@ export async function handleCrowdSecAutocomplete(interaction: any, isAdmin: bool
         return { name: `${ip} · ${reason}`.slice(0, 100), value: ip };
       });
     await interaction.respond(choices);
-  } catch (error: any) {
-    console.error("[ERROR] CrowdSec autocomplete:", error?.message || error);
+  } catch (error) {
+    console.error("[ERROR] CrowdSec autocomplete:", describeError(error));
     if (!interaction.responded) await interaction.respond([]);
   }
   return true;
 }
 
-export async function handleCrowdSecCommand(interaction: any): Promise<void> {
+export async function handleCrowdSecCommand(interaction: ChatInputCommandInteraction): Promise<void> {
   if (!crowdSecConfigured()) {
     await interaction.editReply({ embeds: [notice("ยังไม่ได้ตั้งค่า CrowdSec", "ให้ผู้ดูแลตั้งค่าการเชื่อมต่อบนเซิร์ฟเวอร์ก่อนใช้เมนูนี้")] });
     return;
@@ -259,7 +267,7 @@ export async function handleCrowdSecCommand(interaction: any): Promise<void> {
     if (sub === "bans") {
       const limit = Math.min(Math.max(interaction.options.getInteger("limit") || 6, 1), 25);
       const all = await activeLocalDecisions();
-      interaction.recordBotActivity?.({ outcome: "success", result: `ตรวจสอบแล้ว พบ ${all.length} IP ที่ยังถูกบล็อก` });
+      recordActivity(interaction, { outcome: "success", result: `ตรวจสอบแล้ว พบ ${all.length} IP ที่ยังถูกบล็อก` });
       if (!all.length) {
         await interaction.editReply({ embeds: [new EmbedBuilder().setTitle("ไม่มี IP ที่ถูกบล็อก").setColor(0x22c55e).setDescription("ตอนนี้เซิร์ฟเวอร์ไม่มีรายการบล็อกที่ยังมีผล").setFooter({ text: "แสดงเฉพาะรายการของเซิร์ฟเวอร์นี้" }).setTimestamp()] });
         return;
@@ -297,11 +305,11 @@ export async function handleCrowdSecCommand(interaction: any): Promise<void> {
         new ButtonBuilder().setCustomId("cs_unban_all_cancel").setLabel("ยกเลิก").setStyle(ButtonStyle.Secondary)
       );
       await interaction.editReply({ embeds: [confirmEmbed], components: [confirmRow] });
-      const replyMessage: any = await interaction.fetchReply();
+      const replyMessage = await interaction.fetchReply();
       const collector = replyMessage.createMessageComponentCollector({ time: 60_000 });
       const requesterId = interaction.user.id;
       let finished = false;
-      collector.on("collect", async (btn: any) => {
+      collector.on("collect", async (btn) => {
         try {
           if (btn.user.id !== requesterId) {
             await btn.reply({ content: "ปุ่มนี้สำหรับคนที่สั่งคำสั่งเท่านั้น", ephemeral: true });
@@ -318,16 +326,16 @@ export async function handleCrowdSecCommand(interaction: any): Promise<void> {
           collector.stop("confirmed");
           await btn.deferUpdate();
           const { removed, failed } = await unbanIps(all.map((d) => String(d.value || "")));
-          interaction.recordBotActivity?.({ outcome: failed ? "unknown" : "success", result: `ปลดบล็อกทั้งหมด: สำเร็จ ${removed} IP${failed ? ` · ไม่สำเร็จ ${failed} IP` : ""}` });
+          recordActivity(interaction, { outcome: failed ? "unknown" : "success", result: `ปลดบล็อกทั้งหมด: สำเร็จ ${removed} IP${failed ? ` · ไม่สำเร็จ ${failed} IP` : ""}` });
           const resultEmbed = failed
             ? new EmbedBuilder().setTitle("ปลดบล็อกเสร็จบางส่วน").setColor(0xf59e0b).setDescription(`ปลดบล็อกสำเร็จ **${removed} IP**\nไม่สำเร็จ **${failed} IP** ลองใหม่อีกครั้งหรือตรวจสอบ CrowdSec บนเซิร์ฟเวอร์`).setTimestamp()
             : new EmbedBuilder().setTitle("ปลดบล็อกทั้งหมดแล้ว").setColor(0x22c55e).setDescription(`ปลดบล็อก **${removed} IP** เรียบร้อย กลับมาเชื่อมต่อได้ตามปกติ`).setFooter({ text: "การเปลี่ยนแปลงมีผลภายในประมาณ 15 วินาที" }).setTimestamp();
           await interaction.editReply({ embeds: [resultEmbed], components: [] });
-        } catch (error: any) {
-          console.error("[ERROR] /crowdsec unban-all collect:", error?.message || error);
+        } catch (error) {
+          console.error("[ERROR] /crowdsec unban-all collect:", describeError(error));
         }
       });
-      collector.on("end", async (_collected: any, reason: string) => {
+      collector.on("end", async (_collected, reason) => {
         if (finished || reason !== "time") return;
         try {
           const disabledRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -372,19 +380,19 @@ export async function handleCrowdSecCommand(interaction: any): Promise<void> {
           .setTimestamp()],
         components: [menuRow],
       });
-      const replyMessage: any = await interaction.fetchReply();
+      const replyMessage = await interaction.fetchReply();
       const collector = replyMessage.createMessageComponentCollector({ time: 120_000 });
       const requesterId = interaction.user.id;
       let finished = false;
       let selectedIps: string[] = [];
-      collector.on("collect", async (comp: any) => {
+      collector.on("collect", async (comp) => {
         try {
           if (comp.user.id !== requesterId) {
             await comp.reply({ content: "ตัวเลือกนี้สำหรับคนที่สั่งคำสั่งเท่านั้น", ephemeral: true });
             return;
           }
-          if (comp.customId === "cs_unban_select_menu" && typeof comp.isStringSelectMenu === "function" && comp.isStringSelectMenu()) {
-            selectedIps = (comp.values || []).filter((v: string) => v);
+          if (comp.customId === "cs_unban_select_menu" && comp.isStringSelectMenu()) {
+            selectedIps = comp.values.filter((v) => v);
             if (!selectedIps.length) return;
             const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
               new ButtonBuilder().setCustomId("cs_unban_sel_confirm").setLabel(`ยืนยันปลดบล็อก ${selectedIps.length} IP`).setStyle(ButtonStyle.Danger),
@@ -414,7 +422,7 @@ export async function handleCrowdSecCommand(interaction: any): Promise<void> {
           let failed = 0;
           for (const targetIp of selectedIps) {
             try {
-              const deleted = Number((await request("delete", `/v1/decisions?ip=${encodeURIComponent(targetIp)}`))?.nbDeleted || 0);
+              const deleted = Number((await request<DeleteResult>("delete", `/v1/decisions?ip=${encodeURIComponent(targetIp)}`))?.nbDeleted || 0);
               if (deleted > 0) removed++;
               else failed++;
             } catch {
@@ -422,16 +430,16 @@ export async function handleCrowdSecCommand(interaction: any): Promise<void> {
             }
           }
           clearDecisionCache();
-          interaction.recordBotActivity?.({ outcome: failed ? "unknown" : "success", result: `ปลดบล็อกแบบเลือก: สำเร็จ ${removed} IP${failed ? ` · ไม่สำเร็จ ${failed} IP` : ""}` });
+          recordActivity(interaction, { outcome: failed ? "unknown" : "success", result: `ปลดบล็อกแบบเลือก: สำเร็จ ${removed} IP${failed ? ` · ไม่สำเร็จ ${failed} IP` : ""}` });
           const resultEmbed = failed
             ? new EmbedBuilder().setTitle("ปลดบล็อกเสร็จบางส่วน").setColor(0xf59e0b).setDescription(`ปลดบล็อกสำเร็จ **${removed} IP**\nไม่สำเร็จ **${failed} IP**`).setTimestamp()
             : new EmbedBuilder().setTitle("ปลดบล็อกแล้ว").setColor(0x22c55e).setDescription(`ปลดบล็อก **${removed} IP** ที่เลือกเรียบร้อย`).setFooter({ text: "การเปลี่ยนแปลงมีผลภายในประมาณ 15 วินาที" }).setTimestamp();
           await interaction.editReply({ embeds: [resultEmbed], components: [] });
-        } catch (error: any) {
-          console.error("[ERROR] /crowdsec unban-select collect:", error?.message || error);
+        } catch (error) {
+          console.error("[ERROR] /crowdsec unban-select collect:", describeError(error));
         }
       });
-      collector.on("end", async (_collected: any, reason: string) => {
+      collector.on("end", async (_collected, reason) => {
         if (finished || reason !== "time") return;
         try {
           await interaction.editReply({ components: [] });
@@ -448,8 +456,8 @@ export async function handleCrowdSecCommand(interaction: any): Promise<void> {
       return;
     }
     if (sub === "unban") {
-      const count = Number((await request("delete", `/v1/decisions?ip=${encodeURIComponent(ip)}`))?.nbDeleted || 0);
-      interaction.recordBotActivity?.({ outcome: count > 0 ? "success" : "unknown", target: ip, result: count > 0 ? `ยกเลิกรายการบล็อก ${count} รายการแล้ว · ระบบป้องกันอัปเดตภายในประมาณ 15 วินาที` : "ไม่พบรายการบล็อกที่ยกเลิกได้ จึงไม่มีการเปลี่ยนแปลง" });
+      const count = Number((await request<DeleteResult>("delete", `/v1/decisions?ip=${encodeURIComponent(ip)}`))?.nbDeleted || 0);
+      recordActivity(interaction, { outcome: count > 0 ? "success" : "unknown", target: ip, result: count > 0 ? `ยกเลิกรายการบล็อก ${count} รายการแล้ว · ระบบป้องกันอัปเดตภายในประมาณ 15 วินาที` : "ไม่พบรายการบล็อกที่ยกเลิกได้ จึงไม่มีการเปลี่ยนแปลง" });
       clearDecisionCache();
       const embed = count > 0
         ? new EmbedBuilder().setTitle("ปลดบล็อกแล้ว").setColor(0x22c55e).setDescription(`\`${ip}\` กลับมาเชื่อมต่อได้ตามปกติ`).addFields({ name: "รายการที่ยกเลิก", value: `${count} รายการ`, inline: true }).setFooter({ text: "การเปลี่ยนแปลงมีผลภายในประมาณ 15 วินาที" }).setTimestamp()
@@ -467,21 +475,21 @@ export async function handleCrowdSecCommand(interaction: any): Promise<void> {
         return;
       }
       const now = new Date().toISOString();
-      await request("post", "/v1/alerts", [{
+      await request<unknown>("post", "/v1/alerts", [{
         machine_id: MACHINE_USER, scenario: "manual", scenario_version: "0.1", scenario_hash: "manual", message: reason,
         events: [], events_count: 1, start_at: now, stop_at: now, capacity: 1, leakspeed: "0", simulated: false,
         source: { scope: "Ip", value: ip, ip, as_num: 0, as_name: "", cn: "", lat: 0, lon: 0 },
         decisions: [{ duration, scenario: reason, origin: "cscli", scope: "Ip", type: "ban", value: ip, simulated: false }],
       }]);
-      interaction.recordBotActivity?.({ outcome: "success", target: ip, result: "บันทึกรายการบล็อกแล้ว · ระบบป้องกันอัปเดตภายในประมาณ 15 วินาที", details: `ระยะเวลา: ${isPermanent ? "ถาวร" : friendlyDecisionDuration(duration)}\nเหตุผล: ${reason}` });
+      recordActivity(interaction, { outcome: "success", target: ip, result: "บันทึกรายการบล็อกแล้ว · ระบบป้องกันอัปเดตภายในประมาณ 15 วินาที", details: `ระยะเวลา: ${isPermanent ? "ถาวร" : friendlyDecisionDuration(duration)}\nเหตุผล: ${reason}` });
       clearDecisionCache();
       await interaction.editReply({ embeds: [new EmbedBuilder().setTitle("บล็อก IP แล้ว").setColor(0xef4444).setDescription(`\`${ip}\` จะถูกปฏิเสธการเชื่อมต่อจากเว็บไซต์และ SSH`).addFields(
         { name: "ระยะเวลา", value: isPermanent ? "ถาวร" : friendlyDecisionDuration(duration), inline: true },
         { name: "เหตุผล", value: reason, inline: true }
       ).setFooter({ text: "เริ่มมีผลภายในประมาณ 15 วินาที" }).setTimestamp()] });
     }
-  } catch (error: any) {
-    console.error("[ERROR] /crowdsec", sub, error?.response?.status || "", error?.message || error);
+  } catch (error) {
+    console.error("[ERROR] /crowdsec", sub, errorStatus(error) || "", describeError(error));
     await interaction.editReply({ embeds: [notice("เชื่อมต่อ CrowdSec ไม่ได้", "ลองอีกครั้ง หากยังไม่ได้ ให้ผู้ดูแลตรวจสอบ CrowdSec บนเซิร์ฟเวอร์")] });
   }
 }

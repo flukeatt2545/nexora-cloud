@@ -6,7 +6,7 @@ import "./files-view.css";
 import {
   AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy, Download, ExternalLink, Eye, EyeOff,
   FileArchive, FileAudio, FileCode, FileImage, FileSpreadsheet, FileText, FileVideo,
-  Files, Folder, FolderArchive, FolderInput, FolderOpen, FolderPlus, KeyRound, LayoutGrid, Layers, List, Lock, MoreHorizontal,
+  Files, Folder, FolderInput, FolderOpen, FolderPlus, KeyRound, LayoutGrid, Layers, List, Lock, MoreHorizontal,
   Pencil, Play, Plus, Search, Share2, ShieldCheck, Tag, Trash2, UploadCloud, UserRound, X,
   CheckSquare, Printer,
 } from "lucide-react";
@@ -234,11 +234,9 @@ function CardThumbnail({
 
 export default function FileLibraryView({
   admin = false,
-  notify,
   ask,
 }: {
   admin?: boolean;
-  notify?: (notice: FileNotice) => void;
   ask?: (request: FileConfirmRequest) => void;
 }) {
   const [result, setResult] = useState<FileResponse | null>(null);
@@ -281,7 +279,6 @@ export default function FileLibraryView({
 
   // Folder states
   const [folders, setFolders] = useState<FileFolder[]>([]);
-  const [folderLoading, setFolderLoading] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null); // null = all in category, -1 = root only, >0 = folderId
   const [folderModal, setFolderModal] = useState<{ mode: "create" | "edit"; folder?: FileFolder; parentId?: number | null } | null>(null);
   const [folderForm, setFolderForm] = useState<{ name: string; isVisible: boolean; passwordEnabled: boolean; password: string }>({
@@ -415,87 +412,72 @@ export default function FileLibraryView({
     if (fileTransferHideTimerRef.current) clearTimeout(fileTransferHideTimerRef.current);
   }, []);
 
-  const loadCategories = useCallback(async () => {
-    try {
-      const path = admin ? "/api/admin/user-file-categories" : "/api/files/categories";
-      const response = await fetch(`${API_BASE}${path}`, { credentials: "include", cache: "no-store" });
-      const payload = await response.json().catch(() => ({}));
-      if (response.ok) setCategories(payload.items || []);
-    } catch {
-      /* ignore */
-    }
+  const loadCategories = useCallback(() => {
+    const path = admin ? "/api/admin/user-file-categories" : "/api/files/categories";
+    return fetch(`${API_BASE}${path}`, { credentials: "include", cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (response.ok) setCategories(payload.items || []);
+      })
+      .catch(() => { /* ignore */ });
   }, [admin]);
 
-  const loadFolders = useCallback(async (catId: number) => {
+  const fetchFolders = useCallback((catId: number) => {
+    const path = admin
+      ? `/api/admin/user-file-categories/${catId}/folders`
+      : `/api/files/categories/${catId}/folders`;
+    return fetch(`${API_BASE}${path}`, { credentials: "include", cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        return response.ok ? (payload.items || []) as FileFolder[] : [];
+      })
+      .catch(() => [] as FileFolder[]);
+  }, [admin]);
+
+  const loadFolders = useCallback((catId: number) => {
     if (!catId || catId <= 0) {
       setFolders([]);
-      return;
+      return Promise.resolve();
     }
-    setFolderLoading(true);
-    try {
-      const path = admin
-        ? `/api/admin/user-file-categories/${catId}/folders`
-        : `/api/files/categories/${catId}/folders`;
-      const response = await fetch(`${API_BASE}${path}`, { credentials: "include", cache: "no-store" });
-      const payload = await response.json().catch(() => ({}));
-      if (response.ok) setFolders(payload.items || []);
-      else setFolders([]);
-    } catch {
-      setFolders([]);
-    } finally {
-      setFolderLoading(false);
-    }
-  }, [admin]);
+    return fetchFolders(catId).then(setFolders);
+  }, [fetchFolders]);
 
-  // Load folders when active category changes
-  useEffect(() => {
+  // A new category starts at its top with none of the last one's folders.
+  const [foldersFor, setFoldersFor] = useState(categoryFilter);
+  if (foldersFor !== categoryFilter) {
+    setFoldersFor(categoryFilter);
     setSelectedFolderId(null);
-    if (categoryFilter !== "all" && categoryFilter !== "none" && categoryFilter !== "browse_all") {
-      const catId = parseInt(categoryFilter, 10);
-      if (!Number.isNaN(catId) && catId > 0) {
-        void loadFolders(catId);
-        return;
-      }
-    }
     setFolders([]);
-  }, [categoryFilter, loadFolders]);
-
-  const loadUploadFolders = useCallback(
-    async (catId: number) => {
-      if (!catId || catId <= 0) {
-        setUploadFoldersList([]);
-        setUploadFolderId("");
-        return;
-      }
-      try {
-        const path = admin
-          ? `/api/admin/user-file-categories/${catId}/folders`
-          : `/api/files/categories/${catId}/folders`;
-        const res = await fetch(`${API_BASE}${path}`, { credentials: "include", cache: "no-store" });
-        const data = await res.json().catch(() => ({}));
-        setUploadFoldersList(data.items || []);
-      } catch {
-        setUploadFoldersList([]);
-      }
-    },
-    [admin],
-  );
-
-  // Load folders for upload modal when uploadCategoryId changes
+  }
   useEffect(() => {
-    if (!uploadCategoryId) {
+    if (categoryFilter === "all" || categoryFilter === "none" || categoryFilter === "browse_all") return;
+    const catId = parseInt(categoryFilter, 10);
+    if (!Number.isNaN(catId) && catId > 0) void fetchFolders(catId).then(setFolders);
+  }, [categoryFilter, fetchFolders]);
+
+  const loadUploadFolders = useCallback((catId: number) => {
+    if (!catId || catId <= 0) {
       setUploadFoldersList([]);
       setUploadFolderId("");
-      return;
+      return Promise.resolve();
     }
+    return fetchFolders(catId).then(setUploadFoldersList);
+  }, [fetchFolders]);
+
+  // Folders offered in the upload dialog follow its category; no category means no folder.
+  const [uploadFoldersFor, setUploadFoldersFor] = useState(uploadCategoryId);
+  if (uploadFoldersFor !== uploadCategoryId) {
+    setUploadFoldersFor(uploadCategoryId);
     const catId = parseInt(uploadCategoryId, 10);
-    if (Number.isNaN(catId) || catId <= 0) {
+    if (!uploadCategoryId || Number.isNaN(catId) || catId <= 0) {
       setUploadFoldersList([]);
       setUploadFolderId("");
-      return;
     }
-    void loadUploadFolders(catId);
-  }, [loadUploadFolders, uploadCategoryId]);
+  }
+  useEffect(() => {
+    const catId = parseInt(uploadCategoryId, 10);
+    if (uploadCategoryId && !Number.isNaN(catId) && catId > 0) void fetchFolders(catId).then(setUploadFoldersList);
+  }, [fetchFolders, uploadCategoryId]);
 
   const folderMap = useMemo(() => {
     const map = new Map<number, FileFolder>();
@@ -559,32 +541,43 @@ export default function FileLibraryView({
   const uploadHierarchicalFolders = useMemo(() => buildFolderTree(uploadFoldersList), [buildFolderTree, uploadFoldersList]);
   const currentHierarchicalFolders = useMemo(() => buildFolderTree(folders), [buildFolderTree, folders]);
 
-  const loadFiles = useCallback(async () => {
+  // The admin list is filtered on the server, so a filter change shows "loading" until it arrives.
+  const filesKey = admin ? `${adminQuery.trim()}|${categoryFilter}|${visibilityFilter}` : "";
+  const [filesFor, setFilesFor] = useState(filesKey);
+  if (filesFor !== filesKey) {
+    setFilesFor(filesKey);
     setLoading(true);
     setError("");
-    try {
-      if (admin) {
-        const params = new URLSearchParams();
-        if (adminQuery.trim()) params.set("q", adminQuery.trim());
-        if (categoryFilter !== "all" && categoryFilter !== "browse_all") params.set("categoryId", categoryFilter);
-        if (visibilityFilter !== "all") params.set("visibility", visibilityFilter);
-        const qs = params.toString();
-        const response = await fetch(`${API_BASE}/api/admin/user-files${qs ? `?${qs}` : ""}`, { credentials: "include", cache: "no-store" });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload.error || "โหลดรายการไฟล์ไม่สำเร็จ");
-        setResult(payload);
-      } else {
-        const response = await fetch(`${API_BASE}/api/files`, { credentials: "include", cache: "no-store" });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload.error || "โหลดรายการไฟล์ไม่สำเร็จ");
-        setResult(payload);
-      }
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "โหลดรายการไฟล์ไม่สำเร็จ");
-    } finally {
-      setLoading(false);
+  }
+
+  const fetchFiles = useCallback(() => {
+    let url = `${API_BASE}/api/files`;
+    if (admin) {
+      const params = new URLSearchParams();
+      if (adminQuery.trim()) params.set("q", adminQuery.trim());
+      if (categoryFilter !== "all" && categoryFilter !== "browse_all") params.set("categoryId", categoryFilter);
+      if (visibilityFilter !== "all") params.set("visibility", visibilityFilter);
+      const qs = params.toString();
+      url = `${API_BASE}/api/admin/user-files${qs ? `?${qs}` : ""}`;
     }
+    return fetch(url, { credentials: "include", cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || "โหลดรายการไฟล์ไม่สำเร็จ");
+        setResult(payload);
+      })
+      .catch((requestError) => {
+        setError(requestError instanceof Error ? requestError.message : "โหลดรายการไฟล์ไม่สำเร็จ");
+      })
+      .finally(() => setLoading(false));
   }, [admin, adminQuery, categoryFilter, visibilityFilter]);
+
+  // After a change: show "loading" and fetch the list again.
+  const loadFiles = useCallback(() => {
+    setLoading(true);
+    setError("");
+    return fetchFiles();
+  }, [fetchFiles]);
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
 
@@ -597,7 +590,7 @@ export default function FileLibraryView({
     };
   }, [admin, query]);
 
-  useEffect(() => { loadFiles(); }, [loadFiles]);
+  useEffect(() => { fetchFiles(); }, [fetchFiles]);
 
   const modalOpen = !!(
     showUpload ||
@@ -704,7 +697,7 @@ export default function FileLibraryView({
       const matchFolder = (item.folderName || "").toLocaleLowerCase("th").includes(term);
       return matchName || matchOwner || matchCat || matchFolder;
     });
-  }, [admin, categoryFilter, selectedFolderId, visibilityFilter, typeFilter, query, result]);
+  }, [categoryFilter, selectedFolderId, visibilityFilter, typeFilter, query, result]);
 
   // The category or folder the share button in the folder bar acts on.
   const selectedCategoryId = categoryFilter !== "all" && categoryFilter !== "none" && categoryFilter !== "browse_all" ? Number(categoryFilter) || 0 : 0;
@@ -928,28 +921,6 @@ export default function FileLibraryView({
 
   function shareEndpoint(id: string) {
     return admin ? `/api/admin/user-files/${encodeURIComponent(id)}/share` : `/api/files/${encodeURIComponent(id)}/share`;
-  }
-
-  async function createShareLink() {
-    if (!shareTarget) return;
-    setShareBusy(true);
-    try {
-      const response = await fetch(`${API_BASE}${shareEndpoint(shareTarget.id)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ expiresIn: shareExpiresIn }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "สร้างลิงก์แชร์ไม่สำเร็จ");
-      flash({ kind: "success", text: "สร้างลิงก์แชร์เรียบร้อยแล้ว" });
-      setShareTarget(null);
-      await loadFiles();
-    } catch (err) {
-      flash({ kind: "error", text: err instanceof Error ? err.message : "สร้างลิงก์แชร์ไม่สำเร็จ" });
-    } finally {
-      setShareBusy(false);
-    }
   }
 
   async function revokeShareLink(item: FileItem) {

@@ -810,7 +810,7 @@ test('Feature 16.3: CodeWorkspaceModalProps interface contract verification', ()
     initialFile: 'public/index.php',
     isOpen: true,
     onClose: () => {},
-    onNotify: (msg, type) => {}
+    onNotify: () => {}
   };
   assert.equal(mockModalProps.site.id, 'site_1');
   assert.equal(mockModalProps.site.accessRole, 'owner');

@@ -7,6 +7,7 @@ import NoCoverArt from "./NoCoverArt";
 import { coverCropStyle, type CoverCrop } from "../lib/coverCrop";
 import { API_BASE } from "../runtime";
 import { sanitizeRichText } from "../lib/safeHtml";
+import Link from "next/link";
 
 export type PurchaseProduct = {
   id: number;
@@ -218,7 +219,7 @@ export function PurchaseDialog({
             <>
               {/* Details show the whole picture; the blurred copy fills the sides. Card crops don't apply here. */}
               <span className="buy-media-backdrop" aria-hidden="true">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                { }
                 <img src={product.coverImageUrl} alt="" decoding="async" onError={(event) => { event.currentTarget.style.display = "none"; }} />
               </span>
               <SmartImage src={product.coverImageUrl} alt={product.title} />
@@ -301,7 +302,7 @@ export function PurchaseDialog({
           ) : short ? (
             <>
               <button type="button" className="buy-btn" onClick={onClose}>ยกเลิก</button>
-              <a className="buy-btn is-primary" href="/topups" data-autofocus>เติมพอยท์ <ArrowRight size={15} aria-hidden="true" /></a>
+              <Link className="buy-btn is-primary" href="/topups" data-autofocus>เติมพอยท์ <ArrowRight size={15} aria-hidden="true" /></Link>
             </>
           ) : (
             <>
