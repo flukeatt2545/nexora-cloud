@@ -1,0 +1,38 @@
+/* StoreClosedNotice: the store is switched off in system settings. Theme tokens only. */
+/* Banner: a plain strip with an amber edge; title on one line, what it means on the next. */
+.scn-banner { position: relative; display: flex; align-items: center; gap: 12px 14px; padding: 12px 14px 12px 18px; overflow: hidden; border: 1px solid var(--theme-line-soft); border-radius: 12px; background: var(--theme-elevated); color: var(--theme-text-strong); }
+.scn-banner::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--warning-ink, #f59e0b); } /* theme-ok: status edge */
+.scn-banner-icon { flex: none; color: var(--warning-ink, #f59e0b); } /* theme-ok */
+.scn-banner-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.scn-banner-copy strong { color: var(--theme-text-strong); font-size: 15px; font-weight: 700; line-height: 1.4; }
+.scn-banner-copy p { margin: 0; color: var(--theme-text-soft); font-size: 14px; line-height: 1.5; }
+.scn-banner-actions { flex: none; display: flex; gap: 8px; }
+.scn-banner-actions :is(a, button) { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border: 1px solid var(--theme-line-strong); border-radius: 9px; background: var(--theme-elevated); color: var(--theme-text-strong); font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; text-decoration: none; cursor: pointer; transition: background .15s, border-color .15s; }
+.scn-banner-actions :is(a, button):hover { background: var(--theme-hover); }
+.scn-banner-actions :is(a, button):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.scn-banner-actions :is(a, button):disabled { opacity: .6; cursor: progress; }
+.scn-banner-actions .is-primary { border-color: transparent; background: var(--primary); color: #fff; } /* theme-ok: text on the accent */
+.scn-banner-actions .is-primary:hover { background: var(--primary-hover); }
+.scn-icon { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 9px; }
+.scn-icon { display: grid; place-items: center; border: 1px solid rgb(245 158 11 / .3); background: rgb(245 158 11 / .12); color: var(--warning-ink, #fbbf24); }
+
+.scn-page { width: min(520px, 100%); margin: clamp(24px, 6vh, 64px) auto; display: grid; justify-items: start; gap: 10px; padding: clamp(22px, 4vw, 32px); border: 1px solid var(--theme-line-soft); border-radius: 14px; background: var(--theme-elevated); box-shadow: 0 1px 2px rgb(0 0 0 / .05), 0 12px 32px -20px rgb(0 0 0 / .35); }
+.scn-page .scn-icon { width: 46px; height: 46px; border-radius: 12px; margin-bottom: 4px; }
+.scn-page h1 { margin: 0; color: var(--theme-text-strong); font-size: clamp(20px, 2.6vw, 24px); font-weight: 700; line-height: 1.3; }
+.scn-page p { margin: 0; color: var(--theme-text-soft); font-size: 15px; line-height: 1.6; }
+.scn-page .scn-note { font-size: 14px; }
+.scn-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.scn-actions a, .scn-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 40px; padding: 0 14px; border: 1px solid var(--control-line); border-radius: 9px; background: var(--theme-elevated); color: var(--theme-text-strong); font: inherit; font-size: 14.5px; font-weight: 500; text-decoration: none; cursor: pointer; }
+.scn-actions a:hover, .scn-actions button:hover { border-color: var(--primary-border); color: var(--primary-ink); }
+.scn-actions .is-primary { border-color: transparent; background: var(--primary); color: #fff; font-weight: 600; }
+.scn-actions .is-primary:hover { background: var(--primary-hover); color: #fff; }
+@media (max-width: 640px) {
+  .scn-banner { flex-wrap: wrap; align-items: flex-start; padding: 12px 12px 12px 16px; }
+  .scn-banner-icon { margin-top: 2px; }
+  .scn-banner-copy { flex-basis: calc(100% - 32px); }
+  .scn-banner-actions { width: 100%; padding-left: 32px; }
+  .scn-banner-actions :is(a, button) { flex: 1; height: 38px; }
+}
+@media (max-width: 520px) {
+  .scn-actions a, .scn-actions button { flex: 1 1 140px; }
+}

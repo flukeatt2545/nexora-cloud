@@ -1,0 +1,2 @@
+ALTER TABLE system_settings
+    ADD COLUMN IF NOT EXISTS footer_enabled BOOLEAN NOT NULL DEFAULT TRUE;

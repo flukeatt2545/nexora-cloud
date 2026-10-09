@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS hosting_databases (
+    id BIGSERIAL PRIMARY KEY,
+    site_id BIGINT UNIQUE NOT NULL REFERENCES hosting_sites(id) ON DELETE CASCADE,
+    db_name VARCHAR(64) UNIQUE NOT NULL,
+    db_user VARCHAR(64) UNIQUE NOT NULL,
+    db_password_enc VARCHAR(255) NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'provisioned',
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);

@@ -1,0 +1,139 @@
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
+
+export const commands = [
+  new SlashCommandBuilder()
+    .setName("db")
+    .setDescription("เปิดฐานข้อมูลด้วยรหัส 3 ตัวท้าย")
+    .addStringOption((option) =>
+      option
+        .setName("code")
+        .setDescription("รหัส 3 ตัวท้าย (เช่น 123)")
+        .setRequired(false)
+        .setMinLength(2)
+        .setMaxLength(10)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("code")
+    .setDescription("เปิดพื้นที่เขียนโค้ดด้วยรหัส 3 ตัวท้าย")
+    .addStringOption((option) =>
+      option
+        .setName("code")
+        .setDescription("รหัส 3 ตัวท้าย (เช่น 123)")
+        .setRequired(false)
+        .setMinLength(2)
+        .setMaxLength(10)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("setup-panel")
+    .setDescription("(ผู้ดูแลเท่านั้น) ตั้งปุ่มเข้าใช้งานในห้องนี้")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
+  new SlashCommandBuilder()
+    .setName("admin-map")
+    .setDescription("(ผู้ดูแลเท่านั้น) จัดการการผูกรหัส")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addSubcommand((sub) =>
+      sub
+        .setName("list")
+        .setDescription("แสดงรายการรหัสและฐานข้อมูลที่ผูกไว้ทั้งหมด")
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("set")
+        .setDescription("ผูกรหัสกับฐานข้อมูล")
+        .addStringOption((opt) =>
+          opt
+            .setName("code")
+            .setDescription("รหัส 3 ตัวท้าย (เช่น 123)")
+            .setRequired(true)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName("database")
+            .setDescription("Public ID หรือชื่อฐานข้อมูล (เช่น nxdb_...)")
+            .setRequired(true)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName("name")
+            .setDescription("ชื่อหรือหมายเหตุ")
+            .setRequired(false)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("auto-detect")
+        .setDescription("สแกนตรวจจับรหัส 3 ตัวท้ายจากชื่อฐานข้อมูลอัตโนมัติ")
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("unbind")
+        .setDescription("ยกเลิกสิทธิ์ของบัญชีที่ผูกกับรหัสนี้")
+        .addStringOption((opt) =>
+          opt
+            .setName("code")
+            .setDescription("รหัส 3 ตัวท้าย (เช่น 123)")
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("scan-discord")
+        .setDescription("สแกนชื่อสมาชิกในเซิร์ฟเวอร์เพื่อตรวจจับและผูกรหัส 3 ตัวท้ายให้อัตโนมัติ")
+    ),
+  new SlashCommandBuilder()
+    .setName("crowdsec")
+    .setDescription("จัดการ IP ที่ถูกบล็อกในเซิร์ฟเวอร์")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addSubcommand((sub) =>
+      sub
+        .setName("bans")
+        .setDescription("ดู IP ที่เซิร์ฟเวอร์บล็อกอยู่")
+        .addIntegerOption((opt) =>
+          opt
+            .setName("limit")
+            .setDescription("จำนวน IP ที่ต้องการแสดง (สูงสุด 25)")
+            .setRequired(false)
+            .setMinValue(1)
+            .setMaxValue(25)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("unban")
+        .setDescription("อนุญาตให้ IP เชื่อมต่ออีกครั้ง")
+        .addStringOption((opt) =>
+          opt
+            .setName("ip")
+            .setDescription("IP ที่ต้องการปลดบล็อก เช่น 1.2.3.4")
+            .setRequired(true)
+            .setAutocomplete(true)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("ban")
+        .setDescription("บล็อก IP ชั่วคราว")
+        .addStringOption((opt) =>
+          opt
+            .setName("ip")
+            .setDescription("IP ที่ต้องการบล็อก เช่น 1.2.3.4")
+            .setRequired(true)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName("duration")
+            .setDescription("ระยะเวลาบล็อก เช่น 30m, 4h, 1d หรือ 1w")
+            .setRequired(false)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName("reason")
+            .setDescription("เหตุผลที่บล็อก (ไม่บังคับ)")
+            .setRequired(false)
+            .setMaxLength(200)
+        )
+    ),
+];

@@ -1,0 +1,202 @@
+.social-status-page {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 32%, var(--primary-soft), transparent 36%),
+    var(--background);
+  color: var(--theme-text-strong);
+}
+
+.social-status-card {
+  width: min(100%, 460px);
+  padding: 28px;
+  border: 1px solid var(--theme-line-soft);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--theme-elevated) 94%, transparent);
+  box-shadow: 0 28px 80px var(--theme-shadow);
+  text-align: center;
+}
+
+.social-status-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--theme-line-soft);
+  text-align: left;
+}
+
+.social-status-brand img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.social-status-brand div {
+  display: grid;
+  gap: 1px;
+}
+
+.social-status-brand strong {
+  color: var(--theme-text-strong);
+  font-family: var(--font-gaming);
+  font-size: 15px;
+  letter-spacing: .04em;
+}
+
+.social-status-brand span {
+  color: var(--theme-text-soft);
+  font-size: 10px;
+  letter-spacing: .17em;
+}
+
+.social-provider-mark {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  margin: 28px auto 20px;
+  border: 1px solid var(--theme-line-soft);
+  border-radius: 20px;
+  background: var(--theme-input);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .12);
+}
+
+.social-provider-mark img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.social-provider-discord {
+  border-color: rgba(88, 101, 242, .35);
+  background: rgba(88, 101, 242, .12);
+}
+
+.social-provider-discord img {
+  filter: brightness(0) saturate(100%) invert(39%) sepia(85%) saturate(2347%) hue-rotate(224deg) brightness(98%);
+}
+
+[data-theme="dark"] .social-provider-github img {
+  filter: invert(1);
+}
+
+.social-status-copy {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.social-status-copy h1 {
+  max-width: 390px;
+  margin: 0;
+  color: var(--theme-text-strong);
+  font-family: var(--font-gaming);
+  font-size: clamp(22px, 5vw, 28px);
+  line-height: 1.35;
+}
+
+.social-status-copy p {
+  max-width: 370px;
+  margin: 0;
+  color: var(--theme-text-soft);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.social-status-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.social-status-actions a,
+.social-status-actions button {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.social-status-actions a:hover,
+.social-status-actions button:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.social-status-actions a:focus-visible,
+.social-status-actions button:focus-visible {
+  outline: 3px solid var(--primary-soft);
+  outline-offset: 3px;
+}
+
+.social-status-actions button:disabled {
+  cursor: wait;
+  opacity: .72;
+}
+
+.social-status-actions-single {
+  grid-template-columns: 1fr;
+}
+
+.social-ticket-loading svg {
+  width: 30px;
+  height: 30px;
+  color: var(--primary);
+  animation: social-ticket-spin 900ms linear infinite;
+}
+
+.social-ticket-error span {
+  color: var(--primary);
+  font-family: var(--font-gaming);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+@keyframes social-ticket-spin {
+  to { transform: rotate(360deg); }
+}
+
+.social-status-secondary {
+  border: 1px solid var(--theme-line-soft);
+  background: var(--theme-input);
+  color: var(--theme-text-strong);
+}
+
+.social-status-primary {
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  color: #fff;
+  box-shadow: 0 10px 24px var(--primary-glow);
+}
+
+.social-status-help {
+  margin: 18px 0 0;
+  color: var(--theme-text-soft);
+  font-size: 12px;
+}
+
+@media (max-width: 520px) {
+  .social-status-page {
+    padding: 16px;
+  }
+
+  .social-status-card {
+    padding: 22px 18px;
+    border-radius: 16px;
+  }
+
+  .social-status-actions {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,24 @@
+{
+	email admin@nkn02.com
+	on_demand_tls {
+		ask http://127.0.0.1:8080/api/hosting/domain-authorized
+	}
+}
+
+nkn02.com, www.nkn02.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8088
+}
+
+status.nkn02.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3002
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8088
+}

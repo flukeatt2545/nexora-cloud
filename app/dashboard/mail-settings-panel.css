@@ -1,0 +1,61 @@
+/* System settings → Mail (Resend + Stalwart). Same card frame as the other settings tabs; theme tokens only. */
+.msp { display: grid; gap: 16px; }
+.msp-card { overflow: hidden; border: 1px solid var(--control-line); border-radius: 12px; background: var(--control-surface, var(--theme-elevated)); color: var(--theme-text-strong); }
+.msp-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--control-line); }
+.msp-head > div { flex: 1; min-width: 0; }
+.msp-mark { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 9px; background: var(--primary-soft); color: var(--primary-ink); }
+.msp-head h3 { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px; margin: 0; font-size: 16px; font-weight: 700; line-height: 1.4; }
+.msp-head h3 small { color: var(--theme-text-soft); font-size: 13.5px; font-weight: 500; }
+.msp-head p { margin: 3px 0 0; color: var(--theme-text-soft); font-size: 14px; line-height: 1.5; }
+.msp-state { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; padding: 5px 10px; border-radius: 7px; background: var(--theme-hover); color: var(--theme-text-soft); font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.msp-state i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.msp-state.is-ok { background: rgb(34 197 94 / .1); color: var(--success-ink, #22c55e); } /* theme-ok */
+.msp-state.is-wait { background: rgb(245 158 11 / .1); color: var(--warning-ink, #f59e0b); } /* theme-ok */
+.msp-state.is-bad { background: rgb(var(--danger-rgb) / .1); color: var(--danger); }
+
+.msp-rows { display: grid; }
+.msp-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); align-items: center; gap: 24px; padding: 14px 18px; border-top: 1px solid var(--theme-line-soft); }
+.msp-row:first-child { border-top: 0; }
+.msp-row > label, .msp-label { display: grid; gap: 2px; min-width: 0; }
+.msp-row strong { color: var(--theme-text-strong); font-size: 14.5px; font-weight: 600; }
+.msp-row > label span, .msp-label span { color: var(--theme-text-soft); font-size: 13.5px; line-height: 1.5; }
+.msp-input { width: 100%; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid var(--control-line); border-radius: 9px; background: var(--theme-input); color: var(--theme-text-strong); font: inherit; font-size: 14.5px; }
+.msp-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.msp-input:disabled { opacity: .5; cursor: not-allowed; }
+.msp-copy { display: flex; align-items: center; gap: 6px; min-width: 0; height: 42px; padding: 0 5px 0 12px; border: 1px solid var(--control-line); border-radius: 9px; background: var(--theme-input); }
+.msp-copy span { flex: 1; min-width: 0; overflow: hidden; color: var(--theme-text-strong); font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
+.msp-copy button { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; padding: 0; border: 1px solid transparent; border-radius: 7px; background: none; color: var(--theme-text-soft); cursor: pointer; }
+.msp-copy button:hover { border-color: var(--control-line); background: var(--theme-elevated); color: var(--primary-ink); }
+.msp-copy button.is-done { color: var(--success-ink, #22c55e); } /* theme-ok */
+.msp-copy button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.msp-checks { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.msp-checks label { display: inline-flex; align-items: center; gap: 8px; color: var(--theme-text-strong); font-size: 14.5px; cursor: pointer; }
+.msp-checks input { width: 17px; height: 17px; margin: 0; accent-color: var(--danger); }
+/* Mail log: one checkbox per group of events, each with a one-line hint. */
+.msp-log-groups { display: grid; gap: 10px; }
+.msp-log-groups label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.msp-log-groups input { flex: 0 0 auto; width: 17px; height: 17px; margin: 2px 0 0; accent-color: var(--primary); }
+.msp-log-groups span { min-width: 0; display: grid; gap: 1px; }
+.msp-log-groups strong { color: var(--theme-text-strong); font-size: 14.5px; font-weight: 600; }
+.msp-log-groups small { color: var(--theme-text-soft); font-size: 13px; line-height: 1.45; }
+.msp-value { min-width: 0; color: var(--theme-text-strong); font-size: 14.5px; font-weight: 500; overflow-wrap: anywhere; }
+.msp-value.is-error { color: var(--danger); font-size: 14px; font-weight: 400; }
+.msp-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--control-line); }
+.msp-foot > span { flex: 1 1 220px; color: var(--theme-text-soft); font-size: 13.5px; }
+
+@media (max-width: 760px) {
+  .msp-head { padding: 14px; }
+  .msp-row { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 14px; }
+  .msp-foot { padding: 12px 14px; }
+  .msp-foot > span { flex-basis: 100%; }
+  .msp-foot .premium-btn { flex: 1; justify-content: center; }
+}
+@media (max-width: 560px) {
+  /* The status chip stays top-right beside the title instead of taking a line of its own. */
+  .msp-head { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; column-gap: 12px; row-gap: 10px; }
+  .msp-state { grid-column: 3; grid-row: 1; align-self: start; }
+}
+/* A row whose control is just an on/off switch keeps it beside the label at every width. */
+/* is-inline: other small controls (a colour, a two-way choice) that fit beside the label. */
+.msp-card .msp-row.is-switch, .msp-card .msp-row.is-inline { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.msp-card .msp-row.is-switch > :last-child, .msp-card .msp-row.is-inline > :last-child { max-width: none; justify-self: end; }

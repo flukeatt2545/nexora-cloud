@@ -1,0 +1,55 @@
+services:
+  media-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.media
+      args:
+        YTDLP_OFFLINE: ${MEDIA_YTDLP_OFFLINE:-0}
+    environment:
+      PORT: "8091"
+      WEB_ORIGIN: ${MEDIA_WEB_ORIGIN:-http://localhost:8092}
+      MEDIA_WORKERS: ${MEDIA_WORKERS:-2}
+    tmpfs:
+      - /tmp/nexora-media:size=2g,uid=10001,gid=10001,mode=0700,nosuid,nodev
+    mem_limit: 3g
+    cpus: 1.5
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  media-web:
+    build:
+      context: ./web
+    depends_on:
+      media-api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8092:8080"
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m,uid=101,gid=101
+      - /var/run:size=2m,uid=101,gid=101
+      - /tmp:size=16m,uid=101,gid=101
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

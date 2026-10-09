@@ -1,0 +1,89 @@
+/* My profile (/admin/profile). Builds on .aov panels and the .hv-* buttons, fields and dialogs. Theme tokens only. */
+
+/* Identity: avatar, name, role, one action */
+.pfv-id { flex-direction: row; align-items: center; gap: 18px; padding: 18px 20px; }
+.pfv-avatar { position: relative; width: 72px; height: 72px; flex: 0 0 72px; display: grid; place-items: center; border-radius: 50%; background: var(--primary); color: #fff; font-size: 28px; font-weight: 700; cursor: pointer; }
+.pfv-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.pfv-avatar > i { position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; display: grid; place-items: center; border: 3px solid var(--theme-elevated); border-radius: 50%; background: var(--theme-text-strong); color: var(--theme-elevated); transition: transform .15s; }
+.pfv-avatar:hover > i { transform: scale(1.08); }
+.pfv-avatar input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.pfv-avatar:focus-within { outline: 2px solid var(--primary); outline-offset: 3px; }
+.pfv-id-copy { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.pfv-id-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.pfv .pfv-id-name h2 { display: block; min-width: 0; margin: 0; color: var(--theme-text-strong); font-size: 21px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.pfv-id-copy > p { margin: 0; color: var(--theme-text-soft); font-size: 14.5px; overflow-wrap: anywhere; }
+.pfv-id-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+
+.pfv-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; align-items: stretch; }
+.pfv-grid > .aov-panel, .pfv > .aov-panel:last-of-type { overflow: hidden; }
+
+/* Rows shared by sign-in methods, devices and activity */
+.pfv-rows, .pfv-activity { margin: 10px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--theme-line-soft); }
+.pfv-rows li, .pfv-activity li { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 16px; border-top: 1px solid var(--theme-line-soft); }
+.pfv-rows li:first-child, .pfv-activity li:first-child { border-top: 0; }
+.pfv-rows li:hover, .pfv-activity li:hover { background: var(--theme-hover); }
+.pfv-rows li.is-current { box-shadow: inset 3px 0 0 var(--primary); }
+.pfv-row-icon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 9px; background: var(--primary-soft); color: var(--primary-ink); }
+.pfv-row-icon.is-brand { border: 1px solid var(--theme-line-soft); background: #fff; } /* theme-ok: brand marks need a light tile */
+.pfv-row-icon.is-brand.is-discord { border-color: transparent; background: #5865f2; } /* theme-ok: Discord's white mark sits on its brand blue */
+.pfv-row-icon.is-brand img { width: 18px; height: 18px; object-fit: contain; }
+.pfv-row-copy { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: left; }
+.pfv-row-copy strong { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; color: var(--theme-text-strong); font-size: 14.5px; font-weight: 600; overflow-wrap: anywhere; }
+.pfv-row-copy small { overflow: hidden; color: var(--theme-text-soft); font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
+.pfv-row-copy small.is-on { color: var(--success-ink, #22c55e); } /* theme-ok */
+.pfv-row-copy em { flex: 0 0 auto; padding: 1px 7px; border-radius: 99px; background: var(--primary-soft); color: var(--primary-ink); font-size: 12px; font-style: normal; font-weight: 600; }
+.pfv-row-link { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.pfv-row-link:hover strong { color: var(--primary-ink); }
+.pfv-row-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.pfv-rows .hv-btn { flex: 0 0 auto; }
+.pfv-tip { display: flex; align-items: flex-start; gap: 10px; margin: auto 0 0; padding: 14px 16px; border-top: 1px solid var(--theme-line-soft); color: var(--theme-text-soft); font-size: 13.5px; line-height: 1.55; }
+.pfv-tip > svg { flex: 0 0 auto; margin-top: 2px; color: var(--primary-ink); }
+.pfv-tip button { margin: 0 3px; padding: 0; border: 0; background: none; color: var(--primary-ink); font: inherit; font-weight: 600; cursor: pointer; }
+.pfv-tip button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.pfv-pager { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--theme-line-soft); color: var(--theme-text-soft); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+
+.pfv-activity .log-category-icon { margin: 0; }
+.pfv-activity .hv-status { flex: 0 0 auto; }
+.pfv-when { flex: 0 0 150px; display: grid; gap: 1px; text-align: right; }
+.pfv-when time { color: var(--theme-text-strong); font-size: 13.5px; white-space: nowrap; }
+.pfv-when small { color: var(--theme-text-soft); font-size: 12.5px; }
+
+/* Dialog bits */
+.pfv-ua summary { width: max-content; color: var(--theme-text-soft); font-size: 14px; cursor: pointer; }
+.pfv-ua summary:hover { color: var(--theme-text-strong); }
+.pfv-ua p { margin: 8px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--theme-hover); color: var(--theme-text-strong); font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+.hv-dialog-foot .pfv-foot-left { margin-right: auto; }
+.pfv-crop { position: relative; height: 300px; overflow: hidden; border-radius: 10px; background: #000; } /* theme-ok: crop stage */
+.pfv-zoom { display: flex; align-items: center; gap: 12px; color: var(--theme-text-soft); font-size: 14px; }
+.pfv-zoom input { flex: 1; accent-color: var(--primary); }
+
+@media (max-width: 1000px) {
+  .pfv-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .pfv-id { flex-wrap: wrap; gap: 14px; padding: 16px; }
+  .pfv-avatar { width: 60px; height: 60px; flex-basis: 60px; font-size: 24px; }
+  .pfv-id-actions { width: 100%; }
+  .pfv-id-actions .hv-btn { flex: 1; }
+  .pfv-rows li, .pfv-activity li { padding: 10px 12px; }
+  .pfv-activity li { flex-wrap: wrap; row-gap: 6px; }
+  .pfv-activity .pfv-row-copy { flex-basis: calc(100% - 48px); }
+  .pfv-activity .hv-status { margin-left: 48px; }
+  .pfv-when { flex: 1; display: flex; justify-content: flex-end; gap: 6px; }
+  .pfv-when small { display: none; }
+  .hv-dialog-foot .pfv-foot-left { margin-right: 0; }
+  .pfv-more { justify-content: center; padding: 10px 12px 12px; }
+  .pfv-range { flex-basis: 100%; text-align: center; }
+}
+
+/* Activity grouped by day, ten entries per page */
+.pfv-day h3 { margin: 0; padding: 12px 16px 6px; border-top: 1px solid var(--theme-line-soft); color: var(--theme-text-soft); font-size: 13px; font-weight: 600; }
+.pfv-day:first-of-type h3 { margin-top: 10px; }
+.pfv-day .pfv-activity { margin: 0; }
+.pfv-day .pfv-activity li:first-child { border-top: 1px solid var(--theme-line-soft); }
+/* Activity footer: range on the left, numbered pager on the right. */
+.pfv-activity-list { transition: opacity .15s; }
+.pfv-activity-list.is-loading { opacity: .5; pointer-events: none; }
+.pfv-more { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 10px 16px; border-top: 1px solid var(--theme-line-soft); color: var(--theme-text-soft); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.pfv-when { flex-basis: 110px; }
+.pfv-optional { margin-left: 6px; color: var(--theme-text-soft); font-size: 12.5px; font-weight: 500; }

@@ -1,0 +1,108 @@
+/* Databases (/admin/databases). Builds on the shared .aov / .th-* page and the .hv-* rows and dialogs. */
+.dbv-tabs { padding: 0; border-bottom-color: var(--theme-line-soft); }
+.dbv-tabs button { padding: 0 4px; margin-right: 16px; }
+.dbv-mono { font-family: inherit; font-variant-numeric: tabular-nums; }
+.dbv-icon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 9px; background: var(--primary-soft); color: var(--primary-ink); }
+.dbv-num { font-variant-numeric: tabular-nums; }
+
+/* Database rows: name, owner, size, status, actions */
+/* Fixed action column: every row is its own grid, so an auto column would size differently in the header. */
+.hv-row.dbv-row { grid-template-columns: 20px minmax(0, 2.4fr) minmax(110px, 1fr) 90px minmax(120px, .8fr) 168px; }
+
+/* Bulk tools sit in the meta line so the filter row stays one line. */
+.dbv-meta-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 14px; }
+.th-meta .dbv-meta-tools button { display: inline-flex; align-items: center; gap: 5px; color: var(--theme-text-soft); font-weight: 500; white-space: nowrap; }
+.th-meta .dbv-meta-tools button:hover:not(:disabled) { color: var(--primary-ink); }
+.th-meta .dbv-meta-tools button.is-danger:hover:not(:disabled) { color: var(--danger); }
+.th-meta .dbv-meta-tools button:disabled { opacity: .55; cursor: wait; }
+
+.dbv-select { display: grid; place-items: center; align-self: stretch; cursor: pointer; }
+.hv-row.dbv-row.is-picked { background: var(--primary-soft); }
+.hv-row.dbv-row.is-busy .hv-site, .hv-row.dbv-row.is-busy .hv-cell { opacity: .55; }
+.dbv-spinner { width: 12px; height: 12px; border-width: 1.5px; }
+
+
+.hv-btn.hv-icon-btn.dbv-act-suspend { border-color: transparent; background: none; color: var(--theme-text-soft); }
+.hv-btn.hv-icon-btn.dbv-act-suspend:hover:not(:disabled):not(.is-disabled) { border-color: rgb(245 158 11 / .45); background: rgb(245 158 11 / .08); color: var(--warning-ink, #f59e0b); } /* theme-ok */
+.hv-btn.hv-icon-btn.dbv-act-restore { border-color: rgb(34 197 94 / .35); background: rgb(34 197 94 / .08); color: var(--success-ink, #22c55e); } /* theme-ok */
+.hv-btn.hv-icon-btn.dbv-act-restore:hover:not(:disabled):not(.is-disabled) { border-color: rgb(34 197 94 / .6); background: rgb(34 197 94 / .14); color: var(--success-ink, #22c55e); } /* theme-ok */
+
+/* Student-code mappings */
+.dbv-map { display: grid; grid-template-columns: 64px minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr) 104px; align-items: center; gap: 14px; min-height: 66px; padding: 10px 16px; border-top: 1px solid var(--theme-line-soft); }
+.dbv-map:first-child { border-top: 0; }
+.dbv-map:not(.dbv-map-head):hover { background: var(--theme-hover); }
+.dbv-map-head { min-height: 42px; padding-block: 0; color: var(--theme-text-soft); font-size: 13px; font-weight: 600; }
+.dbv-code { justify-self: start; min-width: 48px; padding: 5px 8px; border-radius: 7px; background: var(--primary-soft); color: var(--primary-ink); font-family: inherit; font-variant-numeric: tabular-nums; font-size: 14.5px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.dbv-cell { min-width: 0; display: grid; gap: 2px; justify-items: start; }
+.dbv-cell strong { max-width: 100%; overflow: hidden; color: var(--theme-text-strong); font-size: 14.5px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.dbv-cell strong.is-soft { color: var(--theme-text-soft); font-weight: 500; }
+.dbv-cell small, .dbv-link { max-width: 100%; overflow: hidden; color: var(--theme-text-soft); font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
+.dbv-link { text-decoration: none; }
+.dbv-link:hover { color: var(--primary-ink); }
+.dbv-inline { max-width: 100%; min-width: 0; display: inline-flex; align-items: center; gap: 2px; }
+.dbv-inline > strong, .dbv-inline > .hv-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dbv-inline > .hv-status { margin-right: 2px; }
+.dbv-inline .hv-icon-btn.is-sm { width: 28px; height: 28px; }
+.dbv-map-actions { gap: 2px; }
+
+/* Detail dialog */
+.dbv-detail { width: min(720px, 100%); }
+.dbv-detail .hv-dh-text h2 { font-size: 17px; }
+.dbv-pass { border-color: rgb(245 158 11 / .32); background: rgb(245 158 11 / .07); } /* theme-ok */
+.dbv-pass > svg { color: var(--warning-ink, #f59e0b); } /* theme-ok */
+.dbv-pass code { margin-left: 6px; font-family: inherit; padding: 2px 6px; border-radius: 6px; background: var(--theme-elevated); font-size: 14px; user-select: all; overflow-wrap: anywhere; }
+.dbv-detail .hv-section-head { align-items: center; }
+/* Connection details: one bordered key/value list, copy button beside each value */
+.dbv-conn { margin: 0; padding: 0; list-style: none; overflow: hidden; border: 1px solid var(--theme-line-soft); border-radius: 10px; background: var(--theme-input); }
+.dbv-conn li { display: grid; grid-template-columns: 104px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 48px; padding: 6px 8px 6px 14px; border-top: 1px solid var(--theme-line-soft); }
+.dbv-conn li:first-child { border-top: 0; }
+.dbv-conn li:hover { background: var(--theme-hover); }
+.dbv-conn-label { color: var(--theme-text-soft); font-size: 13.5px; }
+.dbv-conn-value { min-width: 0; color: var(--theme-text-strong); font-size: 14.5px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.dbv-conn-value.is-hidden { color: var(--theme-text-soft); font-weight: 400; }
+.dbv-conn-action { padding: 0 8px; }
+.dbv-copy { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--theme-text-soft); cursor: pointer; transition: color .15s, background-color .15s, border-color .15s; }
+.dbv-copy:hover { border-color: var(--control-line); background: var(--theme-elevated); color: var(--primary-ink); }
+.dbv-copy:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.dbv-copy.is-done { color: var(--success-ink, #22c55e); } /* theme-ok: follows the theme */
+.dbv-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.dbv-meta span { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--theme-line-soft); border-radius: 8px; color: var(--theme-text-soft); font-size: 13.5px; }
+.dbv-meta svg { color: var(--theme-text-soft); }
+
+/* Form dialogs */
+.dbv-form-dialog { width: min(520px, 100%); }
+.dbv-field-pair { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 12px; }
+.hv-dialog .db-user-select-trigger { min-height: 46px; border-radius: 9px; }
+
+@media (max-width: 1100px) {
+  .hv-row.dbv-row { grid-template-columns: 20px minmax(0, 2.2fr) minmax(100px, 1fr) minmax(110px, .9fr) 168px; }
+  .hv-row.dbv-row > .dbv-num, .hv-row.dbv-row.hv-row-head > span:nth-child(4) { display: none; }
+  .dbv-map { grid-template-columns: 60px minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr) 104px; }
+  .dbv-map > .dbv-person, .dbv-map-head > span:nth-child(2) { display: none; }
+}
+
+@media (max-width: 760px) {
+  .dbv-tabs button { margin-right: 10px; }
+  .hv-row.dbv-row { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "check site status" "actions actions actions"; }
+  .hv-row.dbv-row > .dbv-select { grid-area: check; align-self: start; padding-top: 9px; }
+  .th-meta { flex-wrap: wrap; }
+  .dbv-meta-tools { justify-content: flex-start; }
+
+  /* Each mapping becomes a small card: code + name + actions, then labelled lines. */
+  .dbv-map-head { display: none; }
+  .dbv-map:nth-child(2) { border-top: 0; }
+  .dbv-map { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "code person actions" "db db db" "site site site" "discord discord discord"; gap: 8px 12px; min-height: 0; padding: 14px 12px; }
+  .dbv-map > .dbv-code { grid-area: code; }
+  .dbv-map > .dbv-person { grid-area: person; display: grid; }
+  .dbv-map > .dbv-cell:nth-child(3) { grid-area: db; }
+  .dbv-map > .dbv-cell:nth-child(4) { grid-area: site; }
+  .dbv-map > .dbv-cell:nth-child(5) { grid-area: discord; }
+  .dbv-map > .dbv-map-actions { grid-area: actions; }
+  .dbv-map > .dbv-cell[data-label] { grid-template-columns: 86px minmax(0, 1fr); align-items: center; column-gap: 8px; }
+  .dbv-map > .dbv-cell[data-label]::before { content: attr(data-label); grid-row: 1 / span 2; align-self: start; padding-top: 4px; color: var(--theme-text-soft); font-size: 13px; }
+  .dbv-map > .dbv-cell[data-label] > * { grid-column: 2; }
+
+  .dbv-field-pair { grid-template-columns: 1fr; }
+  .dbv-conn li { grid-template-columns: 82px minmax(0, 1fr) auto; gap: 8px; padding-left: 12px; }
+  .dbv-detail .hv-dh-main > .dbv-icon { display: none; }
+}

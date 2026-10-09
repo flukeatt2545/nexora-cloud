@@ -1,0 +1,208 @@
+:80 {
+	encode zstd gzip
+
+	@sensitive path /topups /topups/* /files /files/* /api/files/* /api/public/files/* /api/topup/* /api/admin/* /api/profile/* /api/hosting/* /api/store/buy/* /api/auth/me
+	header @sensitive {
+		>Cache-Control "no-store, private, max-age=0"
+		>Pragma "no-cache"
+		>Expires "0"
+	}
+
+	@platform_development host localhost 127.0.0.1
+	header @platform_development {
+		>X-Frame-Options "DENY"
+		>Cross-Origin-Opener-Policy "same-origin"
+		>X-Permitted-Cross-Domain-Policies "none"
+		>Referrer-Policy "no-referrer"
+		?Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'self' blob: http://*.localhost http://*.localhost:8088; form-action 'self' http://db.localhost:8088 https://nove666.pro; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; media-src 'self' blob:; connect-src 'self' blob: http://localhost:8080 ws://localhost:3000; worker-src 'self' blob:; manifest-src 'self'"
+	}
+
+	@platform_production host nkn02.com www.nkn02.com
+	header @platform_production {
+		>X-Frame-Options "DENY"
+		>Cross-Origin-Opener-Policy "same-origin"
+		>X-Permitted-Cross-Domain-Policies "none"
+		>Referrer-Policy "no-referrer"
+		?Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'self' blob: https://*.nkn02.com; form-action 'self' https://db.nkn02.com https://nove666.pro; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; media-src 'self' blob:; connect-src 'self' blob: https://api.nkn02.com; worker-src 'self' blob:; manifest-src 'self'"
+	}
+
+	@lock_control host lock.nove666.pro lock.localhost
+	handle @lock_control {
+		@lock_ticket path /t/*
+		handle @lock_ticket {
+			rewrite * /api/lockdown-control{uri}
+			reverse_proxy api:8080
+		}
+		@lock_disable path /disable
+		handle @lock_disable {
+			rewrite * /api/lockdown-control/disable
+			reverse_proxy api:8080
+		}
+		handle {
+			rewrite * /api/lockdown-control
+			reverse_proxy api:8080
+		}
+	}
+
+
+
+
+	@lockdown_gate {
+		host nkn02.com www.nkn02.com api.nkn02.com localhost 127.0.0.1
+		not path /health /_next/* /assets/* /favicon.ico /logo-v2.png /cdn-cgi/*
+	}
+	forward_auth @lockdown_gate api:8080 {
+		uri /api/internal/lockdown/gate
+		header_up X-Lockdown-Original-URI {uri}
+	}
+
+	@nove_vps_www {
+		host www.nove666.pro
+		path /vps /vps/*
+	}
+	handle @nove_vps_www {
+		redir https://nove666.pro{uri} 308
+	}
+	@nove_vps {
+		host nove666.pro
+		path /vps /vps/*
+	}
+	handle @nove_vps {
+		route {
+			uri strip_prefix /vps
+			rewrite * /api/vps-uptime{uri}
+			reverse_proxy api:8080
+		}
+	}
+
+	@db host db.localhost db.nkn02.com nove666.pro www.nove666.pro
+	handle @db {
+		header {
+			Cache-Control "no-store"
+			Referrer-Policy "no-referrer"
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		}
+		@old_signon path /signon.php
+		redir @old_signon /login{?query} 307
+		@database_login path /login
+		rewrite @database_login /signon.php
+		reverse_proxy phpmyadmin:80 {
+			header_up CF-Connecting-IP {http.request.header.CF-Connecting-IP}
+			header_up True-Client-IP {http.request.header.True-Client-IP}
+			header_up X-Real-IP {http.request.header.X-Real-IP}
+		}
+	}
+
+	@mail_server host mail.nkn02.com
+	handle @mail_server {
+		header {
+			Cache-Control "no-store"
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			Referrer-Policy "no-referrer"
+		}
+		reverse_proxy stalwart:8080
+	}
+
+	@api_domain host api.nkn02.com
+	handle @api_domain {
+		@api_internal path /api/internal/* /internal/*
+		handle @api_internal {
+			respond "Not Found" 404
+		}
+
+		@api_health path /health
+		handle @api_health {
+			reverse_proxy api:8080 {
+				trusted_proxies private_ranges 127.0.0.1/32 172.16.0.0/12 10.0.0.0/8 192.168.0.0/16
+			}
+		}
+
+		@api_prefix path /api/*
+		handle @api_prefix {
+			reverse_proxy api:8080 {
+				trusted_proxies private_ranges 127.0.0.1/32 172.16.0.0/12 10.0.0.0/8 192.168.0.0/16
+			}
+		}
+
+		handle {
+			rewrite * /api{uri}
+			reverse_proxy api:8080 {
+				trusted_proxies private_ranges 127.0.0.1/32 172.16.0.0/12 10.0.0.0/8 192.168.0.0/16
+			}
+		}
+	}
+
+	@hosted {
+		host *.nkn02.com *.localhost
+		not host nkn02.com www.nkn02.com api.nkn02.com status.nkn02.com db.nkn02.com mail.nkn02.com localhost db.localhost
+	}
+	handle @hosted {
+		reverse_proxy runtime-gateway:8090
+	}
+
+	handle /api/internal/* {
+		respond "Not Found" 404
+	}
+
+	handle /api/* {
+		reverse_proxy api:8080 {
+			trusted_proxies private_ranges 127.0.0.1/32 172.16.0.0/12 10.0.0.0/8 192.168.0.0/16
+		}
+	}
+
+	handle /health {
+		reverse_proxy api:8080 {
+			trusted_proxies private_ranges 127.0.0.1/32 172.16.0.0/12 10.0.0.0/8 192.168.0.0/16
+		}
+	}
+
+	# vinext emits hashed JS/CSS/MJS files directly under /assets.
+	# Keep nested /assets/... paths available for uploaded MinIO objects.
+	@app_asset path_regexp app_asset ^/assets/[^/]+\.(css|js|mjs|cjs|map|woff2?|ttf|eot|otf|svg|png|jpe?g|gif|webp|avif|ico|json|wasm|txt)$
+	handle @app_asset {
+		reverse_proxy web:3000
+	}
+
+	@uploaded_asset {
+		path /assets/*
+		not path_regexp ^/assets/[^/]+\.(css|js|mjs|cjs|map|woff2?|ttf|eot|otf|svg|png|jpe?g|gif|webp|avif|ico|json|wasm|txt)$
+	}
+	handle @uploaded_asset {
+		# Use one URI transformation. A separate rewrite plus strip_prefix is
+		# reordered by Caddy and can produce /nexora-assets/assets/...
+		uri replace /assets/ /nexora-assets/ 1
+		@browser_asset expression `{http.request.header.Sec-Fetch-Mode} == "navigate" || {http.request.header.Accept}.contains("text/html")`
+		handle @browser_asset {
+			reverse_proxy minio:9000 {
+				@missing_browser_asset status 404 403
+				handle_response @missing_browser_asset {
+					header Cache-Control "no-store, max-age=0"
+					rewrite * /nexora-missing-object
+					reverse_proxy web:3000
+				}
+			}
+		}
+		reverse_proxy minio:9000 {
+			@missing_asset status 404 403
+			handle_response @missing_asset {
+				header Cache-Control "no-store, max-age=0"
+				rewrite * /nexora-missing-object
+				reverse_proxy web:3000
+			}
+		}
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+	}
+}

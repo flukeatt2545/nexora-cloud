@@ -1,0 +1,368 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: nexora
+      POSTGRES_USER: nexora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexora -d nexora"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-nexora}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?S3_SECRET_KEY is required}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  tenant-db:
+    image: mysql:8.0
+    container_name: nexora-tenant-db
+    command: --default-authentication-plugin=caching_sha2_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TENANT_DB_ROOT_PASSWORD:?TENANT_DB_ROOT_PASSWORD is required}
+      PMA_CONTROL_PASSWORD: ${PMA_CONTROL_PASSWORD:?Set PMA_CONTROL_PASSWORD in .env}
+    volumes:
+      - tenant_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    environment:
+      PMA_HOST: tenant-db
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: 300M
+      PMA_INTERNAL_API_URL: http://api:8080
+      PMA_INTERNAL_SECRET: ${PMA_INTERNAL_SECRET:?PMA_INTERNAL_SECRET is required}
+      PMA_CONTROL_PASSWORD: ${PMA_CONTROL_PASSWORD:?Set PMA_CONTROL_PASSWORD in .env}
+      PMA_RETURN_URL: ${PMA_RETURN_URL:-http://localhost:8088/admin/hosting}
+      PMA_ALLOW_DIRECT_DB_LOGIN: ${PMA_ALLOW_DIRECT_DB_LOGIN:-0}
+    volumes:
+      - ./phpmyadmin_config/signon.php:/var/www/html/signon.php:ro
+      - ./phpmyadmin_config/signon.css:/var/www/html/signon.css:ro
+      - ./phpmyadmin_config/session.ini:/usr/local/etc/php/conf.d/nexora-session.ini:ro
+      - ./public/logo-v2.png:/var/www/html/nexora-logo.png:ro
+      - ./phpmyadmin_config/config.user.inc.php:/etc/phpmyadmin/config.user.inc.php:ro
+      - ./phpmyadmin_config/mysql-ca.pem:/etc/phpmyadmin/mysql-ca.pem:ro
+    depends_on:
+      - tenant-db
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      APP_ENV: ${APP_ENV:-auto}
+      PORT: "8080"
+      DATABASE_URL: postgres://nexora:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nexora?sslmode=disable
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8088}
+      SESSION_COOKIE_NAME: nexora_session
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
+      OAUTH_BASE_URL: ${OAUTH_BASE_URL:-http://localhost:8088}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      S3_ENDPOINT: minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-nexora}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY is required}
+      S3_BUCKET: nexora-assets
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-http://localhost:8088/assets}
+      S3_USE_SSL: "false"
+      WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY is required}
+      HOSTING_ENCRYPTION_KEY: ${HOSTING_ENCRYPTION_KEY:?HOSTING_ENCRYPTION_KEY is required}
+      TENANT_MYSQL_DSN: "root:${TENANT_DB_ROOT_PASSWORD:?TENANT_DB_ROOT_PASSWORD is required}@tcp(tenant-db:3306)/?parseTime=true&multiStatements=false"
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      CF_ZONE_ID: ${CF_ZONE_ID:-}
+      CF_HOSTING_DOMAIN: ${CF_HOSTING_DOMAIN:-nkn02.com}
+      HOSTING_SERVER_IP: ${HOSTING_SERVER_IP:-}
+      PMA_INTERNAL_SECRET: ${PMA_INTERNAL_SECRET:?PMA_INTERNAL_SECRET is required}
+      PMA_PUBLIC_URL: ${PMA_PUBLIC_URL:-http://db.localhost:8088}
+      CHECKSLIPS_API_TOKEN: ${CHECKSLIPS_API_TOKEN:-}
+      CHECKSLIPS_TENANT_ID: ${CHECKSLIPS_TENANT_ID:-}
+      CHECKSLIPS_ENCRYPTION_KEY: ${CHECKSLIPS_ENCRYPTION_KEY:-}
+      CHECKSLIPS_API_BASE_URL: ${CHECKSLIPS_API_BASE_URL:-https://api.checkslips.com}
+      TOPUP_RECEIVER_BANK_CODE: ${TOPUP_RECEIVER_BANK_CODE:-}
+      TOPUP_RECEIVER_BANK_NAME: ${TOPUP_RECEIVER_BANK_NAME:-}
+      TOPUP_RECEIVER_ACCOUNT_NUMBER: ${TOPUP_RECEIVER_ACCOUNT_NUMBER:-}
+      TOPUP_RECEIVER_ACCOUNT_NAME: ${TOPUP_RECEIVER_ACCOUNT_NAME:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      RESEND_API_BASE_URL: ${RESEND_API_BASE_URL:-https://api.resend.com}
+      STALWART_API_URL: ${STALWART_API_URL:-http://stalwart:8080}
+      STALWART_API_TOKEN: ${STALWART_API_TOKEN:-}
+      STALWART_PUBLIC_URL: ${STALWART_PUBLIC_URL:-https://mail.nkn02.com}
+      MAIL_DISCORD_ADMIN_IDS: ${MAIL_DISCORD_ADMIN_IDS:-${DISCORD_ADMIN_IDS:-}}
+      DISCORD_ADMIN_IDS: ${DISCORD_ADMIN_IDS:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      tenant-db:
+        condition: service_healthy
+      stalwart:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  mail-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.mail-worker
+    environment:
+      DATABASE_URL: postgres://nexora:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nexora?sslmode=disable
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_API_BASE_URL: ${RESEND_API_BASE_URL:-https://api.resend.com}
+      WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY is required}
+      S3_ENDPOINT: minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-nexora}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY is required}
+      S3_BUCKET: nexora-assets
+      S3_USE_SSL: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  stalwart:
+    image: stalwartlabs/stalwart:v0.16
+    command: ["--config", "/etc/stalwart/config.json"]
+    environment:
+      STALWART_PUBLIC_URL: ${STALWART_PUBLIC_URL:-https://mail.nkn02.com}
+      STALWART_RECOVERY_ADMIN: ${STALWART_RECOVERY_ADMIN:?STALWART_RECOVERY_ADMIN is required}
+      STALWART_RECOVERY_MODE: ${STALWART_RECOVERY_MODE:-0}
+    volumes:
+      - ./stalwart/config.json:/etc/stalwart/config.json:ro
+      - ./stalwart/tls:/etc/stalwart/tls:ro
+      - stalwart_data:/var/lib/stalwart
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    depends_on:
+      - api
+    environment:
+      API_BASE_URL: http://api:8080
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://nkn02.com}
+    expose:
+      - "3000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  runtime-gateway:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.runtime-gateway
+    container_name: nexora-runtime-gateway
+    environment:
+      DATABASE_URL: postgres://nexora:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nexora?sslmode=disable
+      HOSTING_BASE_DOMAINS: ${HOSTING_BASE_DOMAINS:-nkn02.com,localhost}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8090"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8090/_nexora/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  runtime-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.runtime-worker
+    environment:
+      DATABASE_URL: postgres://nexora:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nexora?sslmode=disable
+      DOCKER_SOCKET: /var/run/docker.sock
+      HOSTING_PORT_MIN: ${HOSTING_PORT_MIN:-20000}
+      HOSTING_PORT_MAX: ${HOSTING_PORT_MAX:-20999}
+      RUNTIME_GATEWAY_CONTAINER: nexora-runtime-gateway
+      TENANT_DB_CONTAINER: nexora-tenant-db
+      S3_ENDPOINT: minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-nexora}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY is required}
+      S3_BUCKET: nexora-assets
+      S3_USE_SSL: "false"
+      HOSTING_ENCRYPTION_KEY: ${HOSTING_ENCRYPTION_KEY:?HOSTING_ENCRYPTION_KEY is required}
+      TENANT_MYSQL_DSN: "root:${TENANT_DB_ROOT_PASSWORD:?TENANT_DB_ROOT_PASSWORD is required}@tcp(tenant-db:3306)/?parseTime=true&multiStatements=false"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "112"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      runtime-gateway:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      tenant-db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "127.0.0.1:8088:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+      - runtime-gateway
+      - stalwart
+    restart: unless-stopped
+
+  discord-security-bot:
+    build:
+      context: ./discord-bot
+    restart: unless-stopped
+    environment:
+      DISCORD_BOT_TOKEN: ${DISCORD_SECURITY_BOT_TOKEN:-}
+      DISCORD_CLIENT_ID: ${DISCORD_SECURITY_CLIENT_ID:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      DISCORD_ADMIN_IDS: ${DISCORD_ADMIN_IDS:-}
+      NEXORA_API_URL: http://api:8080
+      BOT_INTERNAL_SECRET: ${INTERNAL_BOT_SECRET:-${PMA_INTERNAL_SECRET:?PMA_INTERNAL_SECRET is required}}
+      DEFAULT_SSO_DOMAIN: ${DEFAULT_PHPMYADMIN_URL:-https://db.nkn02.com}
+      CROWDSEC_LAPI_URL: ${CROWDSEC_LAPI_URL:-}
+      CROWDSEC_MACHINE_USER: ${CROWDSEC_MACHINE_USER:-}
+      CROWDSEC_MACHINE_PASSWORD: ${CROWDSEC_MACHINE_PASSWORD:-}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://nkn02.com}
+    depends_on:
+      - api
+
+  discord-mail-bot:
+    build:
+      context: ./discord-mail-bot
+    restart: unless-stopped
+    environment:
+      MAIL_DISCORD_BOT_TOKEN: ${MAIL_DISCORD_BOT_TOKEN:-}
+      MAIL_DISCORD_CLIENT_ID: ${MAIL_DISCORD_CLIENT_ID:-}
+      MAIL_DISCORD_GUILD_ID: ${MAIL_DISCORD_GUILD_ID:-${DISCORD_GUILD_ID:-}}
+      NEXORA_API_URL: http://api:8080
+      BOT_INTERNAL_SECRET: ${INTERNAL_BOT_SECRET:-${PMA_INTERNAL_SECRET:?PMA_INTERNAL_SECRET is required}}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://nkn02.com}
+      MAIL_DISCORD_ADMIN_IDS: ${MAIL_DISCORD_ADMIN_IDS:-${DISCORD_ADMIN_IDS:-}}
+      DISCORD_ADMIN_IDS: ${DISCORD_ADMIN_IDS:-}
+      MAIL_DISCORD_ACTIVITY_TYPE: ${MAIL_DISCORD_ACTIVITY_TYPE:-watching}
+      MAIL_DISCORD_ACTIVITY_TEXT: ${MAIL_DISCORD_ACTIVITY_TEXT:-เมลของคุณ}
+    depends_on:
+      - api
+
+  discord-voice-bot:
+    build:
+      context: ./discord-voice-bot
+    restart: unless-stopped
+    environment:
+      VOICE_DISCORD_BOT_TOKEN: ${VOICE_DISCORD_BOT_TOKEN:-}
+      VOICE_DISCORD_CATEGORY_ID: ${VOICE_DISCORD_CATEGORY_ID:-}
+      NEXORA_API_URL: http://api:8080
+      BOT_INTERNAL_SECRET: ${INTERNAL_BOT_SECRET:-${PMA_INTERNAL_SECRET:?PMA_INTERNAL_SECRET is required}}
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  caddy_data:
+  caddy_config:
+  tenant_db_data:
+  stalwart_data:
+    name: nexora_stalwart_data
+    external: true

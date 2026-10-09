@@ -1,0 +1,12 @@
+FROM golang:alpine AS builder
+WORKDIR /src
+RUN apk add --no-cache ca-certificates git
+COPY go.mod go.sum ./
+RUN go mod download
+COPY runtime-worker ./runtime-worker
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/runtime-worker ./runtime-worker
+
+FROM alpine:3.22
+RUN apk add --no-cache ca-certificates tzdata
+COPY --from=builder /out/runtime-worker /runtime-worker
+ENTRYPOINT ["/runtime-worker"]

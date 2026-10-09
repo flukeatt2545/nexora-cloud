@@ -1,0 +1,26 @@
+FROM node:24-alpine AS builder
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+ARG CACHEBUST=1
+COPY . .
+RUN npm run build
+
+FROM node:24-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NPM_CONFIG_CACHE=/tmp/.npm
+COPY --from=builder /app/package.json /app/package-lock.json ./
+COPY --from=builder /app/node_modules ./node_modules
+ARG CACHEBUST=1
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/app ./app
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/vite.config.ts /app/tsconfig.json ./
+COPY --from=builder /app/.openai/hosting.json ./.openai/hosting.json
+COPY --from=builder /app/build/sites-vite-plugin.ts ./build/sites-vite-plugin.ts
+RUN rm -rf /usr/local/lib/node_modules/npm \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx
+USER node
+EXPOSE 3000
+CMD ["node", "node_modules/vinext/dist/cli.js", "start"]

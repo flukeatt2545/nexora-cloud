@@ -1,0 +1,20 @@
+.nexora-error-screen { box-sizing: border-box; min-height: 100vh; min-height: 100svh; width: 100%; display: flex; flex-direction: column; justify-content: center; padding: max(32px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: #101b2d; color: #f0f3f8; font-family: 'Kanit', 'Nexora Thai', 'Noto Sans Thai', system-ui, sans-serif; }
+.nexora-error-screen *, .nexora-error-screen *::before, .nexora-error-screen *::after { box-sizing: border-box; font-family: inherit; }
+.nexora-error-screen header, .nexora-error-screen main { width: 100%; max-width: 520px; margin-inline: auto; font-family: inherit; }
+.nexora-error-screen .error-brand { display: inline-flex; gap: 10px; align-items: center; color: var(--strong-ink, #f0f3f8); font-family: inherit; font-weight: 700; font-size: 12px; line-height: 1.5; letter-spacing: .09em; text-decoration: none; }
+.nexora-error-screen .error-brand::before { content: ''; width: 4px; height: 18px; background: #759bff; border-radius: 2px; }
+.nexora-error-screen main { display: grid; gap: 32px; padding-block: 40px; font-family: inherit; }
+.nexora-error-screen .error-status-wrap { display: inline-flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.nexora-error-screen .error-lock { display: inline-flex; color: var(--danger); margin-bottom: 0; flex-shrink: 0; }
+.nexora-error-screen .error-status { margin-bottom: 0; color: var(--danger); font-family: inherit; font-size: clamp(64px, 15vw, 96px); font-weight: 650; line-height: 1; letter-spacing: -.055em; font-feature-settings: "tnum"; }
+.nexora-error-screen h1 { margin: 0; font-family: inherit; font-size: clamp(25px, 6vw, 32px); font-weight: 650; line-height: 1.45; letter-spacing: -.02em; }
+.nexora-error-screen p { margin: 16px 0 0; color: var(--soft-ink, #acb8cb); font-size: 15px; line-height: 1.8; font-family: inherit; }
+.nexora-error-screen nav { display: flex; gap: 12px; flex-direction: column; justify-content: center; font-family: inherit; }
+.nexora-error-screen nav a, .nexora-error-screen button { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 12px 20px; border: 1px solid #354867; border-radius: 8px; background: #19263c; color: #f0f3f8; text-decoration: none; font-family: inherit; cursor: pointer; }
+.nexora-error-screen nav a:hover, .nexora-error-screen button:hover { background: #1d2e49; border-color: #759bff; }
+.nexora-error-screen a:focus-visible, .nexora-error-screen button:focus-visible { outline: 2px solid #94b1ff; outline-offset: 3px; }
+@media (min-width: 900px) { .nexora-error-screen { padding: 56px; } .nexora-error-screen header, .nexora-error-screen main { max-width: 960px; } .nexora-error-screen main { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 64px; align-items: center; padding-block: 72px; } .nexora-error-screen h1 { font-size: clamp(32px, 2.6vw, 42px); } .nexora-error-screen nav { border-left: 1px solid #2c3a50; padding-left: 40px; } }
+@media (max-width: 360px) { .nexora-error-screen { padding-inline: 20px; } }
+@media (max-height: 540px) { .nexora-error-screen { justify-content: flex-start; } .nexora-error-screen main { padding-block: 28px; } }
+@font-face { font-family: 'Nexora Thai'; src: url('/fonts/noto-sans-thai-latin.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Nexora Thai'; src: url('/fonts/noto-sans-thai-thai.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; unicode-range: U+0E00-0E7F; }
