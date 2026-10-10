@@ -1,4 +1,4 @@
-import { EmbedBuilder, MessageFlags, type Client, type Guild, type GuildBasedChannel, type GuildMember, type VoiceState } from "discord.js";
+import { EmbedBuilder, MessageFlags, escapeMarkdown, type Client, type Guild, type GuildBasedChannel, type GuildMember, type VoiceState } from "discord.js";
 import { api, logBotError } from "./api";
 import { isHub } from "./rooms";
 import { COLOR } from "./ui";
@@ -94,7 +94,11 @@ export function sessionLine(session: VoiceSession, withMember = true) {
   const times = session.leftAt
     ? `เข้า <t:${unix(session.joinedAt)}:${style}> · ออก <t:${unix(session.leftAt)}:${style}>`
     : `เข้า <t:${unix(session.joinedAt)}:${style}> · ตอนนี้ยังอยู่`;
-  return `${who}อยู่ <#${session.channelId}> ไป **${duration(session.seconds)}**\n${times}`;
+  // The room by name, not <#id>: a channel mention reads "No Access" (ไม่มีการเข้าถึง) on clients
+  // that have not loaded the room (Discord on phones), for people who cannot see it, and for
+  // everyone once a temporary room is deleted.
+  const room = `**${escapeMarkdown(session.channelName || "ห้องเสียง")}**`;
+  return `${who}อยู่ ${room} ไป **${duration(session.seconds)}**\n${times}`;
 }
 
 /** Posts ended sessions to each server's join/leave log channel. */
@@ -114,9 +118,7 @@ export async function postSessionFeed(logs: Map<string, GuildBasedChannel>) {
           embeds: batch.map((session) => new EmbedBuilder()
             .setColor(COLOR.brand)
             .setTitle("ออกจากห้องแล้ว")
-            .setDescription(sessionLine(session))
-            // The channel may be gone later; its name at the time stays readable here.
-            .setFooter({ text: session.channelName || "ห้องเสียง" })),
+            .setDescription(sessionLine(session))),
           allowedMentions: { parse: [] },
           flags: MessageFlags.SuppressNotifications,
         });
