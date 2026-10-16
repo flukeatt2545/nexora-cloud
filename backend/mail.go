@@ -1142,6 +1142,42 @@ func (s *server) adminListMailDomains(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"items": items, "providerConfigured": s.resendConfigured(c.Context())})
 }
 
+// adminListMailDomainMailboxes lists the mailboxes of one domain for the admin mail page:
+// address, owner and members, aliases, usage, and whether the mail server has the account.
+func (s *server) adminListMailDomainMailboxes(c *fiber.Ctx) error {
+	rows, err := s.db.Query(c.Context(), `
+		SELECT m.public_id,m.local_part||'@'||d.domain,m.display_name,m.quota_bytes,m.used_bytes,m.daily_send_limit,m.status,m.created_at,
+		       m.stalwart_provision_state,m.stalwart_last_error,
+		       COALESCE((SELECT u.identifier FROM mailbox_members mm JOIN users u ON u.id=mm.user_id WHERE mm.mailbox_id=m.id AND mm.role='owner' ORDER BY mm.created_at LIMIT 1),''),
+		       COALESCE((SELECT array_agg(u.identifier ORDER BY u.identifier) FROM mailbox_members mm JOIN users u ON u.id=mm.user_id WHERE mm.mailbox_id=m.id AND mm.role<>'owner'),'{}'),
+		       COALESCE((SELECT array_agg(a.local_part||'@'||d.domain ORDER BY a.local_part) FROM mail_aliases a WHERE a.mailbox_id=m.id AND a.deleted_at IS NULL),'{}')
+		FROM mailboxes m JOIN mail_domains d ON d.id=m.domain_id
+		WHERE d.public_id=$1 AND d.deleted_at IS NULL AND m.deleted_at IS NULL
+		ORDER BY m.local_part`, c.Params("id"))
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	items := []fiber.Map{}
+	for rows.Next() {
+		var id, address, name, status, provisionState, provisionError, owner string
+		var quota, used int64
+		var limit int
+		var created time.Time
+		var members, aliases []string
+		if err := rows.Scan(&id, &address, &name, &quota, &used, &limit, &status, &created, &provisionState, &provisionError, &owner, &members, &aliases); err != nil {
+			return err
+		}
+		items = append(items, fiber.Map{"id": id, "address": address, "displayName": name, "quotaBytes": quota, "usedBytes": used, "dailySendLimit": limit,
+			"status": status, "createdAt": created, "provisionState": provisionState, "provisionError": provisionError,
+			"owner": owner, "members": members, "aliases": aliases})
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return c.JSON(fiber.Map{"items": items})
+}
+
 func (s *server) adminListMailMessages(c *fiber.Ctx) error {
 	rows, err := s.db.Query(c.Context(), `SELECT m.public_id,m.from_address,m.subject,m.delivery_status,COALESCE(m.sent_at,m.created_at),COALESCE((SELECT string_agg(r.address,', ' ORDER BY r.id) FROM mail_recipients r WHERE r.message_id=m.id AND r.kind='to'),'') FROM mail_messages m WHERE m.direction='outbound' AND m.folder<>'draft' ORDER BY m.created_at DESC LIMIT 100`)
 	if err != nil {

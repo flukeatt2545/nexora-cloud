@@ -507,6 +507,7 @@ func main() {
 	admin.Get("/lockdown", requireRoles("superadmin"), s.adminLockdownStatus)
 	admin.Patch("/lockdown", requireRoles("superadmin"), s.adminUpdateLockdown)
 	admin.Get("/mail/domains", s.adminListMailDomains)
+	admin.Get("/mail/domains/:id/mailboxes", s.adminListMailDomainMailboxes)
 	admin.Get("/mail/messages", s.adminListMailMessages)
 	admin.Patch("/mail/domains/:id/status", s.adminSetMailDomainStatus)
 	admin.Post("/mail/stalwart/sync", requireRoles("superadmin"), s.adminSyncStalwart)

@@ -143,7 +143,7 @@ export function localPart(address: string) {
  * The Clipboard API is missing on plain-HTTP pages and refused in some embedded browsers; the
  * old select-and-copy still works there.
  */
-async function writeClipboard(value: string) {
+export async function writeClipboard(value: string) {
   try {
     // Some embedded browsers leave the promise pending forever instead of refusing.
     await Promise.race([

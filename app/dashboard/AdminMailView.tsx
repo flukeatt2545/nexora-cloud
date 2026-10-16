@@ -1,9 +1,9 @@
 "use client";
 import {
-  Check, ChevronLeft, ChevronRight, CircleAlert, CloudCog, Copy, Globe2, Mail, MailPlus, Plus,
+  Check, ChevronDown, ChevronLeft, CircleAlert, CloudCog, Copy, Globe2, Inbox, Mail, MailPlus, Plus,
   RefreshCw, Search, Send, Settings2, X,
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { API_BASE } from "../runtime";
 import { useEscape, useScrollLock } from "./useScrollLock";
@@ -12,6 +12,7 @@ import "./db-admin-view.css";
 import "./admin-mail-view.css";
 import Link from "next/link";
 import type { Ask } from "./types";
+import { writeClipboard } from "./mailShared";
 
 type Notice = (notice: { kind: "success" | "error"; text: string }) => void;
 type DnsRecord = Record<string, unknown>;
@@ -28,6 +29,21 @@ type Domain = {
   usedBytes?: number;
   stalwartProvisionState?: string;
   stalwartLastError?: string;
+};
+type DomainMailbox = {
+  id: string;
+  address: string;
+  displayName: string;
+  quotaBytes: number;
+  usedBytes: number;
+  dailySendLimit: number;
+  status: string;
+  createdAt: string;
+  provisionState: string;
+  provisionError: string;
+  owner: string;
+  members: string[];
+  aliases: string[];
 };
 type MailHistory = { id: string; from: string; to: string; subject: string; status: string; date: string };
 type StalwartHealth = { configured: boolean; healthy: boolean; error?: string };
@@ -69,10 +85,10 @@ const deliveryStatus: Record<string, { label: string; tone: string }> = {
   bounced: { label: "ตีกลับ", tone: "is-bad" },
 };
 
-function when(value: string) {
+function when(value: string, dateOnly = false) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return new Intl.DateTimeFormat("th-TH", dateOnly ? { dateStyle: "medium" } : { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 function formatBytes(bytes = 0) {
   if (!bytes) return "0 B";
@@ -81,6 +97,51 @@ function formatBytes(bytes = 0) {
   return `${parseFloat((bytes / 1024 ** i).toFixed(1))} ${units[i]}`;
 }
 const text = (value: unknown) => (value === null || value === undefined ? "" : String(value));
+const NARROW = "(max-width: 900px)";
+
+/**
+ * Brings an element to the top of the page, under the sticky header. scrollIntoView does not
+ * move the page here: body is a scroll container of its own (overflow-x: hidden).
+ */
+function scrollPageTo(element: Element | null) {
+  if (!element) return;
+  const top = element.getBoundingClientRect().top + window.scrollY - 76;
+  window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+}
+
+/** A centred dialog in the page's dialog style; Esc and a click outside close it. */
+function Modal({ title, eyebrow, icon, wide = false, onClose, children, footer }: {
+  title: string;
+  eyebrow?: string;
+  icon: ReactNode;
+  wide?: boolean;
+  onClose: () => void;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  useScrollLock(true);
+  useEscape(true, onClose);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="hv-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className={`hv-dialog mx-modal${wide ? " is-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby="mx-modal-title">
+        <header className="hv-dialog-head">
+          <div className="hv-dh-main">
+            <span className="hv-dh-icon" aria-hidden="true">{icon}</span>
+            <div className="hv-dh-text">
+              {eyebrow && <small>{eyebrow}</small>}
+              <h2 id="mx-modal-title">{title}</h2>
+            </div>
+          </div>
+          <button type="button" className="hv-btn hv-icon-btn" onClick={onClose} aria-label="ปิด"><X size={18} /></button>
+        </header>
+        <div className="hv-dialog-body mx-modal-body">{children}</div>
+        {footer && <footer className="hv-dialog-foot">{footer}</footer>}
+      </section>
+    </div>,
+    document.body,
+  );
+}
 
 export default function AdminMailView({ notify, ask, isSuperadmin = false }: { notify: Notice; ask?: Ask; isSuperadmin?: boolean }) {
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -89,18 +150,23 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
   const [stalwart, setStalwart] = useState<StalwartHealth | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // Mailboxes per domain id; a missing key means "not loaded yet".
+  const [boxes, setBoxes] = useState<Record<string, DomainMailbox[] | "error">>({});
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"" | "setup" | "active">("");
   const [selectedId, setSelectedId] = useState("");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [focusBox, setFocusBox] = useState("");
   const [showDetail, setShowDetail] = useState(false);
-  const [tab, setTab] = useState<"dns" | "sent">("dns");
   const [working, setWorking] = useState("");
   const [copied, setCopied] = useState("");
   const copiedTimer = useRef<number | undefined>(undefined);
   const detailRef = useRef<HTMLElement>(null);
+  // What to scroll to once the next render is on screen: "detail" or a mailbox id.
+  const pendingScroll = useRef("");
 
-  const [dialog, setDialog] = useState<"" | "domain" | "mailbox">("");
+  const [dialog, setDialog] = useState<"" | "domain" | "mailbox" | "dns" | "sent">("");
   const [newDomain, setNewDomain] = useState("");
   const [newKind, setNewKind] = useState("custom");
   const [domainBusy, setDomainBusy] = useState(false);
@@ -121,8 +187,14 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
     load().catch((error) => notify({ kind: "error", text: (error as Error).message })).finally(() => setLoaded(true));
   }, [load, notify]);
 
-  useScrollLock(Boolean(dialog));
-  useEscape(Boolean(dialog), () => { if (!domainBusy && !mailboxBusy) setDialog(""); });
+  const fetchBoxes = useCallback((domainId: string) =>
+    api<{ items: DomainMailbox[] }>(`/api/admin/mail/domains/${domainId}/mailboxes`)
+      .then((data) => setBoxes((current) => ({ ...current, [domainId]: data.items || [] })))
+      .catch(() => setBoxes((current) => ({ ...current, [domainId]: "error" }))), []);
+
+  const formOpen = dialog === "domain" || dialog === "mailbox";
+  useScrollLock(formOpen);
+  useEscape(formOpen, () => { if (!domainBusy && !mailboxBusy) setDialog(""); });
 
   const isSetup = (status: string) => status !== "active" && status !== "suspended";
   const counts = useMemo(() => ({
@@ -138,24 +210,73 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
     return !q || item.domain.toLowerCase().includes(q) || (item.ownerUsername || "").toLowerCase().includes(q);
   });
   const selected = domains.find((item) => item.id === selectedId) || visible[0] || null;
+  // On wide screens the chosen domain is open in the list; on narrow ones only what was tapped.
+  const expandedId = openId ?? selected?.id ?? "";
   const records = selected?.dnsRecords || [];
   const verifiedRecords = records.filter((record) => text(record.status) === "verified").length;
   const domainSent = selected ? history.filter((item) => item.from.toLowerCase().endsWith(`@${selected.domain.toLowerCase()}`)) : [];
+  const selectedBoxes = selected ? boxes[selected.id] : undefined;
 
-  async function refresh() {
-    setRefreshing(true);
-    try { await load(); } catch (error) { notify({ kind: "error", text: (error as Error).message }); }
-    finally { setRefreshing(false); }
-  }
-  function pick(id: string) {
-    setSelectedId(id);
-    setShowDetail(true);
-    setTab("dns");
-    // One pane at a time on narrow screens: bring the opened domain to the top instead of
-    // leaving the reader where the list was scrolled to.
-    if (window.matchMedia("(max-width: 900px)").matches) {
-      requestAnimationFrame(() => detailRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }));
+  // Load the mailboxes of whatever domain is shown or open, once.
+  useEffect(() => {
+    for (const id of new Set([selected?.id, expandedId])) {
+      if (id && boxes[id] === undefined) void fetchBoxes(id);
     }
+  }, [boxes, expandedId, fetchBoxes, selected?.id]);
+
+  function refresh() {
+    setRefreshing(true);
+    const reloadBoxes = selected ? fetchBoxes(selected.id) : Promise.resolve();
+    Promise.all([load(), reloadBoxes])
+      .catch((error) => notify({ kind: "error", text: (error as Error).message }))
+      .finally(() => setRefreshing(false));
+  }
+  // Scrolling waits for the render: until then the pane (or the card) is still hidden.
+  useEffect(() => {
+    const target = pendingScroll.current;
+    if (!target) return;
+    pendingScroll.current = "";
+    const narrow = window.matchMedia(NARROW).matches;
+    if (target === "detail") {
+      if (narrow) scrollPageTo(detailRef.current);
+      return;
+    }
+    const card = document.getElementById(`mx-box-${target}`);
+    // On phones the pane has just replaced the list, so the page moves; on wide screens only
+    // the card list needs to show the card.
+    if (narrow) scrollPageTo(card);
+    else card?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
+  function showPane() {
+    setShowDetail(true);
+    pendingScroll.current = "detail";
+  }
+  function pickDomain(id: string) {
+    const narrow = window.matchMedia(NARROW).matches;
+    if (narrow) {
+      // On phones the list is a menu: a tap opens the domain's mailboxes in place.
+      setSelectedId(id);
+      setOpenId(expandedId === id ? "" : id);
+      return;
+    }
+    if (selected?.id === id) {
+      setOpenId(expandedId === id ? "" : id);
+      return;
+    }
+    setSelectedId(id);
+    setOpenId(null);
+    setFocusBox("");
+  }
+  function openDomain(id: string) {
+    setSelectedId(id);
+    setFocusBox("");
+    showPane();
+  }
+  function pickMailbox(domainId: string, boxId: string) {
+    setSelectedId(domainId);
+    setFocusBox(boxId);
+    setShowDetail(true);
+    pendingScroll.current = boxId;
   }
   async function run(key: string, task: () => Promise<unknown>, done: string) {
     setWorking(key);
@@ -189,7 +310,7 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
 
   async function copy(value: string, key: string) {
     try {
-      await navigator.clipboard.writeText(value);
+      await writeClipboard(value);
       setCopied(key);
       window.clearTimeout(copiedTimer.current);
       copiedTimer.current = window.setTimeout(() => setCopied(""), 1600);
@@ -197,6 +318,11 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
       notify({ kind: "error", text: "คัดลอกไม่ได้ ลองคลิกที่หน้าเว็บแล้วกดอีกครั้ง" });
     }
   }
+  const copyButton = (value: string, key: string, label: string) => (
+    <button type="button" className={`dbv-copy${copied === key ? " is-done" : ""}`} onClick={(event) => { event.stopPropagation(); void copy(value, key); }} aria-label={`คัดลอก${label} ${value}`} title={copied === key ? "คัดลอกแล้ว" : `คัดลอก${label}`}>
+      {copied === key ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+    </button>
+  );
 
   async function addDomain(event: FormEvent) {
     event.preventDefault();
@@ -204,10 +330,15 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
     try {
       const created = await api<{ id: string }>("/api/mail/domains", { method: "POST", body: JSON.stringify({ domain: newDomain.trim(), kind: newKind }) });
       setNewDomain("");
-      setDialog("");
       await load();
-      if (created?.id) pick(created.id);
-      notify({ kind: "success", text: "เพิ่มโดเมนแล้ว ขั้นต่อไปคือตั้งค่า DNS" });
+      if (created?.id) {
+        setSelectedId(created.id);
+        setOpenId(null);
+        setDialog("dns");
+      } else {
+        setDialog("");
+      }
+      notify({ kind: "success", text: "เพิ่มโดเมนแล้ว ขั้นต่อไปคือเพิ่มระเบียน DNS ตามตาราง" });
     } catch (error) {
       notify({ kind: "error", text: (error as Error).message });
     } finally {
@@ -219,9 +350,10 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
     setMailboxBusy(true);
     try {
       await api("/api/mail/mailboxes", { method: "POST", body: JSON.stringify(mailbox) });
+      const domainId = mailbox.domainId;
       setMailbox({ domainId: "", localPart: "", displayName: "", ownerUsername: "" });
       setDialog("");
-      await load();
+      await Promise.all([load(), fetchBoxes(domainId)]);
       notify({ kind: "success", text: "สร้างกล่องอีเมลแล้ว" });
     } catch (error) {
       notify({ kind: "error", text: (error as Error).message });
@@ -235,12 +367,43 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
   }
 
   const setupHint = (item: Domain) => {
-    if (item.status === "pending_dns") return { title: "เพิ่มระเบียน DNS ด้านล่างที่ผู้ให้บริการโดเมน", body: "เสร็จแล้วกด ตรวจ DNS ระบบอาจใช้เวลาสักครู่ก่อนเห็นค่าใหม่" };
-    if (item.status === "failed") return { title: "ตรวจ DNS ไม่ผ่าน", body: "ดูแถวที่ขึ้นว่าไม่ผ่าน แก้ค่าให้ตรงแล้วกดตรวจอีกครั้ง" };
+    if (item.status === "pending_dns") return { title: "เพิ่มระเบียน DNS ที่ผู้ให้บริการโดเมน", body: "เปิดดูค่าที่ต้องเพิ่ม คัดลอกไปใส่ แล้วกดตรวจ DNS ระบบอาจใช้เวลาสักครู่ก่อนเห็นค่าใหม่" };
+    if (item.status === "failed") return { title: "ตรวจ DNS ไม่ผ่าน", body: "เปิดระเบียน DNS ดูแถวที่ขึ้นว่าไม่ผ่าน แก้ค่าให้ตรงแล้วกดตรวจอีกครั้ง" };
     if (item.status === "pending_approval") return { title: "DNS ผ่านแล้ว รออนุมัติ", body: "อนุมัติแล้วเจ้าของโดเมนจะสร้างกล่องอีเมลได้" };
     if (item.status === "suspended") return { title: "โดเมนนี้ถูกระงับ", body: "กล่องอีเมลในโดเมนนี้ส่งและรับเมลไม่ได้จนกว่าจะเปิดใช้" };
     return null;
   };
+
+  const dnsRecords = (
+    records.length ? (
+      <ul className="mx-records">
+        <li className="mx-record mx-record-head" aria-hidden="true"><span>ชนิด</span><span>ชื่อ</span><span>ค่า</span><span>สถานะ</span></li>
+        {records.map((record, index) => {
+          const type = text(record.type);
+          const name = text(record.name);
+          const value = text(record.value ?? record.content);
+          const priority = text(record.priority);
+          const state = recordStatus[text(record.status)] || { label: text(record.status) || "-", tone: "is-off" };
+          return (
+            <li className={`mx-record ${state.tone}`} key={index}>
+              <span className="mx-type">{type}{priority ? <small>ลำดับ {priority}</small> : null}</span>
+              <span className="mx-cell" data-label="ชื่อ">
+                <code className="mx-val">{name || "@"}</code>
+                {copyButton(name, `n${index}`, "ชื่อ")}
+              </span>
+              <span className="mx-cell" data-label="ค่า">
+                <code className="mx-val is-long">{value}</code>
+                {copyButton(value, `v${index}`, "ค่า")}
+              </span>
+              <span className={`mx-pill ${state.tone}`}>{state.label}</span>
+            </li>
+          );
+        })}
+      </ul>
+    ) : (
+      <p className="mx-empty">ยังไม่มีระเบียน DNS ลองกด ตรวจ DNS เพื่อดึงค่าจากผู้ให้บริการ</p>
+    )
+  );
 
   return (
     <div className="aov hv mx">
@@ -248,10 +411,10 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
         <div>
           <p className="aov-eyebrow">อีเมล</p>
           <h1>อีเมลโดเมน</h1>
-          <p className="aov-sub">เพิ่มโดเมน ตั้งค่า DNS และสร้างกล่องอีเมลให้ผู้ใช้</p>
+          <p className="aov-sub">เลือกโดเมนเพื่อดูกล่องอีเมลในโดเมนนั้น ตั้งค่า DNS และสร้างกล่องให้ผู้ใช้</p>
         </div>
         <div className="aov-head-actions">
-          <button type="button" className="aov-btn" onClick={() => void refresh()} disabled={refreshing} aria-label="รีเฟรชข้อมูล" title="รีเฟรชข้อมูล">
+          <button type="button" className="aov-btn" onClick={refresh} disabled={refreshing} aria-label="รีเฟรชข้อมูล" title="รีเฟรชข้อมูล">
             <RefreshCw size={16} aria-hidden="true" className={refreshing ? "spin" : ""} />
           </button>
           <Link className="aov-btn aov-btn-label" href="/mail"><Mail size={16} aria-hidden="true" /> Webmail</Link>
@@ -275,7 +438,7 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
       </div>
 
       <div className={`mx-split${showDetail || (loaded && !domains.length) ? " is-detail" : ""}${selectedId ? " has-pick" : ""}`}>
-        <aside className="aov-panel mx-side" aria-label="รายการโดเมน">
+        <aside className="aov-panel mx-side" aria-label="โดเมนและกล่องอีเมล">
           <div className="mx-side-tools">
             <label className="th-search" role="search">
               <Search size={17} aria-hidden="true" />
@@ -308,9 +471,18 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
               {visible.map((item) => {
                 const state = statusOf(item.status);
                 const current = selected?.id === item.id;
+                const open = expandedId === item.id;
+                const list = boxes[item.id];
                 return (
-                  <li key={item.id}>
-                    <button type="button" className={`mx-domain${current ? " is-current" : ""}`} aria-current={current ? "true" : undefined} onClick={() => pick(item.id)}>
+                  <li key={item.id} className={open ? "is-open" : ""}>
+                    <button
+                      type="button"
+                      className={`mx-domain${current ? " is-current" : ""}`}
+                      aria-current={current ? "true" : undefined}
+                      aria-expanded={open}
+                      aria-controls={`mx-tree-${item.id}`}
+                      onClick={() => pickDomain(item.id)}
+                    >
                       <span className={`mx-dot ${state.tone}`} aria-hidden="true" />
                       <span className="mx-domain-copy">
                         <strong title={item.domain}>{item.domain}</strong>
@@ -319,8 +491,33 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
                           {item.kind === "platform" && <span className="mx-tag">ระบบ</span>}
                         </small>
                       </span>
-                      <ChevronRight size={16} aria-hidden="true" className="mx-chevron" />
+                      <ChevronDown size={16} aria-hidden="true" className="mx-chevron" />
                     </button>
+                    {open && (
+                      <ul className="mx-tree" id={`mx-tree-${item.id}`} aria-label={`กล่องอีเมลใน ${item.domain}`}>
+                        <li className="mx-tree-detail">
+                          <button type="button" onClick={() => openDomain(item.id)}>
+                            <Settings2 size={14} aria-hidden="true" /> รายละเอียดและ DNS ของโดเมน
+                          </button>
+                        </li>
+                        {list === undefined ? (
+                          <li className="mx-tree-note" aria-busy="true">กำลังโหลดกล่องอีเมล...</li>
+                        ) : list === "error" ? (
+                          <li className="mx-tree-note">โหลดกล่องอีเมลไม่ได้ <button type="button" onClick={() => void fetchBoxes(item.id)}>ลองอีกครั้ง</button></li>
+                        ) : !list.length ? (
+                          <li className="mx-tree-note">ยังไม่มีกล่องอีเมล{item.status === "active" && <> <button type="button" onClick={() => openMailbox(item.id)}>สร้างกล่อง</button></>}</li>
+                        ) : (
+                          list.map((box) => (
+                            <li key={box.id}>
+                              <button type="button" className={focusBox === box.id && current ? "is-current" : ""} onClick={() => pickMailbox(item.id, box.id)} title={box.address}>
+                                <Inbox size={14} aria-hidden="true" />
+                                <span>{box.address.split("@")[0]}<small>@{item.domain}</small></span>
+                              </button>
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    )}
                   </li>
                 );
               })}
@@ -362,8 +559,7 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
                 </div>
                 <p className="mx-meta">
                   {selected.kind === "platform" ? "โดเมนระบบ" : "โดเมนลูกค้า"}
-                  {selected.ownerUsername ? <> · @{selected.ownerUsername}</> : null}
-                  {" · "}{selected.mailboxCount} กล่อง
+                  {selected.ownerUsername ? <> · เจ้าของ @{selected.ownerUsername}</> : null}
                   {selected.usedBytes ? <> · ใช้ไป {formatBytes(selected.usedBytes)}</> : null}
                 </p>
                 <div className="mx-actions">
@@ -377,13 +573,12 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
                       <Check size={15} aria-hidden="true" /> อนุมัติ
                     </button>
                   )}
-                  {selected.status !== "active" && selected.status !== "suspended" && records.length > 0 && (
-                    <button type="button" className="hv-btn" disabled={!!working} onClick={() => void autoDns(selected)} title="สร้างระเบียนให้อัตโนมัติ (เมื่อโดเมนอยู่บน Cloudflare ของระบบ)">
-                      <CloudCog size={15} aria-hidden="true" className={working === `dns:${selected.id}` ? "hv-spin" : ""} /> ตั้ง DNS ให้อัตโนมัติ
-                    </button>
-                  )}
-                  <button type="button" className="hv-btn" disabled={!!working} onClick={() => void verify(selected)}>
-                    <RefreshCw size={15} aria-hidden="true" className={working === `verify:${selected.id}` ? "hv-spin" : ""} /> ตรวจ DNS
+                  <button type="button" className="hv-btn" onClick={() => setDialog("dns")}>
+                    <Globe2 size={15} aria-hidden="true" /> ระเบียน DNS
+                    {records.length > 0 && <span className={`mx-count ${verifiedRecords === records.length ? "is-ok" : "is-wait"}`}>{verifiedRecords}/{records.length}</span>}
+                  </button>
+                  <button type="button" className="hv-btn" onClick={() => setDialog("sent")}>
+                    <Send size={15} aria-hidden="true" /> ส่งล่าสุด <span className="mx-count">{domainSent.length}</span>
                   </button>
                   {selected.status === "active" && (
                     <button type="button" className="hv-btn hv-btn-danger-ghost hv-push" disabled={!!working} onClick={() => suspend(selected)}>ระงับโดเมน</button>
@@ -409,6 +604,9 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
                         <i><b style={{ width: `${(verifiedRecords / records.length) * 100}%` }} /></i>
                       </div>
                     )}
+                    {isSetup(selected.status) && (
+                      <button type="button" className="hv-btn hv-btn-primary" onClick={() => setDialog("dns")}><Globe2 size={15} aria-hidden="true" /> ดูค่า DNS</button>
+                    )}
                   </div>
                 );
               })()}
@@ -420,73 +618,114 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
                 </div>
               )}
 
-              <nav className="hv-tabs mx-tabs" role="tablist" aria-label="รายละเอียดโดเมน">
-                <button type="button" role="tab" id="mx-tab-dns" aria-controls="mx-panel" aria-selected={tab === "dns"} className={tab === "dns" ? "is-active" : ""} onClick={() => setTab("dns")}>
-                  <Globe2 size={15} aria-hidden="true" /> ระเบียน DNS <b>{records.length}</b>
-                </button>
-                <button type="button" role="tab" id="mx-tab-sent" aria-controls="mx-panel" aria-selected={tab === "sent"} className={tab === "sent" ? "is-active" : ""} onClick={() => setTab("sent")}>
-                  <Send size={15} aria-hidden="true" /> ส่งล่าสุด <b>{domainSent.length}</b>
-                </button>
-              </nav>
-
-              <div id="mx-panel" role="tabpanel" aria-labelledby={tab === "dns" ? "mx-tab-dns" : "mx-tab-sent"}>
-              {tab === "dns" ? (
-                records.length ? (
-                  <ul className="mx-records">
-                    <li className="mx-record mx-record-head" aria-hidden="true"><span>ชนิด</span><span>ชื่อ</span><span>ค่า</span><span>สถานะ</span></li>
-                    {records.map((record, index) => {
-                      const type = text(record.type);
-                      const name = text(record.name);
-                      const value = text(record.value ?? record.content);
-                      const priority = text(record.priority);
-                      const state = recordStatus[text(record.status)] || { label: text(record.status) || "—", tone: "is-off" };
+              <section className="mx-boxes" aria-labelledby="mx-boxes-title">
+                <header className="mx-boxes-head">
+                  <h3 id="mx-boxes-title">กล่องอีเมล</h3>
+                  <span>{Array.isArray(selectedBoxes) ? selectedBoxes.length : selected.mailboxCount} กล่อง</span>
+                </header>
+                {selectedBoxes === undefined ? (
+                  <ul className="mx-box-list" aria-busy="true">
+                    {[0, 1].map((i) => <li key={i} className="mx-skeleton"><span /><span /></li>)}
+                  </ul>
+                ) : selectedBoxes === "error" ? (
+                  <p className="mx-empty">โหลดกล่องอีเมลไม่ได้ <button type="button" onClick={() => void fetchBoxes(selected.id)}>ลองอีกครั้ง</button></p>
+                ) : !selectedBoxes.length ? (
+                  <div className="mx-empty">
+                    <p>ยังไม่มีกล่องอีเมลในโดเมนนี้</p>
+                    {selected.status === "active"
+                      ? <button type="button" onClick={() => openMailbox(selected.id)}>สร้างกล่องแรก</button>
+                      : <small>ตั้งค่า DNS ให้ผ่านและอนุมัติโดเมนก่อน จึงจะสร้างกล่องได้</small>}
+                  </div>
+                ) : (
+                  <ul className="mx-box-list">
+                    {selectedBoxes.map((box) => {
+                      const usage = box.quotaBytes ? Math.min(100, (box.usedBytes / box.quotaBytes) * 100) : 0;
+                      const broken = box.provisionState === "failed" || Boolean(box.provisionError);
                       return (
-                        <li className={`mx-record ${state.tone}`} key={index}>
-                          <span className="mx-type">{type}{priority ? <small>ลำดับ {priority}</small> : null}</span>
-                          <span className="mx-cell" data-label="ชื่อ">
-                            <code className="mx-val">{name || "@"}</code>
-                            <button type="button" className={`dbv-copy${copied === `n${index}` ? " is-done" : ""}`} onClick={() => void copy(name, `n${index}`)} aria-label={`คัดลอกชื่อ ${name}`} title="คัดลอก">
-                              {copied === `n${index}` ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-                            </button>
-                          </span>
-                          <span className="mx-cell" data-label="ค่า">
-                            <code className="mx-val is-long">{value}</code>
-                            <button type="button" className={`dbv-copy${copied === `v${index}` ? " is-done" : ""}`} onClick={() => void copy(value, `v${index}`)} aria-label="คัดลอกค่า" title="คัดลอก">
-                              {copied === `v${index}` ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-                            </button>
-                          </span>
-                          <span className={`mx-pill ${state.tone}`}>{state.label}</span>
+                        <li key={box.id} id={`mx-box-${box.id}`} className={`mx-box${focusBox === box.id ? " is-focus" : ""}`}>
+                          <div className="mx-box-main">
+                            <span className="mx-box-avatar" aria-hidden="true">{(box.displayName || box.address).charAt(0).toUpperCase()}</span>
+                            <div className="mx-box-name">
+                              <span className="mx-box-address">
+                                <strong>{box.address}</strong>
+                                {copyButton(box.address, `box:${box.id}`, "อีเมล")}
+                              </span>
+                              <small>{box.displayName || "ไม่มีชื่อที่แสดง"}{box.status !== "active" && <> · {box.status}</>}</small>
+                            </div>
+                          </div>
+                          <dl className="mx-box-facts">
+                            <div><dt>เจ้าของ</dt><dd>{box.owner ? `@${box.owner}` : "-"}</dd></div>
+                            {box.members.length > 0 && <div><dt>สมาชิก</dt><dd>{box.members.map((name) => `@${name}`).join(", ")}</dd></div>}
+                            {box.aliases.length > 0 && <div><dt>Alias</dt><dd>{box.aliases.join(", ")}</dd></div>}
+                            <div><dt>สร้างเมื่อ</dt><dd>{when(box.createdAt, true)}</dd></div>
+                          </dl>
+                          <div className="mx-box-usage" title={`ใช้ไป ${usage.toFixed(1)}%`}>
+                            <i><b className={usage > 90 ? "is-full" : ""} style={{ width: `${usage}%` }} /></i>
+                            <small>{formatBytes(box.usedBytes)} จาก {formatBytes(box.quotaBytes)} · ส่งได้ {box.dailySendLimit} ฉบับต่อวัน</small>
+                          </div>
+                          {broken && (
+                            <p className="mx-box-error"><CircleAlert size={14} aria-hidden="true" /> เซิร์ฟเวอร์รับเมลยังไม่มีกล่องนี้{box.provisionError ? `: ${box.provisionError}` : ""}</p>
+                          )}
                         </li>
                       );
                     })}
                   </ul>
-                ) : (
-                  <p className="mx-empty">ยังไม่มีระเบียน DNS ลองกด ตรวจ DNS เพื่อดึงค่าจากผู้ให้บริการ</p>
-                )
-              ) : domainSent.length ? (
-                <ul className="mx-sent">
-                  {domainSent.map((item) => {
-                    const state = deliveryStatus[item.status] || { label: item.status, tone: "is-off" };
-                    return (
-                      <li key={item.id}>
-                        <span className="mx-sent-copy">
-                          <strong title={item.subject}>{item.subject || "(ไม่มีหัวข้อ)"}</strong>
-                          <small title={`${item.from} → ${item.to}`}>{item.from.split("@")[0]} → {item.to}</small>
-                        </span>
-                        <span className={`mx-pill ${state.tone}`}>{state.label}</span>
-                        <time>{when(item.date)}</time>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="mx-empty">ยังไม่มีอีเมลที่ส่งจากโดเมนนี้</p>
-              )}
-              </div>
+                )}
+              </section>
             </>
           )}
         </section>
       </div>
+
+      {dialog === "dns" && selected && (
+        <Modal
+          wide
+          icon={<Globe2 size={20} />}
+          eyebrow={selected.domain}
+          title="ระเบียน DNS"
+          onClose={() => setDialog("")}
+          footer={
+            <>
+              {records.length > 0 && <span className="mx-modal-note">ผ่าน {verifiedRecords} จาก {records.length} ระเบียน</span>}
+              {selected.status !== "active" && selected.status !== "suspended" && records.length > 0 && (
+                <button type="button" className="hv-btn" disabled={!!working} onClick={() => void autoDns(selected)} title="สร้างระเบียนให้อัตโนมัติ (เมื่อโดเมนอยู่บน Cloudflare ของระบบ)">
+                  <CloudCog size={15} aria-hidden="true" className={working === `dns:${selected.id}` ? "hv-spin" : ""} /> ตั้ง DNS ให้อัตโนมัติ
+                </button>
+              )}
+              <button type="button" className="hv-btn hv-btn-primary" disabled={!!working} onClick={() => void verify(selected)}>
+                <RefreshCw size={15} aria-hidden="true" className={working === `verify:${selected.id}` ? "hv-spin" : ""} /> ตรวจ DNS
+              </button>
+            </>
+          }
+        >
+          <p className="mx-modal-lead">เพิ่มระเบียนเหล่านี้ที่ผู้ให้บริการ DNS ของโดเมน คัดลอกชื่อและค่าไปวางได้เลย</p>
+          {dnsRecords}
+        </Modal>
+      )}
+
+      {dialog === "sent" && selected && (
+        <Modal wide icon={<Send size={20} />} eyebrow={selected.domain} title="อีเมลที่ส่งล่าสุด" onClose={() => setDialog("")}>
+          {domainSent.length ? (
+            <ul className="mx-sent">
+              {domainSent.map((item) => {
+                const state = deliveryStatus[item.status] || { label: item.status, tone: "is-off" };
+                return (
+                  <li key={item.id}>
+                    <span className="mx-sent-copy">
+                      <strong title={item.subject}>{item.subject || "(ไม่มีหัวข้อ)"}</strong>
+                      <small title={`${item.from} → ${item.to}`}>{item.from} → {item.to}</small>
+                    </span>
+                    <span className={`mx-pill ${state.tone}`}>{state.label}</span>
+                    <time>{when(item.date)}</time>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="mx-empty">ยังไม่มีอีเมลที่ส่งจากโดเมนนี้</p>
+          )}
+        </Modal>
+      )}
 
       {dialog === "domain" && typeof document !== "undefined" && createPortal(
         <div className="hv-backdrop" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && !domainBusy && setDialog("")}>
