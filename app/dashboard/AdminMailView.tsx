@@ -11,6 +11,7 @@ import "./hosting-view.css";
 import "./db-admin-view.css";
 import "./admin-mail-view.css";
 import Link from "next/link";
+import type { Ask } from "./types";
 
 type Notice = (notice: { kind: "success" | "error"; text: string }) => void;
 type DnsRecord = Record<string, unknown>;
@@ -81,7 +82,7 @@ function formatBytes(bytes = 0) {
 }
 const text = (value: unknown) => (value === null || value === undefined ? "" : String(value));
 
-export default function AdminMailView({ notify, isSuperadmin = false }: { notify: Notice; isSuperadmin?: boolean }) {
+export default function AdminMailView({ notify, ask, isSuperadmin = false }: { notify: Notice; ask?: Ask; isSuperadmin?: boolean }) {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [history, setHistory] = useState<MailHistory[]>([]);
   const [configured, setConfigured] = useState(true);
@@ -97,6 +98,7 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
   const [working, setWorking] = useState("");
   const [copied, setCopied] = useState("");
   const copiedTimer = useRef<number | undefined>(undefined);
+  const detailRef = useRef<HTMLElement>(null);
 
   const [dialog, setDialog] = useState<"" | "domain" | "mailbox">("");
   const [newDomain, setNewDomain] = useState("");
@@ -149,6 +151,11 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
     setSelectedId(id);
     setShowDetail(true);
     setTab("dns");
+    // One pane at a time on narrow screens: bring the opened domain to the top instead of
+    // leaving the reader where the list was scrolled to.
+    if (window.matchMedia("(max-width: 900px)").matches) {
+      requestAnimationFrame(() => detailRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }));
+    }
   }
   async function run(key: string, task: () => Promise<unknown>, done: string) {
     setWorking(key);
@@ -166,6 +173,19 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
   const autoDns = (item: Domain) => run(`dns:${item.id}`, () => api(`/api/mail/domains/${item.id}/dns/auto-configure`, { method: "POST" }), "สร้างระเบียน DNS ให้แล้ว รอสักครู่แล้วกดตรวจ DNS");
   const setStatus = (item: Domain, status: string, done: string) =>
     run(`status:${item.id}`, () => api(`/api/admin/mail/domains/${item.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }), done);
+  function suspend(item: Domain) {
+    const go = () => setStatus(item, "suspended", "ระงับโดเมนแล้ว");
+    if (!ask) return void go();
+    ask({
+      title: `ระงับ ${item.domain}?`,
+      message: item.mailboxCount
+        ? `กล่องอีเมล ${item.mailboxCount} กล่องในโดเมนนี้จะส่งและรับเมลไม่ได้จนกว่าจะเปิดใช้อีกครั้ง`
+        : "โดเมนนี้จะสร้างกล่องอีเมล ส่ง และรับเมลไม่ได้จนกว่าจะเปิดใช้อีกครั้ง",
+      confirmLabel: "ระงับโดเมน",
+      danger: true,
+      action: go,
+    });
+  }
 
   async function copy(value: string, key: string) {
     try {
@@ -243,18 +263,18 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
 
       <div className="mx-health" aria-label="สถานะระบบอีเมล">
         <span className={`mx-svc ${!loaded ? "" : configured ? "is-ok" : "is-bad"}`}>
-          <i aria-hidden="true" />ส่งเมล <b>{!loaded ? "…" : configured ? "พร้อม" : "ยังไม่เชื่อม Resend"}</b>
+          <i aria-hidden="true" /><span>ส่งเมล</span><b>{!loaded ? "กำลังตรวจ" : configured ? "พร้อม" : "ยังไม่เชื่อม Resend"}</b>
         </span>
         <span className={`mx-svc ${!stalwart ? "" : stalwart.healthy ? "is-ok" : "is-bad"}`}>
-          <i aria-hidden="true" />รับเมล <b>{!stalwart ? "…" : !stalwart.configured ? "ยังไม่ตั้งค่า Stalwart" : stalwart.healthy ? "ออนไลน์" : "ออฟไลน์"}</b>
+          <i aria-hidden="true" /><span>รับเมล</span><b>{!stalwart ? "กำลังตรวจ" : !stalwart.configured ? "ยังไม่ตั้งค่า Stalwart" : stalwart.healthy ? "ออนไลน์" : "ออฟไลน์"}</b>
         </span>
-        <span className="mx-tally">{domains.length} โดเมน · {counts.mailboxes} กล่อง</span>
+        <span className="mx-tally"><b>{domains.length}</b> โดเมน <span aria-hidden="true">·</span> <b>{counts.mailboxes}</b> กล่อง</span>
         {isSuperadmin && (
           <Link className="mx-settings" href="/admin/settings?tab=mail"><Settings2 size={15} aria-hidden="true" /> ตั้งค่าการเชื่อมต่อ</Link>
         )}
       </div>
 
-      <div className={`mx-split${showDetail || (loaded && !domains.length) ? " is-detail" : ""}`}>
+      <div className={`mx-split${showDetail || (loaded && !domains.length) ? " is-detail" : ""}${selectedId ? " has-pick" : ""}`}>
         <aside className="aov-panel mx-side" aria-label="รายการโดเมน">
           <div className="mx-side-tools">
             <label className="th-search" role="search">
@@ -293,8 +313,11 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
                     <button type="button" className={`mx-domain${current ? " is-current" : ""}`} aria-current={current ? "true" : undefined} onClick={() => pick(item.id)}>
                       <span className={`mx-dot ${state.tone}`} aria-hidden="true" />
                       <span className="mx-domain-copy">
-                        <strong>{item.domain}</strong>
-                        <small>{state.label} · {item.mailboxCount} กล่อง</small>
+                        <strong title={item.domain}>{item.domain}</strong>
+                        <small>
+                          {state.label} · {item.mailboxCount} กล่อง
+                          {item.kind === "platform" && <span className="mx-tag">ระบบ</span>}
+                        </small>
                       </span>
                       <ChevronRight size={16} aria-hidden="true" className="mx-chevron" />
                     </button>
@@ -311,7 +334,7 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
           )}
         </aside>
 
-        <section className="aov-panel mx-detail" aria-live="polite">
+        <section className="aov-panel mx-detail" ref={detailRef} aria-live="polite">
           {!loaded ? (
             <div className="mx-detail-loading"><span className="hv-spinner" aria-hidden="true" /> กำลังโหลด...</div>
           ) : !selected && domains.length ? (
@@ -363,7 +386,7 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
                     <RefreshCw size={15} aria-hidden="true" className={working === `verify:${selected.id}` ? "hv-spin" : ""} /> ตรวจ DNS
                   </button>
                   {selected.status === "active" && (
-                    <button type="button" className="hv-btn hv-btn-danger-ghost hv-push" disabled={!!working} onClick={() => void setStatus(selected, "suspended", "ระงับโดเมนแล้ว")}>ระงับ</button>
+                    <button type="button" className="hv-btn hv-btn-danger-ghost hv-push" disabled={!!working} onClick={() => suspend(selected)}>ระงับโดเมน</button>
                   )}
                   {selected.status === "suspended" && (
                     <button type="button" className="hv-btn hv-push" disabled={!!working} onClick={() => void setStatus(selected, "active", "เปิดใช้โดเมนแล้ว")}>เปิดใช้อีกครั้ง</button>
@@ -398,14 +421,15 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
               )}
 
               <nav className="hv-tabs mx-tabs" role="tablist" aria-label="รายละเอียดโดเมน">
-                <button type="button" role="tab" aria-selected={tab === "dns"} className={tab === "dns" ? "is-active" : ""} onClick={() => setTab("dns")}>
+                <button type="button" role="tab" id="mx-tab-dns" aria-controls="mx-panel" aria-selected={tab === "dns"} className={tab === "dns" ? "is-active" : ""} onClick={() => setTab("dns")}>
                   <Globe2 size={15} aria-hidden="true" /> ระเบียน DNS <b>{records.length}</b>
                 </button>
-                <button type="button" role="tab" aria-selected={tab === "sent"} className={tab === "sent" ? "is-active" : ""} onClick={() => setTab("sent")}>
+                <button type="button" role="tab" id="mx-tab-sent" aria-controls="mx-panel" aria-selected={tab === "sent"} className={tab === "sent" ? "is-active" : ""} onClick={() => setTab("sent")}>
                   <Send size={15} aria-hidden="true" /> ส่งล่าสุด <b>{domainSent.length}</b>
                 </button>
               </nav>
 
+              <div id="mx-panel" role="tabpanel" aria-labelledby={tab === "dns" ? "mx-tab-dns" : "mx-tab-sent"}>
               {tab === "dns" ? (
                 records.length ? (
                   <ul className="mx-records">
@@ -417,16 +441,16 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
                       const priority = text(record.priority);
                       const state = recordStatus[text(record.status)] || { label: text(record.status) || "—", tone: "is-off" };
                       return (
-                        <li className="mx-record" key={index}>
-                          <span className="mx-type">{type}{priority ? <small> · {priority}</small> : null}</span>
+                        <li className={`mx-record ${state.tone}`} key={index}>
+                          <span className="mx-type">{type}{priority ? <small>ลำดับ {priority}</small> : null}</span>
                           <span className="mx-cell" data-label="ชื่อ">
-                            <span className="mx-val" title={name}>{name || "@"}</span>
+                            <code className="mx-val">{name || "@"}</code>
                             <button type="button" className={`dbv-copy${copied === `n${index}` ? " is-done" : ""}`} onClick={() => void copy(name, `n${index}`)} aria-label={`คัดลอกชื่อ ${name}`} title="คัดลอก">
                               {copied === `n${index}` ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                             </button>
                           </span>
                           <span className="mx-cell" data-label="ค่า">
-                            <span className="mx-val is-long" title={value}>{value}</span>
+                            <code className="mx-val is-long">{value}</code>
                             <button type="button" className={`dbv-copy${copied === `v${index}` ? " is-done" : ""}`} onClick={() => void copy(value, `v${index}`)} aria-label="คัดลอกค่า" title="คัดลอก">
                               {copied === `v${index}` ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                             </button>
@@ -458,6 +482,7 @@ export default function AdminMailView({ notify, isSuperadmin = false }: { notify
               ) : (
                 <p className="mx-empty">ยังไม่มีอีเมลที่ส่งจากโดเมนนี้</p>
               )}
+              </div>
             </>
           )}
         </section>

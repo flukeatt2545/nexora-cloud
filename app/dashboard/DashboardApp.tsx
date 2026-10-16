@@ -828,7 +828,7 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
           {view === "hosting" && <HostingView me={me} notify={setNotice} ask={setConfirmRequest} />}
           {view === "overview" && <AdminOverview role={me.role} name={me.displayName || me.username} actionText={actionText} storeOpen={storeState.open} />}
           {view === "databases" && <DatabaseAdminView me={me} notify={setNotice} ask={setConfirmRequest} />}
-          {view === "mail" && <AdminMailView notify={setNotice} isSuperadmin={me.role === "superadmin"} />}
+          {view === "mail" && <AdminMailView notify={setNotice} ask={setConfirmRequest} isSuperadmin={me.role === "superadmin"} />}
           {view === "discord-bot" && <DiscordBotView notify={setNotice} isSuperadmin={me.role === "superadmin"} />}
           {view === "users" && <UsersView me={me} notify={setNotice} ask={setConfirmRequest} />}
           {view === "access" && <AccessView me={me} notify={setNotice} ask={setConfirmRequest} />}
