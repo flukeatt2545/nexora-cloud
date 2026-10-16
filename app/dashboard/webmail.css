@@ -1,0 +1,425 @@
+/* Webmail (/mail): mailbox and folders, the message list, and the open message.
+   Theme tokens only; the layout follows the width of the page area (container queries), so it
+   fits whether the sidebar is open, on a tablet or on a phone. */
+
+/* Unread count on the sidebar link (UserApp) */
+.usb-mail-badge { margin-left: auto; min-width: 20px; padding: 2px 6px; border-radius: 20px; background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; line-height: 1.3; text-align: center; }
+
+.wm {
+  --wm-line: var(--theme-line-soft);
+  --wm-surface: var(--theme-elevated);
+  --wm-sunken: var(--control-surface-strong);
+  --wm-radius: 14px;
+  --wm-ok: var(--success-ink, var(--success));
+  --wm-ok-rgb: var(--success-rgb);
+  --wm-wait: var(--warning-ink, #f59e0b); /* theme-ok: amber has no dark-mode token */
+  --wm-wait-rgb: 245 158 11; /* theme-ok */
+  --wm-mono: var(--font-code, ui-monospace, SFMono-Regular, Consolas, monospace);
+  /* Sheet for mail that brings its own colours (see paintsItself in MailView). */
+  --wm-paper: #ffffff;
+  --wm-paper-ink: #1f2328;
+  container: wm / inline-size;
+  width: 100%;
+  max-width: 1480px;
+  display: grid;
+  gap: 16px;
+  color: var(--theme-text-strong);
+}
+.wm h1, .wm h2, .wm h3, .wm p { margin: 0; }
+.wm-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Buttons */
+.wm-btn, .wm-backdrop .wm-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 0 14px; border: 1px solid var(--control-line); border-radius: 9px; background: var(--control-surface); color: var(--theme-text-strong); font: inherit; font-size: 14px; font-weight: 600; line-height: 1; white-space: nowrap; text-decoration: none; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; }
+.wm-btn:disabled { opacity: .55; cursor: not-allowed; }
+.wm-btn-primary, .wm-backdrop .wm-btn-primary { border-color: transparent; background: var(--primary); color: #fff; }
+.wm-btn-danger, .wm-backdrop .wm-btn-danger { border-color: transparent; background: var(--danger); color: #fff; }
+.wm-btn-ghost-danger { color: var(--danger); }
+.wm-icon-btn { width: 38px; height: 38px; flex: 0 0 38px; display: inline-grid; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 9px; background: none; color: var(--theme-text-soft); cursor: pointer; transition: background-color .15s, color .15s, border-color .15s; }
+.wm-icon-btn:disabled { opacity: .5; cursor: not-allowed; }
+.wm-link { padding: 0; border: 0; background: none; color: var(--primary-ink); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.wm-text-btn { flex: 0 0 auto; padding: 4px 8px; border: 0; border-radius: 6px; background: none; color: var(--theme-text-soft); font: inherit; font-size: 13px; cursor: pointer; }
+.wm :is(.wm-btn, .wm-icon-btn, .wm-link, .wm-text-btn, .wm-copy, .wm-row, .wm-folders button, .wm-thread-head, .wm-quote-toggle):focus-visible,
+.wm-backdrop :is(.wm-btn, .wm-icon-btn, .wm-link, .wm-text-btn, .wm-copy, .wm-tabs button):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.wm-spin { animation: wm-spin .8s linear infinite; }
+.wm-spinner { width: 15px; height: 15px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: wm-spin .7s linear infinite; }
+@keyframes wm-spin { to { transform: rotate(360deg); } }
+
+/* Copy button: small and quiet until it has done its job */
+.wm-copy { position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 30px; height: 30px; padding: 0 7px; border: 1px solid transparent; border-radius: 7px; background: none; color: var(--theme-text-soft); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: color .15s, background-color .15s, border-color .15s; }
+.wm-copy.has-text { border-color: var(--control-line); background: var(--control-surface); color: var(--theme-text-strong); }
+.wm-copy.is-done { color: var(--wm-ok); }
+.wm-copy.is-done.has-text { border-color: rgb(var(--wm-ok-rgb) / .35); }
+
+/* Page head */
+.wm-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; }
+.wm-head-text { display: grid; gap: 4px; min-width: 0; }
+.wm-head h1 { color: var(--theme-text-strong); font-size: clamp(1.45rem, 1.2rem + .8vw, 1.8rem); font-weight: 700; line-height: 1.25; }
+.wm-head p { color: var(--theme-text-soft); font-size: 14.5px; line-height: 1.5; }
+.wm-head-actions { display: flex; gap: 8px; }
+
+/* The three panes */
+.wm-shell { display: grid; grid-template-columns: 236px minmax(300px, 380px) minmax(0, 1fr); height: max(540px, calc(100dvh - 214px)); overflow: hidden; border: 1px solid var(--wm-line); border-radius: var(--wm-radius); background: var(--wm-surface); }
+.wm-nav { display: flex; flex-direction: column; gap: 14px; min-height: 0; padding: 14px 12px; overflow-y: auto; border-right: 1px solid var(--wm-line); background: var(--wm-sunken); }
+.wm-list { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--wm-line); }
+.wm-read { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-margin-top: 76px; }
+
+/* Mailbox identity: who you send as, with copy */
+.wm-box { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 10px; border: 1px solid var(--wm-line); border-radius: 11px; background: var(--wm-surface); }
+.wm-box-text { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; min-width: 0; }
+.wm-box-text strong { overflow: hidden; color: var(--theme-text-strong); font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.wm-addr { min-width: 0; overflow: hidden; color: var(--theme-text-soft); font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
+.wm-box .wm-addr { display: block; }
+/* With more than one mailbox the address line is the switch */
+.wm-switch { position: relative; display: block; min-width: 0; }
+.wm-switch select { width: 100%; max-width: 100%; height: 22px; padding: 0 20px 0 0; border: 0; border-radius: 4px; background: none; color: var(--theme-text-soft); font: inherit; font-size: 13px; text-overflow: ellipsis; appearance: none; cursor: pointer; }
+.wm-switch select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.wm-switch select option { background: var(--theme-elevated); color: var(--theme-text-strong); }
+.wm-switch svg { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); color: var(--theme-text-soft); pointer-events: none; }
+.wm-skeleton-line { grid-column: 1 / -1; height: 36px; border-radius: 8px; background: var(--theme-hover); }
+
+.wm-avatar { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border: 1px solid var(--wm-line); border-radius: 50%; background: var(--control-surface); color: var(--theme-text-soft); font-size: 14px; font-weight: 700; line-height: 1; }
+.wm-box-avatar { border-color: var(--primary-border); background: var(--primary-soft); color: var(--primary-ink); }
+
+.wm-folders { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.wm-folders button { position: relative; width: 100%; display: flex; align-items: center; gap: 11px; min-height: 40px; padding: 0 10px 0 12px; border: 0; border-radius: 9px; background: none; color: var(--theme-text-soft); font: inherit; font-size: 14.5px; text-align: left; cursor: pointer; transition: background-color .15s, color .15s; }
+.wm-folders button span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.wm-folders button.is-active { background: var(--primary-soft); color: var(--primary-ink); font-weight: 600; }
+.wm-folders b { min-width: 22px; padding: 1px 7px; border-radius: 99px; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; line-height: 1.5; text-align: center; font-variant-numeric: tabular-nums; }
+
+.wm-usage { display: grid; gap: 6px; margin-top: auto; padding: 4px 6px 2px; }
+.wm-usage-bar { display: block; height: 5px; overflow: hidden; border-radius: 99px; background: var(--control-line); }
+.wm-usage-bar i { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
+.wm-usage-bar i.is-full { background: var(--danger); }
+.wm-usage small { color: var(--theme-text-soft); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+/* Message list */
+.wm-list-tools { display: flex; align-items: center; gap: 6px; padding: 10px; border-bottom: 1px solid var(--wm-line); }
+.wm-search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 4px 0 12px; border: 1px solid var(--control-line); border-radius: 10px; background: var(--theme-input, var(--control-surface)); color: var(--theme-text-soft); }
+.wm-search:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / .14); }
+.wm-search input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; color: var(--theme-text-strong); font: inherit; font-size: 14.5px; outline: none; }
+.wm-search .wm-icon-btn { width: 30px; height: 30px; flex-basis: 30px; }
+.wm-rows { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.wm-items { margin: 0; padding: 0; list-style: none; }
+.wm-items > li + li { border-top: 1px solid var(--wm-line); }
+.wm-row { position: relative; width: 100%; display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px 12px 16px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color .12s; }
+.wm-row.is-active { background: var(--primary-soft); }
+.wm-row.is-active::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--primary); }
+.wm-row.is-opening { opacity: .65; }
+.wm-row-main { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; }
+.wm-row-top { display: flex; align-items: baseline; gap: 10px; }
+.wm-row-top strong { flex: 1; min-width: 0; overflow: hidden; color: var(--theme-text-soft); font-size: 14px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
+.wm-row-top time { flex: 0 0 auto; color: var(--theme-text-soft); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.wm-row-subject { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--theme-text-strong); font-size: 14.5px; }
+.wm-row-subject > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.wm-row-subject svg { flex: 0 0 auto; color: var(--theme-text-soft); }
+.wm-row-preview { display: -webkit-box; overflow: hidden; color: var(--theme-text-soft); font-size: 13px; line-height: 1.5; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+/* Unread: a dot and bold text, not a coloured background */
+.wm-row.is-unread .wm-row-top strong { color: var(--theme-text-strong); font-weight: 700; }
+.wm-row.is-unread .wm-row-subject { font-weight: 700; }
+.wm-row.is-unread .wm-row-top time { color: var(--primary-ink); font-weight: 600; }
+.wm-row.is-unread::after { content: ""; position: absolute; left: 5px; top: 26px; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+.wm-more { padding: 14px; text-align: center; }
+
+.wm-skeleton { margin: 0; padding: 0; list-style: none; }
+.wm-skeleton li { display: grid; gap: 7px; padding: 16px; border-bottom: 1px solid var(--wm-line); }
+.wm-skeleton span { height: 11px; border-radius: 6px; background: var(--theme-hover); animation: wm-pulse 1.2s ease-in-out infinite; }
+.wm-skeleton span:nth-child(1) { width: 45%; }
+.wm-skeleton span:nth-child(2) { width: 80%; }
+.wm-skeleton span:nth-child(3) { width: 65%; }
+@keyframes wm-pulse { 50% { opacity: .45; } }
+.wm-list-empty { display: grid; justify-items: center; gap: 10px; padding: 48px 20px; color: var(--theme-text-soft); font-size: 14.5px; line-height: 1.6; text-align: center; }
+.wm-list-empty svg { opacity: .6; }
+.wm-list-empty-hint { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 8px; font-size: 13.5px; }
+.wm-list-empty-hint b { color: var(--theme-text-strong); font-weight: 600; overflow-wrap: anywhere; }
+
+/* The open message */
+.wm-read-empty { height: 100%; min-height: 320px; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--theme-text-soft); font-size: 14.5px; }
+.wm-read-empty svg { opacity: .5; }
+.wm-read-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; min-height: 58px; padding: 10px 20px; border-bottom: 1px solid var(--wm-line); background: var(--wm-surface); }
+.wm-back { display: none; }
+.wm-read-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+.wm-icon-danger { color: var(--theme-text-soft); }
+.wm-read-head { display: grid; gap: 6px; padding: 22px 28px 0; }
+.wm .wm-read-head h2 { color: var(--theme-text-strong); font-size: clamp(1.2rem, 1.05rem + .5vw, 1.45rem); font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.wm-thread-count { color: var(--theme-text-soft); font-size: 13.5px; }
+
+.wm-sender { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 4px 12px; padding: 18px 28px 6px; }
+.wm-sender .wm-avatar { width: 42px; height: 42px; flex-basis: 42px; font-size: 16px; }
+.wm-sender-text { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; min-width: 0; }
+.wm .wm-sender-line { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; line-height: 1.5; }
+.wm-sender-line strong { color: var(--theme-text-strong); font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.wm-sender-line .wm-addr, .wm-meta .wm-addr, .wm-person .wm-addr { overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.wm-sender-line .wm-copy, .wm-meta .wm-copy, .wm-person .wm-copy { height: 26px; min-width: 26px; margin: -2px 0; padding: 0 5px; }
+.wm-people { display: grid; gap: 2px; margin: 0; color: var(--theme-text-soft); font-size: 13.5px; line-height: 1.55; }
+.wm-people > div { display: flex; gap: 6px; min-width: 0; }
+.wm-people dt { flex: 0 0 auto; }
+.wm-people dd { min-width: 0; display: flex; flex-wrap: wrap; gap: 0 10px; margin: 0; }
+.wm-person { display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.wm-person + .wm-person::before { content: ","; margin: 0 4px 0 -12px; }
+.wm-sender-date { padding-top: 2px; color: var(--theme-text-soft); font-size: 13px; white-space: nowrap; }
+
+/* Message bodies */
+.wm-body { margin: 14px 28px 0; color: var(--theme-text-strong); font-size: 15px; line-height: 1.75; overflow-wrap: anywhere; }
+.wm-body.is-plain { white-space: pre-wrap; }
+.wm-body.is-paper { padding: 20px; border: 1px solid var(--wm-line); border-radius: 10px; background: var(--wm-paper); color: var(--wm-paper-ink); color-scheme: light; }
+.wm-body > :first-child { margin-top: 0; }
+.wm-body p { margin: 0 0 .8em; }
+.wm-body a { color: var(--primary-ink); text-decoration: underline; text-underline-offset: 3px; }
+.wm-body.is-paper a { color: revert; }
+.wm-body img { max-width: 100%; height: auto; border-radius: 6px; cursor: zoom-in; }
+.wm-body table { max-width: 100%; }
+.wm-body pre { overflow-x: auto; white-space: pre-wrap; }
+.wm-body code, .wm-body pre { font-family: var(--wm-mono); font-size: 13.5px; }
+.wm-body blockquote { margin: 10px 0; padding: 2px 0 2px 14px; border-left: 3px solid var(--control-line); color: var(--theme-text-soft); }
+.wm-body.is-paper blockquote { color: inherit; opacity: .8; }
+.wm-body.hide-quotes blockquote { display: none; }
+.wm-quote-toggle { display: inline-flex; margin: 8px 28px 0; padding: 4px 10px; border: 1px solid var(--control-line); border-radius: 99px; background: var(--control-surface); color: var(--theme-text-soft); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* Conversation */
+.wm-thread { display: grid; gap: 10px; margin: 18px 28px 0; padding: 0; list-style: none; }
+.wm-thread > li { overflow: hidden; border: 1px solid var(--wm-line); border-radius: 12px; background: var(--wm-surface); }
+.wm-thread > li.is-open { border-color: var(--control-line); }
+.wm-thread-head { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.wm-thread-who { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.wm-thread-who strong { flex: 0 0 auto; max-width: 60%; overflow: hidden; color: var(--theme-text-strong); font-size: 14.5px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.wm-thread-snippet { min-width: 0; overflow: hidden; color: var(--theme-text-soft); font-size: 13.5px; white-space: nowrap; text-overflow: ellipsis; }
+.wm-thread-head time { flex: 0 0 auto; color: var(--theme-text-soft); font-size: 12.5px; }
+.wm-thread-body { padding: 0 16px 16px; }
+.wm-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; color: var(--theme-text-soft); font-size: 13px; line-height: 1.55; }
+.wm-thread .wm-body { margin: 10px 0 0; }
+.wm-thread .wm-quote-toggle { margin: 8px 0 0; }
+
+/* Attachments */
+.wm-images { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 18px 28px 0; }
+.wm-images button { aspect-ratio: 4 / 3; overflow: hidden; padding: 0; border: 1px solid var(--wm-line); border-radius: 10px; background: var(--wm-sunken); cursor: zoom-in; }
+.wm-images img { width: 100%; height: 100%; object-fit: cover; }
+.wm-files { margin: 20px 28px 0; }
+.wm .wm-files h3 { margin-bottom: 8px; color: var(--theme-text-soft); font-size: 13.5px; font-weight: 600; }
+.wm-files ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.wm-files a { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px; border: 1px solid var(--wm-line); border-radius: 10px; background: var(--wm-sunken); color: var(--theme-text-strong); text-decoration: none; transition: border-color .15s, background-color .15s; }
+.wm-files a > svg:first-child { flex: 0 0 auto; color: var(--theme-text-soft); }
+.wm-file-name { flex: 1; min-width: 0; overflow: hidden; font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.wm-files small { flex: 0 0 auto; color: var(--theme-text-soft); font-size: 12.5px; }
+.wm-file-get { flex: 0 0 auto; color: var(--theme-text-soft); }
+.wm-read-foot { display: flex; flex-wrap: wrap; gap: 8px; padding: 22px 28px 28px; }
+
+/* No mailbox yet */
+.wm-start { display: grid; justify-items: center; gap: 12px; padding: 56px 24px; border: 1px solid var(--wm-line); border-radius: var(--wm-radius); background: var(--wm-surface); text-align: center; }
+.wm-start-icon { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 14px; background: var(--primary-soft); color: var(--primary-ink); }
+.wm .wm-start h2 { font-size: 19px; font-weight: 700; }
+.wm-start p { max-width: 460px; color: var(--theme-text-soft); font-size: 14.5px; line-height: 1.65; }
+.wm-start .wm-btn { margin-top: 6px; }
+
+/* Dialogs: compose and manage. They render outside .wm's container, so they carry their own
+   tokens and use viewport media queries. */
+.wm-backdrop {
+  --wm-line: var(--theme-line-soft);
+  --wm-surface: var(--theme-elevated);
+  --wm-sunken: var(--control-surface-strong);
+  --wm-ok: var(--success-ink, var(--success));
+  --wm-ok-rgb: var(--success-rgb);
+  --wm-wait: var(--warning-ink, #f59e0b); /* theme-ok */
+  --wm-wait-rgb: 245 158 11; /* theme-ok */
+  --wm-mono: var(--font-code, ui-monospace, SFMono-Regular, Consolas, monospace);
+  position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: var(--theme-overlay); animation: wm-fade .15s ease-out;
+}
+.wm-backdrop h2, .wm-backdrop h3, .wm-backdrop p { margin: 0; }
+.wm-dialog { width: min(760px, 100%); max-height: min(860px, calc(100dvh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--wm-line); border-radius: 16px; background: var(--wm-surface); color: var(--theme-text-strong); box-shadow: 0 24px 70px var(--theme-shadow); animation: wm-rise .18s ease-out; }
+@keyframes wm-fade { from { opacity: 0; } }
+@keyframes wm-rise { from { opacity: 0; transform: translateY(8px); } }
+.wm-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; padding: 12px 14px 12px 22px; border-bottom: 1px solid var(--wm-line); }
+.wm-dialog-head h2 { font-size: 17px; font-weight: 700; }
+.wm-dialog-head p { margin-top: 2px; color: var(--theme-text-soft); font-size: 13.5px; overflow-wrap: anywhere; }
+.wm-dialog-body { flex: 1; min-height: 0; display: grid; align-content: start; gap: 14px; padding: 18px 22px 22px; overflow-y: auto; }
+.wm-dialog-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px 12px 22px; border-top: 1px solid var(--wm-line); background: var(--wm-sunken); }
+.wm-grow { flex: 1; }
+
+/* Compose */
+.wm-compose { height: min(760px, calc(100dvh - 48px)); }
+.wm-compose-fields { border-bottom: 1px solid var(--wm-line); }
+.wm-field-row { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 16px 0 22px; border-bottom: 1px solid var(--wm-line); }
+.wm-field-row:last-child { border-bottom: 0; }
+.wm-field-row:focus-within { background: var(--theme-hover); }
+.wm-field-label { flex: 0 0 64px; color: var(--theme-text-soft); font-size: 14px; }
+.wm-field-row input { flex: 1; min-width: 0; height: 46px; padding: 0; border: 0; background: none; color: var(--theme-text-strong); font: inherit; font-size: 15px; outline: none; }
+.wm-field-static { flex: 1; min-width: 0; overflow: hidden; color: var(--theme-text-strong); font-size: 14.5px; white-space: nowrap; text-overflow: ellipsis; }
+.wm-editor-tools { display: flex; flex-wrap: wrap; gap: 2px; padding: 6px 14px; border-bottom: 1px solid var(--wm-line); }
+.wm-editor-tools .wm-icon-btn { width: 34px; height: 34px; flex-basis: 34px; }
+.wm-editor { flex: 1; min-height: 180px; padding: 18px 22px; overflow-y: auto; color: var(--theme-text-strong); font-size: 15px; line-height: 1.7; outline: none; overflow-wrap: anywhere; }
+.wm-editor:empty::before { content: attr(data-placeholder); color: var(--theme-text-soft); pointer-events: none; }
+.wm-editor p { margin: 0 0 .6em; }
+.wm-editor blockquote { margin: 8px 0; padding-left: 14px; border-left: 3px solid var(--control-line); color: var(--theme-text-soft); }
+.wm-editor img { max-width: 100%; height: auto; }
+.wm-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 10px 22px; border-top: 1px solid var(--wm-line); list-style: none; }
+.wm-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 32px; padding: 0 4px 0 10px; border: 1px solid var(--control-line); border-radius: 8px; background: var(--wm-sunken); color: var(--theme-text-strong); font-size: 13px; }
+.wm-chip-name { min-width: 0; max-width: 220px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.wm-chip small { color: var(--theme-text-soft); }
+.wm-chip button { width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--theme-text-soft); cursor: pointer; }
+.wm-attach { position: relative; overflow: hidden; }
+.wm-attach input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.wm-attach:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+.wm-attach-size { color: var(--theme-text-soft); font-size: 12.5px; }
+.wm-discard { background: rgb(var(--danger-rgb) / .06); }
+.wm-discard > span { flex: 1 1 200px; color: var(--theme-text-strong); font-size: 14px; }
+
+/* Manage */
+.wm-manage { width: min(820px, 100%); min-height: min(560px, calc(100dvh - 48px)); }
+.wm-tabs { display: flex; gap: 4px; padding: 0 14px; overflow-x: auto; border-bottom: 1px solid var(--wm-line); scrollbar-width: none; }
+.wm-tabs button { position: relative; display: inline-flex; align-items: center; gap: 7px; min-height: 46px; padding: 0 10px; border: 0; background: none; color: var(--theme-text-soft); font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.wm-tabs button.is-active { color: var(--primary-ink); }
+.wm-tabs button.is-active::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--primary); }
+.wm-section { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--wm-line); border-radius: 12px; background: var(--wm-surface); }
+.wm-section-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 16px; }
+.wm-section-head > div { display: grid; gap: 3px; min-width: 0; flex: 1 1 260px; }
+.wm-section-head h3 { display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 700; }
+.wm-section-head p, .wm-note { color: var(--theme-text-soft); font-size: 13.5px; line-height: 1.6; }
+.wm-input, .wm-address-input { min-width: 0; min-height: 40px; border: 1px solid var(--control-line); border-radius: 9px; background: var(--theme-input, var(--control-surface)); color: var(--theme-text-strong); font: inherit; font-size: 14.5px; }
+.wm-input { padding: 0 12px; }
+.wm-input:focus, .wm-address-input:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / .14); outline: none; }
+.wm-address-input { display: flex; align-items: stretch; overflow: hidden; }
+.wm-address-input input { flex: 1; min-width: 0; padding: 0 12px; border: 0; background: none; color: inherit; font: inherit; outline: none; }
+.wm-address-input > span, .wm-address-input select { flex: 0 1 auto; max-width: 60%; display: flex; align-items: center; padding: 0 12px; border: 0; border-left: 1px solid var(--control-line); background: var(--wm-sunken); color: var(--theme-text-soft); font: inherit; font-size: 14px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.wm-address-input select { color: var(--theme-text-strong); cursor: pointer; }
+.wm-inline-form { display: flex; flex-wrap: wrap; gap: 8px; }
+.wm-inline-form > .wm-input, .wm-inline-form > .wm-address-input { flex: 1 1 220px; }
+.wm-form { gap: 14px; }
+.wm-form-field { display: grid; gap: 6px; }
+.wm-form-field > label { color: var(--theme-text-strong); font-size: 14px; font-weight: 600; }
+.wm-row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.wm-error-text { color: var(--danger); font-size: 13.5px; line-height: 1.55; }
+
+.wm-settings { display: grid; gap: 6px; }
+.wm-setting { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 6px 6px 12px; border: 1px solid var(--wm-line); border-radius: 9px; background: var(--wm-sunken); }
+.wm-setting-label { flex: 0 0 170px; color: var(--theme-text-soft); font-size: 13px; }
+.wm-setting-value { flex: 1; min-width: 0; color: var(--theme-text-strong); font-family: var(--wm-mono); font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; word-break: break-all; }
+.wm-setting-meta { margin: -2px 0 4px 12px; color: var(--theme-text-soft); font-size: 12.5px; }
+.wm-secret { display: grid; gap: 8px; padding: 12px; border: 1px solid rgb(var(--wm-wait-rgb) / .35); border-left-width: 3px; border-left-color: var(--wm-wait); border-radius: 10px; background: rgb(var(--wm-wait-rgb) / .07); font-size: 13.5px; }
+.wm-secret .wm-setting { background: var(--wm-surface); }
+.wm-credentials { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.wm-credentials li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--wm-line); border-radius: 9px; }
+.wm-credentials li > span:first-child { display: grid; gap: 2px; }
+.wm-credentials strong { font-size: 14px; }
+.wm-credentials small { color: var(--theme-text-soft); font-size: 12.5px; }
+.wm-inline-confirm { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.wm-pill { display: inline-flex; align-items: center; width: max-content; padding: 3px 9px; border: 1px solid transparent; border-radius: 6px; background: var(--theme-hover); color: var(--theme-text-soft); font-size: 12.5px; font-weight: 600; line-height: 1.4; white-space: nowrap; }
+.wm-pill.is-ok { border-color: rgb(var(--wm-ok-rgb) / .22); background: rgb(var(--wm-ok-rgb) / .1); color: var(--wm-ok); }
+.wm-pill.is-wait { border-color: rgb(var(--wm-wait-rgb) / .28); background: rgb(var(--wm-wait-rgb) / .1); color: var(--wm-wait); }
+.wm-pill.is-bad { border-color: rgb(var(--danger-rgb) / .25); background: rgb(var(--danger-rgb) / .09); color: var(--danger); }
+.wm-domains { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.wm-domain { overflow: hidden; border: 1px solid var(--wm-line); border-radius: 12px; }
+.wm-domain-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 12px 12px 16px; }
+.wm-domain-head > span:first-child { flex: 1 1 180px; display: grid; gap: 2px; min-width: 0; }
+.wm-domain-head strong { font-size: 15px; overflow-wrap: anywhere; }
+.wm-domain-head small { color: var(--theme-text-soft); font-size: 12.5px; }
+.wm-dns { border-top: 1px solid var(--wm-line); background: var(--wm-sunken); }
+.wm-dns summary { padding: 10px 16px; color: var(--theme-text-soft); font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.wm-dns ul { display: grid; gap: 10px; margin: 0; padding: 0 12px 12px; list-style: none; }
+.wm-dns-record { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding: 10px; border: 1px solid var(--wm-line); border-radius: 10px; background: var(--wm-surface); }
+.wm-dns-record .wm-setting { grid-column: 1 / -1; }
+.wm-dns-record .wm-setting-label { flex-basis: 34px; }
+.wm-dns-type { display: flex; align-items: baseline; gap: 8px; font-family: var(--wm-mono); font-size: 13.5px; font-weight: 700; }
+.wm-dns-type small { color: var(--theme-text-soft); font-family: var(--font-body, inherit); font-size: 12.5px; font-weight: 500; }
+
+/* Image viewer */
+.wm-viewer { position: fixed; inset: 0; z-index: 1100; display: grid; grid-template-rows: auto minmax(0, 1fr); place-items: center; gap: 12px; padding: 16px; background: var(--theme-overlay); }
+.wm-viewer-bar { width: min(960px, 100%); display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border: 1px solid var(--theme-line-soft); border-radius: 12px; background: var(--theme-elevated); color: var(--theme-text-strong); }
+.wm-viewer-bar span { flex: 1; min-width: 0; overflow: hidden; font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.wm-viewer > img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; }
+
+/* Hover only where there is a pointer, so taps on phones do not leave rows lit */
+@media (hover: hover) {
+  .wm-btn:hover:not(:disabled), .wm-backdrop .wm-btn:hover:not(:disabled) { border-color: var(--primary-border); background: var(--theme-hover); }
+  .wm-btn-primary:hover:not(:disabled), .wm-backdrop .wm-btn-primary:hover:not(:disabled) { border-color: transparent; background: var(--primary-hover); }
+  .wm-btn-danger:hover:not(:disabled), .wm-backdrop .wm-btn-danger:hover:not(:disabled) { border-color: transparent; background: var(--danger); filter: brightness(.92); }
+  .wm-icon-btn:hover:not(:disabled) { background: var(--theme-hover); color: var(--theme-text-strong); }
+  .wm-icon-danger:hover:not(:disabled) { background: rgb(var(--danger-rgb) / .1); color: var(--danger); }
+  .wm-copy:hover { border-color: var(--control-line); background: var(--theme-hover); color: var(--primary-ink); }
+  .wm-text-btn:hover, .wm-quote-toggle:hover { background: var(--theme-hover); color: var(--theme-text-strong); }
+  .wm-folders button:hover:not(.is-active) { background: var(--theme-hover); color: var(--theme-text-strong); }
+  .wm-row:hover:not(.is-active) { background: var(--theme-hover); }
+  .wm-thread-head:hover { background: var(--theme-hover); }
+  .wm-files a:hover { border-color: var(--primary-border); }
+  .wm-files a:hover .wm-file-get { color: var(--primary-ink); }
+  .wm-chip button:hover { background: var(--theme-hover); color: var(--danger); }
+  .wm-tabs button:hover:not(.is-active) { color: var(--theme-text-strong); }
+}
+
+/* Mid width (tablet, or a laptop with the sidebar open): folders move into a strip on top */
+@container wm (max-width: 1060px) {
+  .wm-shell { grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .wm-nav { grid-column: 1 / -1; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 8px 14px; padding: 10px 12px; overflow: visible; border-right: 0; border-bottom: 1px solid var(--wm-line); }
+  .wm-box { flex: 0 1 340px; min-width: 0; padding: 6px 6px 6px 8px; }
+  .wm-box-avatar { width: 30px; height: 30px; flex-basis: 30px; font-size: 13px; }
+  .wm-folders { flex: 1 1 auto; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  .wm-folders button { min-height: 36px; padding: 0 12px; white-space: nowrap; }
+  .wm-folders button span { overflow: visible; }
+  .wm-usage { display: none; }
+  .wm-read-head, .wm-sender { padding-inline: 22px; }
+  .wm-body, .wm-quote-toggle, .wm-thread, .wm-images, .wm-files { margin-inline: 22px; }
+  .wm-read-foot { padding-inline: 22px; }
+  .wm-thread .wm-body, .wm-thread .wm-quote-toggle { margin-inline: 0; }
+}
+
+
+/* Narrow (phones): one pane at a time, the page scrolls instead of the panes */
+@container wm (max-width: 760px) {
+  .wm-shell { display: block; height: auto; overflow: visible; }
+  .wm-nav { display: grid; gap: 10px; }
+  .wm-box { flex: none; padding: 8px; }
+  .wm-folders { margin: 0 -12px; padding: 0 12px; }
+  .wm-usage { display: none; }
+  .wm-list { border-right: 0; }
+  .wm-rows { overflow: visible; }
+  .wm-list-tools { position: sticky; top: 64px; z-index: 3; background: var(--wm-surface); }
+  .wm-shell:not(.is-reading) .wm-read, .wm-shell.is-reading .wm-list { display: none; }
+  .wm-shell.is-reading .wm-nav { display: none; }
+  .wm-read { overflow: visible; }
+  .wm-read-bar { top: 64px; padding: 8px 10px; }
+  .wm-back { display: inline-flex; padding: 0 10px 0 6px; border-color: transparent; background: none; }
+  .wm-read-actions { gap: 2px; }
+  .wm-read-actions .wm-btn { padding: 0 10px; }
+  .wm-read-actions .wm-btn span { display: none; }
+  .wm-read-actions .wm-btn-primary span { display: inline; }
+  .wm-read-head { padding: 18px 16px 0; }
+  .wm-sender { grid-template-columns: auto minmax(0, 1fr); padding: 14px 16px 4px; }
+  .wm-sender-date { grid-column: 2; padding-top: 0; }
+  .wm-body, .wm-quote-toggle, .wm-thread, .wm-images, .wm-files { margin-inline: 16px; }
+  .wm-body.is-paper { padding: 14px; }
+  .wm-read-foot { padding: 20px 16px 24px; }
+  .wm-read-foot .wm-btn { flex: 1; }
+  .wm-row { padding: 12px 14px; }
+  .wm-thread-head { padding: 12px; }
+  .wm-thread-body { padding: 0 12px 14px; }
+}
+
+@container wm (max-width: 520px) {
+  .wm-head { align-items: stretch; }
+  .wm-head-actions { width: 100%; }
+  .wm-head-actions .wm-btn { flex: 1; }
+  .wm-head-actions .wm-btn-primary { flex: 1.4; }
+}
+
+@media (max-width: 640px) {
+  .wm-backdrop { padding: 0; place-items: stretch; }
+  .wm-dialog, .wm-compose, .wm-manage { width: 100%; height: 100dvh; max-height: none; border: 0; border-radius: 0; }
+  .wm-dialog-head { padding-left: 16px; }
+  .wm-dialog-body { padding: 14px 14px 22px; }
+  .wm-dialog-foot { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  .wm-dialog-foot .wm-attach span { display: none; }
+  .wm-field-row { padding: 0 12px 0 16px; }
+  .wm-field-label { flex-basis: 56px; }
+  .wm-editor { padding: 14px 16px; }
+  .wm-chips { padding: 10px 16px; }
+  .wm-setting { flex-wrap: wrap; }
+  .wm-setting-label { flex-basis: 100%; }
+  .wm-dns-record .wm-setting-label { flex-basis: 34px; }
+  .wm-discard > span { flex-basis: 100%; }
+  .wm-discard .wm-btn { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wm-spin, .wm-spinner, .wm-skeleton span { animation: none; }
+  .wm-backdrop, .wm-dialog { animation: none; }
+  .wm-btn, .wm-icon-btn, .wm-row, .wm-folders button, .wm-copy, .wm-files a { transition: none; }
+}
