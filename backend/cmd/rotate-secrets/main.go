@@ -112,42 +112,44 @@ func main() {
 	}
 	defer tx.Rollback(ctx)
 
-	rows, err := tx.Query(ctx, `SELECT id, name, value_ciphertext FROM hosting_environment_variables FOR UPDATE`)
-	if err != nil {
-		log.Fatalf("Query failed: %v", err)
-	}
-
 	type envVar struct {
 		id         int64
 		name       string
 		ciphertext string
 	}
-	var vars []envVar
-	for rows.Next() {
-		var v envVar
-		if err := rows.Scan(&v.id, &v.name, &v.ciphertext); err != nil {
-			log.Fatalf("Scan failed: %v", err)
-		}
-		vars = append(vars, v)
-	}
-	rows.Close()
-
 	rotatedCount := 0
-	for _, v := range vars {
-		decrypted, err := decryptSecret(v.ciphertext, keys)
+	// Website variables and Discord bot variables share the same key.
+	for _, table := range []string{"hosting_environment_variables", "bot_environment_variables"} {
+		rows, err := tx.Query(ctx, `SELECT id, name, value_ciphertext FROM `+table+` FOR UPDATE`)
 		if err != nil {
-			log.Fatalf("Failed to decrypt variable %s (id=%d): %v", v.name, v.id, err)
+			log.Fatalf("Query %s failed: %v", table, err)
 		}
-		reEncrypted, err := encryptSecret(decrypted, primaryKey)
-		if err != nil {
-			log.Fatalf("Failed to re-encrypt variable %s (id=%d): %v", v.name, v.id, err)
+		var vars []envVar
+		for rows.Next() {
+			var v envVar
+			if err := rows.Scan(&v.id, &v.name, &v.ciphertext); err != nil {
+				log.Fatalf("Scan failed: %v", err)
+			}
+			vars = append(vars, v)
 		}
+		rows.Close()
 
-		_, err = tx.Exec(ctx, `UPDATE hosting_environment_variables SET value_ciphertext=$1, updated_at=NOW() WHERE id=$2`, reEncrypted, v.id)
-		if err != nil {
-			log.Fatalf("Failed to update variable %s (id=%d): %v", v.name, v.id, err)
+		for _, v := range vars {
+			decrypted, err := decryptSecret(v.ciphertext, keys)
+			if err != nil {
+				log.Fatalf("Failed to decrypt %s variable %s (id=%d): %v", table, v.name, v.id, err)
+			}
+			reEncrypted, err := encryptSecret(decrypted, primaryKey)
+			if err != nil {
+				log.Fatalf("Failed to re-encrypt %s variable %s (id=%d): %v", table, v.name, v.id, err)
+			}
+
+			_, err = tx.Exec(ctx, `UPDATE `+table+` SET value_ciphertext=$1, updated_at=NOW() WHERE id=$2`, reEncrypted, v.id)
+			if err != nil {
+				log.Fatalf("Failed to update %s variable %s (id=%d): %v", table, v.name, v.id, err)
+			}
+			rotatedCount++
 		}
-		rotatedCount++
 	}
 
 	if err := tx.Commit(ctx); err != nil {

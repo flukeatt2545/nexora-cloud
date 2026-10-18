@@ -1,7 +1,7 @@
 :80 {
 	encode zstd gzip
 
-	@sensitive path /topups /topups/* /files /files/* /api/files/* /api/public/files/* /api/topup/* /api/admin/* /api/profile/* /api/hosting/* /api/store/buy/* /api/auth/me
+	@sensitive path /topups /topups/* /files /files/* /api/files/* /api/public/files/* /api/topup/* /api/admin/* /api/profile/* /api/hosting/* /api/bots/* /api/store/buy/* /api/auth/me
 	header @sensitive {
 		>Cache-Control "no-store, private, max-age=0"
 		>Pragma "no-cache"

@@ -113,6 +113,7 @@ services:
       WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY is required}
       HOSTING_ENCRYPTION_KEY: ${HOSTING_ENCRYPTION_KEY:?HOSTING_ENCRYPTION_KEY is required}
       TENANT_MYSQL_DSN: "root:${TENANT_DB_ROOT_PASSWORD:?TENANT_DB_ROOT_PASSWORD is required}@tcp(tenant-db:3306)/?parseTime=true&multiStatements=false"
+      BOT_DEFAULT_LIMIT: ${BOT_DEFAULT_LIMIT:-2}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       CF_ZONE_ID: ${CF_ZONE_ID:-}
       CF_HOSTING_DOMAIN: ${CF_HOSTING_DOMAIN:-nkn02.com}
@@ -270,6 +271,8 @@ services:
       S3_USE_SSL: "false"
       HOSTING_ENCRYPTION_KEY: ${HOSTING_ENCRYPTION_KEY:?HOSTING_ENCRYPTION_KEY is required}
       TENANT_MYSQL_DSN: "root:${TENANT_DB_ROOT_PASSWORD:?TENANT_DB_ROOT_PASSWORD is required}@tcp(tenant-db:3306)/?parseTime=true&multiStatements=false"
+      # Network for user Discord bots; deploy/bot-egress-firewall.sh must use the same subnet.
+      BOT_NETWORK_SUBNET: ${BOT_NETWORK_SUBNET:-172.31.250.0/24}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:

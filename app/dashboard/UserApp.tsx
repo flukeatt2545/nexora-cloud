@@ -2,7 +2,7 @@
 
 import {
   Cloud, Eye, EyeOff, FolderOpen, Info, LayoutDashboard, LogOut, Menu, ShieldCheck, User, X, Globe, Smartphone, Monitor, KeyRound, Check, Clock3, Zap, ChevronDown, Coins, Lock, Store, ReceiptText, RefreshCw, ChevronLeft, ChevronRight, Plus, ArrowUpRight, ExternalLink, Database, Mail, ShoppingCart, Undo2,
-  FileImage, FileVideo, FileAudio, FileText, FileArchive, File as FileIcon, CircleCheck, Circle, Upload,
+  FileImage, FileVideo, FileAudio, FileText, FileArchive, File as FileIcon, CircleCheck, Circle, Upload, Bot,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -16,6 +16,7 @@ import GamingStore, { MarqueeAnnouncementQueue, type Announcement } from "../Gam
 import { asciiInputProps, hasNonAscii } from "../lib/asciiInput";
 import { API_BASE } from "../runtime";
 import MailView from "./MailView";
+import BotsView from "./BotsView";
 import "./user-overview.css";
 import SmartImage from "../components/SmartImage";
 import { POINTS_EVENT, broadcastPoints } from "../components/StorePurchase";
@@ -148,7 +149,7 @@ function UserConfirmDialog({ request, busy, onClose, onConfirm }: { request: Con
   );
 }
 
-type UserView = "profile" | "hosting" | "overview" | "topups" | "files" | "store" | "mail";
+type UserView = "profile" | "hosting" | "overview" | "topups" | "files" | "store" | "mail" | "bots";
 
 function getTimeGreeting(): string {
   const hour = new Date().getHours();
@@ -188,6 +189,7 @@ const userViewLoadingLabel: Record<UserView, string> = {
   files: "กำลังเข้าสู่ไฟล์ของฉัน...",
   store: "กำลังเข้าสู่ร้านค้า...",
   mail: "กำลังเข้าสู่ Webmail...",
+  bots: "กำลังเข้าสู่บอท Discord...",
 };
 
 export default function UserApp({ view }: { view: UserView }) {
@@ -463,6 +465,7 @@ export default function UserApp({ view }: { view: UserView }) {
             <Link href="/dashboard" className={view === "overview" ? "active" : ""} aria-current={view === "overview" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><LayoutDashboard size={18} /><span>ภาพรวม</span></Link>
             {(store.open || view === "store") && <Link href="/store" className={view === "store" ? "active" : ""} aria-current={view === "store" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><Store size={18} /><span>ร้านค้า</span></Link>}
             <Link href="/hosting" className={view === "hosting" ? "active" : ""} aria-current={view === "hosting" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><Cloud size={18} /><span>เว็บไซต์ของฉัน</span></Link>
+            <Link href="/bots" className={view === "bots" ? "active" : ""} aria-current={view === "bots" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><Bot size={18} /><span>บอท Discord</span></Link>
             <Link href="/files" className={view === "files" ? "active" : ""} aria-current={view === "files" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><FolderOpen size={18} /><span>ไฟล์ของฉัน</span></Link>
             <Link href="/mail" className={view === "mail" ? "active" : ""} aria-current={view === "mail" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><Mail size={18} /><span>อีเมล</span>{mailUnread > 0 && <b className="usb-mail-badge">{mailUnread > 99 ? "99+" : mailUnread}</b>}</Link>
 
@@ -486,6 +489,7 @@ export default function UserApp({ view }: { view: UserView }) {
             {view === "overview" && "ภาพรวม"}
             {view === "store" && "ร้านค้าและแพ็กเกจ"}
             {view === "hosting" && "เว็บไซต์ของฉัน"}
+            {view === "bots" && "บอท Discord"}
             {view === "files" && "ไฟล์ของฉัน"}
             {view === "topups" && "ประวัติพอยท์"}
             {view === "profile" && "บัญชีของฉัน"}
@@ -856,6 +860,7 @@ export default function UserApp({ view }: { view: UserView }) {
           );
         })()}
         {view === "hosting" && <HostingView me={me} notify={setNotice} ask={setConfirmRequest} />}
+        {view === "bots" && <BotsView notify={setNotice} ask={setConfirmRequest} />}
         {view === "files" && <FileLibraryView />}
         {view === "mail" && <MailView notify={setNotice} />}
         {view === "topups" && (

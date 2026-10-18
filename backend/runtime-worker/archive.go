@@ -153,6 +153,15 @@ func zipToSafeTar(data []byte, byteLimit int64) ([]byte, []string, error) {
 	return output.Bytes(), names, nil
 }
 
+// checkedArchiveSize converts a zip entry's declared size, which the uploader controls, to int64
+// only when it is within limit; a value above MaxInt64 would otherwise turn negative.
+func checkedArchiveSize(size uint64, limit int64) (int64, error) {
+	if limit < 0 || size > uint64(limit) {
+		return 0, errors.New("archive entry too large")
+	}
+	return int64(size), nil
+}
+
 func safeArchivePath(value string) (string, error) {
 	value = strings.ReplaceAll(strings.TrimSpace(value), `\`, "/")
 	if value == "" {

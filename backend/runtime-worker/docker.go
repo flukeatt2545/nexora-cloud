@@ -27,12 +27,14 @@ type dockerClient struct {
 }
 
 type containerInspect struct {
-	ID    string `json:"Id"`
-	State struct {
-		Status   string `json:"Status"`
-		Running  bool   `json:"Running"`
-		ExitCode int    `json:"ExitCode"`
-		Health   struct {
+	ID           string `json:"Id"`
+	RestartCount int    `json:"RestartCount"`
+	State        struct {
+		Status     string `json:"Status"`
+		Running    bool   `json:"Running"`
+		Restarting bool   `json:"Restarting"`
+		ExitCode   int    `json:"ExitCode"`
+		Health     struct {
 			Status string `json:"Status"`
 		} `json:"Health"`
 	} `json:"State"`

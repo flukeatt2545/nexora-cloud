@@ -3,7 +3,7 @@
 import {
   Activity, ArrowRight, Ban, Bell, Calendar, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Clock, Cloud, Database, FileImage, Folder, KeyRound, LayoutDashboard,
   Info, LogOut, Megaphone, Menu, Moon, Pencil, Save, Search, Send, Settings, ShieldAlert, ShieldCheck, SlidersHorizontal, Sun, Trash2, User, TriangleAlert, Star, Heart, Gift,
-  UserCog, Users, UserPlus, X, Monitor, Smartphone, Globe, Copy, Upload, Maximize2, LayoutGrid, List, UploadCloud, FolderOpen, RefreshCw, FileText, Code, Download, Eye, Check, CheckCircle, CheckCircle2, Store, Package, PlayCircle, StopCircle, Zap, Plus, WalletCards, ReceiptText, TrendingUp, Share2, Server, ListChecks, CheckCheck, Link2, Mail, Bot, EyeOff, PauseCircle, Minus
+  UserCog, Users, UserPlus, X, Monitor, Smartphone, Globe, Copy, Upload, Maximize2, LayoutGrid, List, UploadCloud, FolderOpen, RefreshCw, FileText, Code, Download, Eye, Check, CheckCircle, CheckCircle2, Store, Package, PlayCircle, StopCircle, Zap, Plus, WalletCards, ReceiptText, TrendingUp, Share2, Server, ListChecks, CheckCheck, Link2, Mail, Bot, EyeOff, PauseCircle, Minus, SquareTerminal
 } from "lucide-react";
 import { FormEvent, Fragment, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Cropper, { type Area } from "react-easy-crop";
@@ -26,6 +26,7 @@ import { API_BASE } from "../runtime";
 import SocialOAuthButton, { type SocialProvider, useSocialAvailability } from "../SocialOAuthButton";
 import AdminMailView from "./AdminMailView";
 import DiscordBotView from "./DiscordBotView";
+import AdminBotsView from "./AdminBotsView";
 import MailSettingsPanel from "./MailSettingsPanel";
 import SmartImage from "../components/SmartImage";
 import StoreClosedNotice from "../components/StoreClosedNotice";
@@ -34,7 +35,7 @@ import Link from "next/link";
 // Admin pages about selling: they show a notice while the store is switched off.
 const STORE_VIEWS = new Set<string>(["store-categories", "store-products", "store-orders", "store-sales", "topups", "topup-transactions", "topup-settings"]);
 
-export type DashboardView = "profile" | "hosting" | "databases" | "mail" | "discord-bot" | "overview" | "users" | "access" | "logs" | "announcements" | "settings" | "homepage-settings" | "files" | "file-system" | "file-categories" | "store-categories" | "store-products" | "store-orders" | "store-sales" | "topups" | "topup-transactions" | "topup-settings";
+export type DashboardView = "profile" | "hosting" | "databases" | "mail" | "discord-bot" | "user-bots" | "overview" | "users" | "access" | "logs" | "announcements" | "settings" | "homepage-settings" | "files" | "file-system" | "file-categories" | "store-categories" | "store-products" | "store-orders" | "store-sales" | "topups" | "topup-transactions" | "topup-settings";
 type Role = "user" | "admin" | "superadmin";
 type AuthUser = { id: number; username: string; displayName: string; email: string; avatarUrl: string; role: Role; status: string; passwordEnabled?: boolean; permissions: string[] };
 type Session = { id: number; ipAddress: string; userAgent: string; createdAt: string; lastSeenAt: string; expiresAt: string; current: boolean };
@@ -443,6 +444,7 @@ const viewNavGroup: Partial<Record<DashboardView, string>> = {
   databases: "hosting",
   mail: "hosting",
   "discord-bot": "hosting",
+  "user-bots": "hosting",
   announcements: "content",
   "file-system": "content",
   "file-categories": "content",
@@ -467,6 +469,7 @@ const viewLoadingMeta: Record<DashboardView, { page: string; system: string }> =
   databases: { page: "ฐานข้อมูล", system: "เว็บไซต์" },
   mail: { page: "ระบบอีเมล", system: "อีเมลโดเมน" },
   "discord-bot": { page: "บอท Discord", system: "เว็บไซต์" },
+  "user-bots": { page: "บอทของผู้ใช้", system: "เว็บไซต์" },
   users: { page: "จัดการผู้ใช้", system: "ผู้ใช้และสิทธิ์" },
   access: { page: "สิทธิ์การเข้าถึง", system: "ผู้ใช้และสิทธิ์" },
   logs: { page: "บันทึกกิจกรรม", system: "บันทึกระบบ" },
@@ -755,7 +758,8 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
       { href: "/admin/hosting", label: "จัดการเว็บไซต์", icon: Cloud, key: "hosting", show: true },
       { href: "/admin/databases", label: "ฐานข้อมูล", icon: Database, key: "databases", show: true },
       { href: "/admin/mail", label: "อีเมลโดเมน", icon: Mail, key: "mail", show: me.role !== "user" },
-      { href: "/admin/discord-bot", label: "บอท Discord", icon: Bot, key: "discord-bot", show: me.role !== "user" }
+      { href: "/admin/discord-bot", label: "บอท Discord", icon: Bot, key: "discord-bot", show: me.role !== "user" },
+      { href: "/admin/bots", label: "บอทของผู้ใช้", icon: SquareTerminal, key: "user-bots", show: me.role !== "user" }
     ] },
 
     { key: "account", label: "บัญชีผู้ใช้", icon: User, show: true, links: [{ href: "/admin/profile", label: "โปรไฟล์ของฉัน", icon: User, key: "profile", show: true }] },
@@ -830,6 +834,7 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
           {view === "databases" && <DatabaseAdminView me={me} notify={setNotice} ask={setConfirmRequest} />}
           {view === "mail" && <AdminMailView notify={setNotice} ask={setConfirmRequest} isSuperadmin={me.role === "superadmin"} />}
           {view === "discord-bot" && <DiscordBotView notify={setNotice} isSuperadmin={me.role === "superadmin"} />}
+          {view === "user-bots" && <AdminBotsView notify={setNotice} ask={setConfirmRequest} />}
           {view === "users" && <UsersView me={me} notify={setNotice} ask={setConfirmRequest} />}
           {view === "access" && <AccessView me={me} notify={setNotice} ask={setConfirmRequest} />}
           {view === "logs" && <LogsView />}

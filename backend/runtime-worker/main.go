@@ -49,6 +49,7 @@ type config struct {
 	pollInterval         time.Duration
 	healthInterval       time.Duration
 	leaseDuration        time.Duration
+	botSubnet            string
 }
 
 type worker struct {
@@ -56,6 +57,7 @@ type worker struct {
 	db     *pgxpool.Pool
 	docker *dockerClient
 	store  *minio.Client
+	bots   *botState
 }
 
 type operation struct {
@@ -129,6 +131,7 @@ func main() {
 		db:     db,
 		docker: newDockerClient(cfg.dockerSocket),
 		store:  store,
+		bots:   newBotState(),
 	}
 	if err := w.docker.ping(ctx); err != nil {
 		log.Fatalf("Docker Engine is unavailable: %v", err)
@@ -137,6 +140,7 @@ func main() {
 	log.Printf("NEXORA runtime worker started (ports %d-%d)", cfg.portMin, cfg.portMax)
 	go w.monitor(ctx)
 	go w.expirationLoop(ctx)
+	w.startBots(ctx)
 
 	ticker := time.NewTicker(cfg.pollInterval)
 	defer ticker.Stop()
@@ -179,6 +183,7 @@ func loadConfig() (config, error) {
 		pollInterval:         time.Second,
 		healthInterval:       15 * time.Second,
 		leaseDuration:        5 * time.Minute,
+		botSubnet:            env("BOT_NETWORK_SUBNET", "172.31.250.0/24"),
 	}, nil
 }
 
