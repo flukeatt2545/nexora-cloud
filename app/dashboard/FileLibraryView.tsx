@@ -592,6 +592,8 @@ export default function FileLibraryView({
 
   useEffect(() => { fetchFiles(); }, [fetchFiles]);
 
+  // Dialogs lock the page behind them. The notice toast is not one: locking for it pinned the
+  // body at its scroll offset and cut off the rest of the page while the toast was up.
   const modalOpen = !!(
     showUpload ||
     deleteTarget ||
@@ -609,8 +611,7 @@ export default function FileLibraryView({
     batchFolderModalOpen ||
     categoryModal ||
     categoryDeleteTarget ||
-    categoryPasswordPrompt ||
-    notice
+    categoryPasswordPrompt
   );
   const previewOpen = Boolean(preview);
 
