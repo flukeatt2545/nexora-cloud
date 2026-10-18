@@ -584,6 +584,9 @@ func main() {
 	admin.Post("/student-mappings/:id/unbind-discord", s.adminUnbindStudentDiscord)
 	admin.Post("/student-mappings/unbind-all", s.adminUnbindAllStudentDiscord)
 
+	admin.Get("/bot-uploads", s.adminListBotUploads)
+	admin.Delete("/bot-uploads/:id", s.adminDeleteBotUpload)
+
 	app.Post("/api/internal/phpmyadmin/tickets/consume", s.consumeSecurePhpMyAdminTicket)
 	app.Post("/api/internal/bot/student-db-ticket", s.botGenerateStudentTicket)
 	app.Post("/api/internal/bot/student-workspace-ticket", s.botGenerateStudentWorkspaceTicket)
