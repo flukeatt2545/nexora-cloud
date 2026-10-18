@@ -466,6 +466,11 @@ func (s *server) uploadOwnUserFile(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(apiError{Error: "ไฟล์ประเภทนี้ไม่ได้รับอนุญาต", Code: "file_type_blocked"})
 	}
 
+	// Admins see the system categories and folders (owner NULL) in the file-system view, hidden
+	// ones included, and upload into them through this endpoint; everyone else may only use
+	// their own and the visible system categories, and only their own folders.
+	canUseSystemFolders := actor.Role == "admin" || actor.Role == "superadmin"
+
 	var categoryID *int
 	if raw := strings.TrimSpace(c.FormValue("categoryId")); raw != "" {
 		id, err := strconv.Atoi(raw)
@@ -476,9 +481,9 @@ func (s *server) uploadOwnUserFile(c *fiber.Ctx) error {
 		if err := s.db.QueryRow(c.Context(), `
 			SELECT EXISTS(
 				SELECT 1 FROM user_file_categories
-				WHERE id=$1 AND (owner_user_id=$2 OR (owner_user_id IS NULL AND is_visible=TRUE))
+				WHERE id=$1 AND (owner_user_id=$2 OR (owner_user_id IS NULL AND (is_visible=TRUE OR $3)))
 			)
-		`, id, actor.ID).Scan(&exists); err != nil {
+		`, id, actor.ID, canUseSystemFolders).Scan(&exists); err != nil {
 			log.Printf("[uploadOwnUserFile] category check error: %v", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(apiError{Error: "ตรวจสอบหมวดหมู่ไม่สำเร็จ", Code: "category_query_error"})
 		}
@@ -494,9 +499,6 @@ func (s *server) uploadOwnUserFile(c *fiber.Ctx) error {
 		if err != nil || fID <= 0 {
 			return c.Status(fiber.StatusBadRequest).JSON(apiError{Error: "แฟ้มไม่ถูกต้อง", Code: "invalid_folder"})
 		}
-		// Admins see the system folders (owner NULL) in the file-system view and upload into
-		// them through this endpoint; everyone else may only use their own folders.
-		canUseSystemFolders := actor.Role == "admin" || actor.Role == "superadmin"
 		var folderCatID int
 		err = s.db.QueryRow(c.Context(), `
 			SELECT category_id FROM user_file_folders
@@ -938,9 +940,9 @@ func (s *server) patchOwnUserFile(c *fiber.Ctx) error {
 			if err := s.db.QueryRow(c.Context(), `
 				SELECT EXISTS(
 					SELECT 1 FROM user_file_categories
-					WHERE id=$1 AND (owner_user_id=$2 OR (owner_user_id IS NULL AND is_visible=TRUE))
+					WHERE id=$1 AND (owner_user_id=$2 OR (owner_user_id IS NULL AND (is_visible=TRUE OR $3)))
 				)
-			`, *body.CategoryID, actor.ID).Scan(&exists); err != nil {
+			`, *body.CategoryID, actor.ID, actor.Role == "admin" || actor.Role == "superadmin").Scan(&exists); err != nil {
 				return fiber.NewError(fiber.StatusInternalServerError)
 			}
 			if !exists {
