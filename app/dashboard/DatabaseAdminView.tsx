@@ -934,7 +934,7 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
                           <>
                             <span className="dbv-inline">
                               <strong title={m.siteName || m.siteSubdomain}>{m.siteName || m.siteSubdomain}</strong>
-                              <a className="hv-btn hv-icon-btn is-sm" href={m.siteSubdomain ? `https://code-${m.siteSubdomain}.nkn02.com` : "/hosting"} target="_blank" rel="noreferrer" title="เปิด VS Code ของเว็บนี้" aria-label="เปิด VS Code">
+                              <a className="hv-btn hv-icon-btn is-sm" href={m.sitePublicId ? `/workspace?id=${encodeURIComponent(m.sitePublicId)}` : "/hosting"} target="_blank" rel="noreferrer" title="เปิด VS Code ของเว็บนี้" aria-label="เปิด VS Code">
                                 <Code2 size={14} aria-hidden="true" />
                               </a>
                               <button type="button" className="hv-btn hv-icon-btn is-sm hv-danger-icon" onClick={() => handleUnlinkSite(m)} title="ปลดเว็บไซต์ออกจากรหัสนี้" aria-label="ปลดเว็บไซต์">

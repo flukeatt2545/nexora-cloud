@@ -888,12 +888,9 @@ export default function HostingView({
 
   function openFileManager() {
     if (!detail?.site) return;
-    const sub = detail.site.subdomain;
-    const currentHostname = typeof window !== "undefined" ? window.location.hostname : "nkn02.com";
-    const baseDomain = currentHostname.includes("localhost") ? "localhost:8088" : "nkn02.com";
-    const protocol = typeof window !== "undefined" ? window.location.protocol : "https:";
-    const workspaceUrl = `${protocol}//code-${sub}.${baseDomain}`;
-    window.open(workspaceUrl, "_blank", "noopener,noreferrer");
+    // The code-<site> host only lets in a browser carrying a launch token. /workspace asks the
+    // API for one and then goes there; opening code-<site> directly always ends on its 401 page.
+    window.open(`/workspace?id=${encodeURIComponent(detail.site.id)}`, "_blank", "noopener,noreferrer");
   }
 
   function removeSite(site: HostingSite) {

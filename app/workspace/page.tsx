@@ -97,19 +97,17 @@ function WorkspaceContainerContent() {
 
         // 3. Request a secure SSO workspace launch token
         setStatusText("กำลังเริ่มการทำงานของสภาพแวดล้อม VS Code...");
-        let launchToken = "";
-        try {
-          const tokenRes = await fetch(`${API_BASE}/api/hosting/sites/${encodeURIComponent(activeSiteId)}/workspace/token`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-          });
-          if (tokenRes.ok) {
-            const tokenData = await tokenRes.json().catch(() => ({}));
-            launchToken = tokenData.token || "";
-          }
-        } catch {
-          // Fallback
+        // Without a token the code host answers 401, so a failed request stops here and says why
+        // (read-only access, a stopped site...) instead of sending the browser there anyway.
+        const tokenRes = await fetch(`${API_BASE}/api/hosting/sites/${encodeURIComponent(activeSiteId)}/workspace/token`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+        const tokenData = await tokenRes.json().catch(() => ({}));
+        const launchToken: string = tokenRes.ok ? tokenData.token || "" : "";
+        if (!launchToken) {
+          throw new Error(tokenData.error || "ขอสิทธิ์เปิดพื้นที่เขียนโค้ดไม่สำเร็จ ลองอีกครั้ง");
         }
 
         // 4. Construct the code subdomain destination
@@ -119,7 +117,7 @@ function WorkspaceContainerContent() {
         const portSuffix = currentHostname.includes("localhost") && window.location.port ? `:${window.location.port}` : "";
 
         const codeHost = `code-${subdomain}.${baseDomain}${portSuffix}`;
-        const finalUrl = `${protocol}//${codeHost}${launchToken ? `?token=${encodeURIComponent(launchToken)}` : ""}`;
+        const finalUrl = `${protocol}//${codeHost}?token=${encodeURIComponent(launchToken)}`;
 
         if (isMounted) {
           setTargetUrl(finalUrl);
