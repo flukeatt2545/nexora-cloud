@@ -236,6 +236,8 @@ type createBotInput struct {
 	Source     string `json:"source"`
 	GitHubRepo string `json:"githubRepo"`
 	GitHubRef  string `json:"githubRef"`
+	// Admins may create a bot that belongs to someone else; it counts against that person's quota.
+	OwnerUsername string `json:"ownerUsername"`
 }
 
 func cleanBotName(value string) (string, bool) {
@@ -306,18 +308,35 @@ func (s *server) createBot(c *fiber.Ctx) error {
 		entry, startMode = detectBotEntry(files, input.Runtime, entry)
 	}
 
+	ownerID, ownerName := actor.ID, ""
+	if wanted := strings.TrimPrefix(strings.TrimSpace(input.OwnerUsername), "@"); wanted != "" && !strings.EqualFold(wanted, actor.Username) {
+		if !isPlatformAdmin(actor) {
+			return c.Status(fiber.StatusForbidden).JSON(apiError{Error: "สร้างบอทให้คนอื่นได้เฉพาะแอดมิน", Code: "forbidden"})
+		}
+		err := s.db.QueryRow(c.Context(), `SELECT id,identifier FROM users WHERE LOWER(identifier)=LOWER($1)`, wanted).Scan(&ownerID, &ownerName)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return c.Status(fiber.StatusNotFound).JSON(apiError{Error: "ไม่พบผู้ใช้ชื่อ " + truncateRunes(wanted, 40), Code: "user_not_found"})
+		}
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError)
+		}
+	}
+
 	tx, err := s.db.BeginTx(c.Context(), pgx.TxOptions{})
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError)
 	}
 	defer tx.Rollback(c.Context())
 	// Holding the user row makes two quick "create" clicks count one after the other.
-	if _, err := tx.Exec(c.Context(), `SELECT 1 FROM users WHERE id=$1 FOR UPDATE`, actor.ID); err != nil {
+	if _, err := tx.Exec(c.Context(), `SELECT 1 FROM users WHERE id=$1 FOR UPDATE`, ownerID); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError)
 	}
-	limit, used, err := s.userBotQuota(c.Context(), tx, actor.ID)
+	limit, used, err := s.userBotQuota(c.Context(), tx, ownerID)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError)
+	}
+	if used >= limit && ownerName != "" {
+		return c.Status(fiber.StatusForbidden).JSON(apiError{Error: fmt.Sprintf("%s มีบอทครบโควตา %d ตัวแล้ว เพิ่มโควตาให้ก่อนในส่วนโควตาต่อคน", ownerName, limit), Code: "bot_quota_reached"})
 	}
 	if used >= limit {
 		return c.Status(fiber.StatusForbidden).JSON(apiError{Error: fmt.Sprintf("บัญชีนี้สร้างบอทได้ %d ตัว ลบตัวที่ไม่ใช้แล้วก่อน หรือขอแอดมินเพิ่มโควตา", limit), Code: "bot_quota_reached"})
@@ -327,7 +346,7 @@ func (s *server) createBot(c *fiber.Ctx) error {
 	if err := tx.QueryRow(c.Context(), `
 		INSERT INTO bot_apps (public_id,owner_user_id,name,runtime,entry_file,start_mode,source_kind,github_repo,github_ref)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id
-	`, publicID, actor.ID, name, input.Runtime, entry, startMode, sourceKind, repo, ref).Scan(&botID); err != nil {
+	`, publicID, ownerID, name, input.Runtime, entry, startMode, sourceKind, repo, ref).Scan(&botID); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError)
 	}
 	storedKey := ""
@@ -345,7 +364,7 @@ func (s *server) createBot(c *fiber.Ctx) error {
 		s.removeBotObject(storedKey)
 		return fiber.NewError(fiber.StatusInternalServerError)
 	}
-	s.audit(c, auditEvent{Actor: actor, Category: "bots", Action: "bot.created", Target: "bot", TargetID: publicID, Metadata: map[string]any{"runtime": input.Runtime, "source": sourceKind}})
+	s.audit(c, auditEvent{Actor: actor, Category: "bots", Action: "bot.created", Target: "bot", TargetID: publicID, Metadata: map[string]any{"runtime": input.Runtime, "source": sourceKind, "owner": ownerName}})
 	bot, err := loadBot(c.Context(), s.db, actor, publicID, false)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError)

@@ -31,10 +31,13 @@
   container: bt / inline-size;
   width: 100%;
   max-width: 1240px;
+  margin-inline: auto;
   display: grid;
   gap: 18px;
   color: var(--theme-text-strong);
 }
+/* The admin page fills the panel like the other admin pages. */
+.bt.bt-admin { max-width: none; }
 .bt h1, .bt h2, .bt h3, .bt p, .bt-backdrop h2, .bt-backdrop h3, .bt-backdrop p { margin: 0; }
 .bt code, .bt-backdrop code { padding: 1px 5px; border-radius: 5px; background: var(--theme-hover); font-family: var(--bt-mono); font-size: .92em; }
 .bt-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -519,6 +522,45 @@
 @keyframes bt-avatar-pop { 0% { opacity: 0; transform: scale(.5); } 60% { opacity: 1; transform: scale(1.08); } 100% { transform: scale(1); } }
 
 /* Admin (/admin/bots) */
+.bt-eyebrow { color: var(--primary-ink); font-size: 13px; font-weight: 700; }
+.bt-spin { animation: bt-spin .8s linear infinite; }
+.bt-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.bt-kpis li { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 16px 18px; border: 1px solid var(--bt-line); border-radius: var(--bt-radius); background: var(--bt-surface); animation: bt-rise .45s var(--bt-ease) both; }
+.bt-kpis li:nth-child(2) { animation-delay: 50ms; }
+.bt-kpis li:nth-child(3) { animation-delay: 100ms; }
+.bt-kpis li:nth-child(4) { animation-delay: 150ms; }
+.bt-kpis li > span:last-child { display: grid; gap: 2px; min-width: 0; }
+.bt-kpis small { color: var(--theme-text-soft); font-size: 13px; }
+.bt-kpis b { font-size: 24px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bt-kpi-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; border-radius: 12px; background: var(--primary-soft); color: var(--primary-ink); }
+.bt-kpis li.is-ok .bt-kpi-icon { background: rgb(var(--bt-ok-rgb) / .12); color: var(--bt-ok); }
+.bt-kpis li.is-bad .bt-kpi-icon { background: rgb(var(--danger-rgb) / .1); color: var(--danger); }
+.bt-kpis li.is-bad b { color: var(--danger); }
+.bt-admin-table-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px 10px; }
+.bt-admin-table-head h2 { font-size: 16px; }
+.bt-admin-table-head .bt-admin-tools { flex: 1 1 520px; justify-content: flex-end; }
+.bt-admin-table-head .bt-admin-search { flex: 0 1 320px; }
+.bt-admin-pad { padding: 4px 18px 14px; }
+.bt-admin-empty { display: grid; justify-items: center; gap: 10px; padding: 36px 20px 40px; border-top: 1px solid var(--bt-line); text-align: center; animation: bt-fade .3s ease-out; }
+.bt-admin-empty-icon { display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 4px; border-radius: 16px; background: var(--primary-soft); color: var(--primary-ink); }
+.bt-admin-empty h3 { margin: 0; font-size: 17px; }
+.bt-admin-empty p { max-width: 460px; color: var(--theme-text-soft); font-size: 14px; }
+.bt-admin-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
+.bt-quota-finder { max-width: 420px; }
+.bt-quota-who { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.bt-quota-who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bt-quota-initial { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 50%; background: var(--bt-sunken); color: var(--theme-text-soft); font-size: 13px; font-weight: 700; }
+@container bt (max-width: 900px) {
+  .bt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bt-admin-table-head .bt-admin-tools { justify-content: flex-start; }
+  .bt-admin-table-head .bt-admin-search { flex: 1 1 100%; }
+}
+@container bt (max-width: 460px) {
+  .bt-kpis li { padding: 12px; gap: 10px; }
+  .bt-kpi-icon { width: 36px; height: 36px; flex-basis: 36px; }
+  .bt-kpis b { font-size: 20px; }
+}
+
 .bt-stats.bt-admin-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .bt-admin-kpis dd { font-size: 20px; }
 .bt-admin-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }

@@ -468,6 +468,7 @@ func main() {
 	admin.Delete("/hosting/databases/:id", s.adminDeleteDatabase)
 	admin.Get("/bots", s.adminListBots)
 	admin.Patch("/bots/:id", s.adminUpdateBot)
+	admin.Get("/bot-limits", s.adminSearchBotOwners)
 	admin.Patch("/bot-limits/:userId", s.adminSetBotLimit)
 	admin.Get("/health", s.adminHealthDetails)
 	admin.Get("/users", s.adminUsers)

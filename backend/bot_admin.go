@@ -29,8 +29,10 @@ func (s *server) adminListBots(c *fiber.Ctx) error {
 	}
 	owners, err := s.db.Query(c.Context(), `
 		SELECT u.id,u.identifier,u.bot_limit,COUNT(b.id)
-		FROM users u JOIN bot_apps b ON b.owner_user_id=u.id AND b.deleted_at IS NULL
-		GROUP BY u.id ORDER BY u.identifier
+		FROM users u LEFT JOIN bot_apps b ON b.owner_user_id=u.id AND b.deleted_at IS NULL
+		GROUP BY u.id
+		HAVING COUNT(b.id)>0 OR u.bot_limit IS NOT NULL
+		ORDER BY u.identifier
 	`)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError)
@@ -48,6 +50,36 @@ func (s *server) adminListBots(c *fiber.Ctx) error {
 		people = append(people, fiber.Map{"id": id, "username": username, "limit": custom, "bots": count})
 	}
 	return c.JSON(fiber.Map{"items": items, "owners": people, "defaultLimit": botDefaultLimit()})
+}
+
+// adminSearchBotOwners finds users by name so a quota can be set before they have a bot.
+func (s *server) adminSearchBotOwners(c *fiber.Ctx) error {
+	query := strings.TrimPrefix(strings.TrimSpace(c.Query("q")), "@")
+	if query == "" {
+		return c.JSON(fiber.Map{"items": []fiber.Map{}})
+	}
+	rows, err := s.db.Query(c.Context(), `
+		SELECT u.id,u.identifier,u.bot_limit,
+		       (SELECT COUNT(*) FROM bot_apps b WHERE b.owner_user_id=u.id AND b.deleted_at IS NULL)
+		FROM users u WHERE u.identifier ILIKE '%' || $1 || '%'
+		ORDER BY LENGTH(u.identifier), u.identifier LIMIT 8
+	`, strings.NewReplacer("%", "", "_", "").Replace(query))
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError)
+	}
+	defer rows.Close()
+	items := make([]fiber.Map, 0)
+	for rows.Next() {
+		var id int64
+		var username string
+		var custom *int
+		var count int
+		if err := rows.Scan(&id, &username, &custom, &count); err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError)
+		}
+		items = append(items, fiber.Map{"id": id, "username": username, "limit": custom, "bots": count})
+	}
+	return c.JSON(fiber.Map{"items": items})
 }
 
 func (s *server) adminUpdateBot(c *fiber.Ctx) error {

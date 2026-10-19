@@ -13,10 +13,12 @@ type Source = "zip" | "github" | "template";
 
 const steps = ["ตั้งชื่อ", "ใส่โค้ด", "ใส่โทเคน"];
 
-export default function BotCreateWizard({ onClose, onCreated, notify }: { onClose: () => void; onCreated: (bot: Bot) => void; notify: Notify }) {
+/** With forAdmin, step one also asks whose bot it is (empty means the admin's own). */
+export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin = false }: { onClose: () => void; onCreated: (bot: Bot) => void; notify: Notify; forAdmin?: boolean }) {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [name, setName] = useState("");
+  const [owner, setOwner] = useState("");
   const [runtime, setRuntime] = useState<BotRuntime>("node");
   const [source, setSource] = useState<Source>("zip");
   const [file, setFile] = useState<File | null>(null);
@@ -88,7 +90,7 @@ export default function BotCreateWizard({ onClose, onCreated, notify }: { onClos
     setError("");
     try {
       const created = await botApi<{ bot: Bot; source: SourceReport | null }>("/api/bots", botSend("POST", {
-        name: name.trim(), runtime, source, githubRepo: repo.trim(), githubRef: ref.trim(),
+        name: name.trim(), runtime, source, githubRepo: repo.trim(), githubRef: ref.trim(), ownerUsername: owner.trim(),
       }));
       let result = created.source;
       setBot(created.bot);
@@ -175,6 +177,13 @@ export default function BotCreateWizard({ onClose, onCreated, notify }: { onClos
                 <input value={name} onChange={(event) => setName(event.target.value)} maxLength={60} placeholder="เช่น บอทเพลงห้องเกม" autoFocus />
                 <small>ใช้เรียกในเว็บนี้เท่านั้น ชื่อที่เห็นใน Discord มาจากหน้า Developer Portal</small>
               </label>
+              {forAdmin && (
+                <label className="bt-field">
+                  <span>เจ้าของบอท <em>ไม่ใส่ก็ได้</em></span>
+                  <input value={owner} onChange={(event) => setOwner(event.target.value.replace(/[^A-Za-z0-9@]/g, ""))} maxLength={40} placeholder="ชื่อผู้ใช้ เว้นว่างไว้ถ้าเป็นบอทของคุณเอง" spellCheck={false} />
+                  <small>บอทจะไปอยู่ในหน้าบอทของผู้ใช้คนนั้น และนับในโควตาของเขา</small>
+                </label>
+              )}
               <fieldset className="bt-field">
                 <legend>เขียนด้วยภาษาอะไร</legend>
                 <div className="bt-choice-grid">
