@@ -2,6 +2,7 @@
 
 // The idle time before signing out, typed in seconds, minutes, hours or days. The API stores
 // whole minutes (5 minutes to 30 days), so seconds are rounded to the minute and the field says so.
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import "./session-ttl.css";
 
@@ -104,20 +105,13 @@ export default function SessionTtlField({ value, onChange }: { value: number; on
           aria-label="ระยะเวลา"
           aria-invalid={tooShort || tooLong}
         />
-        <div className="ttl-units" role="radiogroup" aria-label="หน่วยเวลา">
-          {units.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="radio"
-              aria-checked={unit === item.id}
-              className={unit === item.id ? "is-active" : ""}
-              onClick={() => changeUnit(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        <label className="ttl-unit">
+          <span className="ttl-sr">หน่วยเวลา</span>
+          <select value={unit} onChange={(event) => changeUnit(event.target.value as Unit)}>
+            {units.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+          <ChevronDown size={16} aria-hidden="true" />
+        </label>
       </div>
       <p className={`ttl-note${tooShort || tooLong ? " is-invalid" : ""}`} aria-live="polite">
         {tooShort
