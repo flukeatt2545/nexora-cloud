@@ -281,7 +281,7 @@ func main() {
 			}
 			return trustedRuntimeOrigin(cfg.environment, origin, cfg.cfDomain, "www."+cfg.cfDomain)
 		},
-		AllowHeaders:     "Origin, Content-Type, Accept, Idempotency-Key, X-Csrf-Token",
+		AllowHeaders:     "Origin, Content-Type, Accept, Idempotency-Key, X-Csrf-Token, X-Nexora-Idle",
 		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 		AllowCredentials: true,
 		MaxAge:           600,
@@ -305,6 +305,8 @@ func main() {
 	auth.Post("/login", s.rateLimit("login", loginRequestLimit, failedLoginWindow), s.login)
 	auth.Post("/logout", sensitiveResponseHeaders, s.logout)
 	auth.Get("/me", sensitiveResponseHeaders, s.me)
+	auth.Get("/session", sensitiveResponseHeaders, s.sessionStatus)
+	auth.Post("/session/extend", sensitiveResponseHeaders, s.extendSessionNow)
 	auth.Post("/oauth/ticket", s.rateLimit("oauth_ticket", 20, 5*time.Minute), s.issueOAuthTicket)
 	auth.Post("/oauth/ticket/consume", s.rateLimit("oauth_consume", 30, 5*time.Minute), s.consumeOAuthTicket)
 	auth.Post("/workspace/ticket/consume", s.rateLimit("workspace_consume", 30, 5*time.Minute), s.consumeWorkspaceTicket)

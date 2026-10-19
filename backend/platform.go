@@ -303,19 +303,86 @@ func (s *server) authenticate(c *fiber.Ctx) (*currentUser, error) {
 		return nil, err
 	}
 	user.Permissions = permissionsForRole(user.Role)
-	tag, sErr := s.db.Exec(c.Context(), `
-		UPDATE user_sessions
-		SET last_seen_at = NOW(),
-		    expires_at = NOW() + ((COALESCE((SELECT session_ttl_minutes FROM system_settings WHERE id = 1), 30) || ' minutes')::interval)
-		WHERE id = $1 AND last_seen_at < NOW() - INTERVAL '5 minutes'
-	`, user.SessionID)
-	if sErr == nil && tag.RowsAffected() > 0 {
-		var ttlMins int
-		if err := s.db.QueryRow(c.Context(), `SELECT session_ttl_minutes FROM system_settings WHERE id = 1`).Scan(&ttlMins); err == nil && ttlMins > 0 {
-			s.redis.Expire(c.Context(), "session:"+hash, time.Duration(ttlMins)*time.Minute)
-		}
+	// A request the page sends by itself while nobody touches it (refreshing a list, polling a
+	// console) carries X-Nexora-Idle and must not keep the session alive, or "logged out after
+	// N idle minutes" would never happen with such a page open.
+	if c.Get(sessionIdleHeader) != "1" {
+		s.extendSession(c, &user, hash, token, false)
 	}
 	return &user, nil
+}
+
+const sessionIdleHeader = "X-Nexora-Idle"
+
+// extendSession moves the session's end to now + the configured idle time. It writes at most
+// once per minute (or tenth of the idle time) unless forced, and re-sends the cookie each time:
+// the cookie's own lifetime was fixed at login and used to end a busy session early.
+func (s *server) extendSession(c *fiber.Ctx, user *currentUser, hash, token string, force bool) {
+	var ttlMinutes int
+	err := s.db.QueryRow(c.Context(), `
+		UPDATE user_sessions s
+		SET last_seen_at = NOW(),
+		    expires_at = NOW() + make_interval(mins => t.ttl)
+		FROM (SELECT COALESCE((SELECT session_ttl_minutes FROM system_settings WHERE id = 1), 30) AS ttl) t
+		WHERE s.id = $1
+		  AND ($2 OR s.last_seen_at < NOW() - LEAST(INTERVAL '5 minutes', make_interval(secs => t.ttl * 6)))
+		RETURNING t.ttl
+	`, user.SessionID, force).Scan(&ttlMinutes)
+	if err != nil || ttlMinutes <= 0 {
+		return
+	}
+	ttl := time.Duration(ttlMinutes) * time.Minute
+	s.redis.Expire(c.Context(), "session:"+hash, ttl)
+	c.Cookie(&fiber.Cookie{
+		Name:     s.cfg.cookieName,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(ttl.Seconds()),
+		HTTPOnly: true,
+		Secure:   s.cfg.cookieSecure,
+		SameSite: fiber.CookieSameSiteStrictMode,
+	})
+}
+
+// sessionStatus tells the page when the session ends, so it can warn before and show a notice
+// after. It never extends the session itself.
+func (s *server) sessionStatus(c *fiber.Ctx) error {
+	c.Request().Header.Set(sessionIdleHeader, "1")
+	user, err := s.authenticate(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError)
+	}
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(apiError{Error: "เซสชันหมดอายุแล้ว", Code: "unauthenticated"})
+	}
+	return s.writeSessionStatus(c, user)
+}
+
+// extendSessionNow is the "stay signed in" button and the page's report that someone is using it.
+func (s *server) extendSessionNow(c *fiber.Ctx) error {
+	c.Request().Header.Set(sessionIdleHeader, "1")
+	user, err := s.authenticate(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError)
+	}
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(apiError{Error: "เซสชันหมดอายุแล้ว", Code: "unauthenticated"})
+	}
+	token := c.Cookies(s.cfg.cookieName)
+	s.extendSession(c, user, tokenHash(token), token, true)
+	return s.writeSessionStatus(c, user)
+}
+
+func (s *server) writeSessionStatus(c *fiber.Ctx, user *currentUser) error {
+	var expiresAt time.Time
+	var ttlMinutes int
+	if err := s.db.QueryRow(c.Context(), `
+		SELECT s.expires_at, COALESCE((SELECT session_ttl_minutes FROM system_settings WHERE id = 1), 30)
+		FROM user_sessions s WHERE s.id = $1
+	`, user.SessionID).Scan(&expiresAt, &ttlMinutes); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError)
+	}
+	return c.JSON(fiber.Map{"expiresAt": expiresAt, "now": time.Now(), "ttlMinutes": ttlMinutes})
 }
 
 func (s *server) requireUser(c *fiber.Ctx) error {

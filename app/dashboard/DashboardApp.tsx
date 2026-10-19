@@ -27,6 +27,7 @@ import SocialOAuthButton, { type SocialProvider, useSocialAvailability } from ".
 import AdminMailView from "./AdminMailView";
 import DiscordBotView from "./DiscordBotView";
 import AdminBotsView from "./AdminBotsView";
+import SessionGuard from "../components/SessionGuard";
 import MailSettingsPanel from "./MailSettingsPanel";
 import SmartImage from "../components/SmartImage";
 import StoreClosedNotice from "../components/StoreClosedNotice";
@@ -854,6 +855,7 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
         </div>
       </section>
       {notice && <FeedbackToast notice={notice} onClose={() => setNotice(null)} />}
+      <SessionGuard />
       {confirmRequest && <ConfirmDialog request={confirmRequest} busy={confirmBusy} onClose={() => setConfirmRequest(null)} onConfirm={async () => {
         setConfirmBusy(true);
         try { await confirmRequest.action(); setConfirmRequest(null); }
@@ -4677,7 +4679,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
 
                   <SettingRow
                     title="อยู่ในระบบได้นานแค่ไหน"
-                    description="ไม่ได้ใช้งานเกินนี้ต้องเข้าสู่ระบบใหม่ มีผลกับการเข้าสู่ระบบครั้งถัดไป"
+                    description="ไม่ได้ใช้งานเกินนี้ต้องเข้าสู่ระบบใหม่ ก่อนหมดเวลาจะมีหน้าต่างถามว่ายังใช้งานอยู่ไหม มีผลกับทุกคนตั้งแต่การใช้งานครั้งถัดไป"
                   >
                     <div style={{ display: 'grid', gap: '10px', width: '100%', maxWidth: '420px' }}>
                       <div className="session-ttl-input-wrap">

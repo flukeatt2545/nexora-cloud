@@ -1,0 +1,50 @@
+/* Session notice (SessionGuard): centred over everything, theme tokens only. */
+.sg-backdrop {
+  position: fixed; inset: 0; z-index: 2147483000;
+  display: grid; place-items: center; padding: 16px;
+  background: var(--theme-overlay);
+  backdrop-filter: blur(3px);
+  animation: sg-fade .2s ease-out;
+}
+.sg-dialog {
+  width: min(400px, 100%);
+  display: grid; justify-items: center; gap: 10px;
+  padding: 28px 24px 22px;
+  border: 1px solid var(--control-line); border-radius: 18px;
+  background: var(--theme-elevated); color: var(--theme-text-strong);
+  box-shadow: 0 24px 60px -18px var(--theme-shadow);
+  text-align: center;
+  animation: sg-rise .3s cubic-bezier(.2, .75, .25, 1);
+}
+.sg-dialog h2 { margin: 6px 0 0; font-size: 19px; font-weight: 700; }
+.sg-dialog p { margin: 0; color: var(--theme-text-soft); font-size: 14px; line-height: 1.6; }
+.sg-icon {
+  display: grid; place-items: center; width: 56px; height: 56px;
+  border-radius: 16px; background: var(--primary-soft); color: var(--primary-ink);
+}
+.sg-dialog.is-expired .sg-icon { animation: sg-shake .5s .2s ease-in-out; }
+.sg-count { font-size: 34px; font-weight: 700; letter-spacing: .02em; font-variant-numeric: tabular-nums; color: var(--primary-ink); }
+.sg-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: 100%; margin-top: 8px; }
+.sg-btn {
+  flex: 1 1 140px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 16px;
+  border: 1px solid var(--control-line); border-radius: 11px;
+  background: var(--theme-elevated); color: var(--theme-text-strong);
+  font: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer;
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+.sg-btn:disabled { opacity: .6; cursor: not-allowed; }
+.sg-btn-primary { border-color: transparent; background: var(--primary); color: #fff; }
+.sg-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+@media (hover: hover) {
+  .sg-btn:hover:not(:disabled) { border-color: var(--primary-border); color: var(--primary-ink); }
+  .sg-btn.sg-btn-primary:hover:not(:disabled) { border-color: transparent; background: var(--primary-hover); color: #fff; }
+}
+.sg-spinner { width: 15px; height: 15px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: sg-spin .7s linear infinite; }
+@keyframes sg-fade { from { opacity: 0; } }
+@keyframes sg-rise { from { opacity: 0; transform: translateY(14px) scale(.97); } }
+@keyframes sg-shake { 20%, 60% { transform: rotate(-8deg); } 40%, 80% { transform: rotate(8deg); } }
+@keyframes sg-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .sg-backdrop, .sg-dialog, .sg-dialog.is-expired .sg-icon { animation: none; }
+}

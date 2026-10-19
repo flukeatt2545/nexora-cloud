@@ -17,6 +17,7 @@ import { asciiInputProps, hasNonAscii } from "../lib/asciiInput";
 import { API_BASE } from "../runtime";
 import MailView from "./MailView";
 import BotsView from "./BotsView";
+import SessionGuard from "../components/SessionGuard";
 import "./user-overview.css";
 import SmartImage from "../components/SmartImage";
 import { POINTS_EVENT, broadcastPoints } from "../components/StorePurchase";
@@ -892,6 +893,7 @@ export default function UserApp({ view }: { view: UserView }) {
       )}
 
       {notice && <UserFeedbackToast notice={notice} onClose={() => setNotice(null)} />}
+      <SessionGuard />
       {confirmRequest && <UserConfirmDialog request={confirmRequest} busy={confirmBusy} onClose={() => setConfirmRequest(null)} onConfirm={async () => {
         setConfirmBusy(true);
         try { await confirmRequest.action(); setConfirmRequest(null); }

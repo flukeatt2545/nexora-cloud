@@ -12,6 +12,7 @@ import { asciiInputProps, hasNonAscii, latinAlphanumericInputProps } from "./lib
 import SiteNavbar, { SESSION_EVENT } from "./components/SiteNavbar";
 import { getDocumentTitle, type SiteTitleMode } from "./pageTitle";
 import { API_BASE } from "./runtime";
+import { takeReturnPath } from "./components/SessionGuard";
 import { OwnedPurchaseList, POINTS_EVENT, PurchaseDialog, broadcastPoints, formatPointAmount, type OwnedPurchase } from "./components/StorePurchase";
 import { richTextToPlain } from "./lib/safeHtml";
 import Link from "next/link";
@@ -884,6 +885,11 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
         const user = payload?.authenticated && payload.user ? payload.user : null;
         setSessionUser(user);
         if (!user) setAccountOpen(false);
+        // The session-expired notice sends people here to sign in again.
+        if (new URLSearchParams(window.location.search).get("next") === "relogin" && !user) {
+          setAuthMode("login");
+          setAuthOpen(true);
+        }
         if (new URLSearchParams(window.location.search).get("next") === "vps-uptime") {
           window.sessionStorage.setItem("nexora_vps_uptime_return", "1");
           if (user) {
@@ -1133,6 +1139,11 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
     if (window.sessionStorage.getItem("nexora_vps_uptime_return") === "1") {
       window.sessionStorage.removeItem("nexora_vps_uptime_return");
       window.location.href = "/api/vps-uptime/start";
+      return;
+    }
+    const back = takeReturnPath();
+    if (back) {
+      window.location.href = back;
       return;
     }
     const pending = pendingProductRef.current;
