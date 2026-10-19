@@ -28,6 +28,7 @@ import AdminMailView from "./AdminMailView";
 import DiscordBotView from "./DiscordBotView";
 import AdminBotsView from "./AdminBotsView";
 import SessionGuard from "../components/SessionGuard";
+import SessionTtlField from "./SessionTtlField";
 import MailSettingsPanel from "./MailSettingsPanel";
 import SmartImage from "../components/SmartImage";
 import StoreClosedNotice from "../components/StoreClosedNotice";
@@ -4681,40 +4682,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                     title="อยู่ในระบบได้นานแค่ไหน"
                     description="ไม่ได้ใช้งานเกินนี้ต้องเข้าสู่ระบบใหม่ ก่อนหมดเวลาจะมีหน้าต่างถามว่ายังใช้งานอยู่ไหม มีผลกับทุกคนตั้งแต่การใช้งานครั้งถัดไป"
                   >
-                    <div style={{ display: 'grid', gap: '10px', width: '100%', maxWidth: '420px' }}>
-                      <div className="session-ttl-input-wrap">
-                        <input
-                          type="number"
-                          className="premium-input"
-                          min={15}
-                          max={43200}
-                          value={settings.sessionTtlMinutes}
-                          onChange={(e) => set("sessionTtlMinutes", Number(e.target.value))}
-                        />
-                        <span className="ttl-unit-tag">นาที</span>
-                      </div>
-                      <div className="ttl-preset-pills">
-                        <span className="ttl-hint-text" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          เท่ากับ <strong>{settings.sessionTtlMinutes >= 1440 ? `${Number((settings.sessionTtlMinutes / 1440).toFixed(1)).toLocaleString("th-TH")} วัน` : `${Number((settings.sessionTtlMinutes / 60).toFixed(1)).toLocaleString("th-TH")} ชั่วโมง`}</strong>
-                        </span>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          {[
-                            { label: "1 วัน", mins: 1440 },
-                            { label: "7 วัน", mins: 10080 },
-                            { label: "30 วัน", mins: 43200 }
-                          ].map(preset => (
-                            <button
-                              key={preset.mins}
-                              type="button"
-                              className={`ttl-preset-btn ${settings.sessionTtlMinutes === preset.mins ? 'active' : ''}`}
-                              onClick={() => set("sessionTtlMinutes", preset.mins)}
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+                    <SessionTtlField value={settings.sessionTtlMinutes} onChange={(minutes) => set("sessionTtlMinutes", minutes)} />
                   </SettingRow>
                 </div>
 
