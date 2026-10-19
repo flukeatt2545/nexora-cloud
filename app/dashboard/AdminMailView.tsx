@@ -1,6 +1,6 @@
 "use client";
 import {
-  Check, ChevronDown, ChevronLeft, CircleAlert, CloudCog, Copy, Globe2, Inbox, Mail, MailPlus, Plus,
+  Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CloudCog, Copy, Globe2, Inbox, Mail, MailPlus, Plus,
   RefreshCw, Search, Send, Settings2, X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -644,10 +644,10 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
                       return (
                         <li key={box.id} id={`mx-box-${box.id}`} className={`mx-box${focusBox === box.id ? " is-focus" : ""}`}>
                           <div className="mx-box-main">
-                            <span className="mx-box-avatar" aria-hidden="true">{(box.displayName || box.address).charAt(0).toUpperCase()}</span>
+                            <Link className="mx-box-avatar" href={`/mail?mailbox=${encodeURIComponent(box.id)}`} tabIndex={-1} aria-hidden="true">{(box.displayName || box.address).charAt(0).toUpperCase()}</Link>
                             <div className="mx-box-name">
                               <span className="mx-box-address">
-                                <strong>{box.address}</strong>
+                                <Link className="mx-box-open" href={`/mail?mailbox=${encodeURIComponent(box.id)}`} title="เปิดอ่านอีเมลของกล่องนี้"><strong>{box.address}</strong></Link>
                                 {copyButton(box.address, `box:${box.id}`, "อีเมล")}
                               </span>
                               <small>{box.displayName || "ไม่มีชื่อที่แสดง"}{box.status !== "active" && <> · {box.status}</>}</small>
@@ -663,6 +663,9 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
                             <i><b className={usage > 90 ? "is-full" : ""} style={{ width: `${usage}%` }} /></i>
                             <small>{formatBytes(box.usedBytes)} จาก {formatBytes(box.quotaBytes)} · ส่งได้ {box.dailySendLimit} ฉบับต่อวัน</small>
                           </div>
+                          <Link className="mx-box-go" href={`/mail?mailbox=${encodeURIComponent(box.id)}`}>
+                            <Inbox size={15} aria-hidden="true" /> เปิดกล่องจดหมาย <ChevronRight size={15} aria-hidden="true" />
+                          </Link>
                           {broken && (
                             <p className="mx-box-error"><CircleAlert size={14} aria-hidden="true" /> เซิร์ฟเวอร์รับเมลยังไม่มีกล่องนี้{box.provisionError ? `: ${box.provisionError}` : ""}</p>
                           )}

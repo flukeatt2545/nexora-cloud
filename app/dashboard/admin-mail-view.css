@@ -145,6 +145,17 @@
 .mx-box-name { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 .mx-box-address { display: flex; align-items: center; gap: 2px; min-width: 0; }
 .mx-box-address strong { min-width: 0; overflow: hidden; color: var(--theme-text-strong); font-size: 15px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.mx-box-avatar { text-decoration: none; }
+.mx-box-open { min-width: 0; color: inherit; text-decoration: none; }
+.mx-box-open:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.mx-box-go { display: flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 12px; border: 1px solid var(--control-line); border-radius: 9px; background: var(--theme-elevated); color: var(--theme-text-strong); font-size: 14px; font-weight: 600; text-decoration: none; transition: border-color .15s, color .15s, background-color .15s; }
+.mx-box-go svg:last-child { margin-left: auto; color: var(--theme-text-soft); transition: transform .2s; }
+@media (hover: hover) {
+  .mx-box-open:hover strong { color: var(--primary-ink); }
+  .mx-box-go:hover { border-color: var(--primary-border); background: var(--primary-soft); color: var(--primary-ink); }
+  .mx-box-go:hover svg:last-child { transform: translateX(3px); color: inherit; }
+}
+.mx-box-go:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .mx-box-address .dbv-copy { flex: 0 0 auto; width: 30px; height: 30px; }
 .mx-box-name small { overflow: hidden; color: var(--theme-text-soft); font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
 .mx-box-facts { display: grid; gap: 4px; margin: 0; font-size: 13.5px; }

@@ -75,6 +75,34 @@
 .wm-switch select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .wm-switch select option { background: var(--theme-elevated); color: var(--theme-text-strong); }
 .wm-switch svg { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); color: var(--theme-text-soft); pointer-events: none; }
+/* Mailbox picker: the current mailbox is the button; the list opens under it */
+.wm-box { grid-template-columns: minmax(0, 1fr) auto; }
+.wm-picker { min-width: 0; }
+.wm-picker-button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 0; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.wm-picker-button:disabled { cursor: default; }
+.wm-picker-button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.wm-picker-end { display: inline-flex; align-items: center; gap: 6px; color: var(--theme-text-soft); }
+.wm-picker-end svg { transition: transform .2s; }
+.wm-picker.is-open .wm-picker-end svg { transform: rotate(180deg); }
+.wm-picker-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+.wm-picker-pop { position: fixed; z-index: 100020; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--control-line); border-radius: 12px; background: var(--theme-elevated); color: var(--theme-text-strong); box-shadow: 0 18px 40px -12px var(--theme-shadow); animation: wm-pop .16s ease-out; }
+@keyframes wm-pop { from { opacity: 0; transform: translateY(-6px); } }
+.wm-picker-search { display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--theme-line-soft); color: var(--theme-text-soft); }
+.wm-picker-search input { flex: 1; min-width: 0; height: 40px; border: 0; background: none; color: var(--theme-text-strong); font: inherit; font-size: 14px; outline: none; }
+.wm-picker-scroll { overflow-y: auto; padding: 4px 6px 8px; overscroll-behavior: contain; }
+.wm-picker-domain { margin: 8px 8px 4px; color: var(--theme-text-soft); font-size: 12.5px; font-weight: 700; }
+.wm-picker-none { margin: 0; padding: 18px 12px; color: var(--theme-text-soft); font-size: 13.5px; text-align: center; }
+.wm-picker-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 6px 8px; border: 0; border-radius: 9px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.wm-picker-option .wm-avatar { width: 32px; height: 32px; flex-basis: 32px; font-size: 13px; }
+.wm-picker-option.is-active { background: var(--primary-soft); }
+.wm-picker-option:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.wm-picker-text { display: grid; min-width: 0; }
+.wm-picker-text b { overflow: hidden; font-size: 14.5px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.wm-picker-text small { overflow: hidden; color: var(--theme-text-soft); font-size: 12.5px; white-space: nowrap; text-overflow: ellipsis; }
+.wm-picker-count { min-width: 22px; padding: 2px 7px; border-radius: 20px; background: var(--primary); color: #fff; font-size: 11.5px; font-weight: 700; text-align: center; }
+.wm-picker-check { color: var(--primary-ink); }
+@media (hover: hover) { .wm-picker-option:hover:not(.is-active) { background: var(--theme-hover); } }
+@media (max-width: 560px) { .wm-picker-pop { left: 8px !important; width: calc(100vw - 16px) !important; } }
 .wm-skeleton-line { grid-column: 1 / -1; height: 36px; border-radius: 8px; background: var(--theme-hover); }
 
 .wm-avatar { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border: 1px solid var(--wm-line); border-radius: 50%; background: var(--control-surface); color: var(--theme-text-soft); font-size: 14px; font-weight: 700; line-height: 1; }
@@ -422,4 +450,6 @@
   .wm-spin, .wm-spinner, .wm-skeleton span { animation: none; }
   .wm-backdrop, .wm-dialog { animation: none; }
   .wm-btn, .wm-icon-btn, .wm-row, .wm-folders button, .wm-copy, .wm-files a { transition: none; }
+  .wm-picker-pop { animation: none; }
+  .wm-picker-end svg { transition: none; }
 }

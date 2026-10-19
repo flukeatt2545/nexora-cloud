@@ -1,13 +1,14 @@
 "use client";
 
 import {
-  ArchiveRestore, ChevronDown, ChevronLeft, Download, File, Forward, Inbox, Mail, MailOpen, MailPlus,
+  ArchiveRestore, ChevronLeft, Download, File, Forward, Inbox, Mail, MailOpen, MailPlus,
   Paperclip, RefreshCw, Reply, ReplyAll, Search, Send, Settings2, SquarePen, Trash2, X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE } from "../runtime";
 import { useEscape, useScrollLock } from "./useScrollLock";
 import MailCompose from "./MailCompose";
+import MailboxPicker from "./MailboxPicker";
 import MailManage from "./MailManage";
 import {
   api, bytes, CopyButton, emptyCompose, escapeHTML, fullDate, initial, localPart, shortDate,
@@ -83,13 +84,23 @@ function MailImageViewer({ image, onClose }: { image: ViewedImage | null; onClos
   );
 }
 
+const ENTITIES: Record<string, string> = { "&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" };
+
 /**
- * The API cuts previews at a byte count, which can split a Thai character and leave a
+ * Previews are the first bytes of the mail as sent: some carry HTML tags, line breaks and
+ * non-breaking spaces, and the API's byte cut can split a Thai character and leave a
  * replacement character (U+FFFD) at the end; drop the broken tail and mark the cut.
  */
+const BROKEN_TAIL = new RegExp(`${String.fromCharCode(0xfffd)}+$`);
 const cleanPreview = (value: string) => {
-  const trimmed = value.replace(/�+$/, "").trimEnd();
-  return trimmed.length < value.length ? `${trimmed}…` : trimmed;
+  const cut = BROKEN_TAIL.test(value);
+  const text = value
+    .replace(BROKEN_TAIL, "")
+    .replace(/<[^>]*>?/g, " ")
+    .replace(/&(nbsp|amp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity] || " ")
+    .replace(/[\s\p{Cf}]+/gu, " ")
+    .trim();
+  return cut ? `${text}…` : text;
 };
 
 const people = (list: Recipient[] | undefined, kind: string) => (list || []).filter((item) => item.kind === kind);
@@ -114,13 +125,24 @@ export default function MailView({ notify }: { notify: Notice }) {
   const [compose, setCompose] = useState<ComposeState | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
   const readerRef = useRef<HTMLElement>(null);
+  const linkedMailbox = useRef(typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("mailbox") || "");
   const copyFailed = useCallback(() => notify({ kind: "error", text: "คัดลอกไม่ได้ ลองคลิกที่หน้าเว็บแล้วกดอีกครั้ง" }), [notify]);
 
   const refreshBootstrap = useCallback(async () => {
     const data = await api<{ mailboxes: Mailbox[] }>("/api/mail/bootstrap");
-    setMailboxes(data.mailboxes || []);
-    setMailboxId((current) => (data.mailboxes || []).some((item) => item.id === current) ? current : data.mailboxes?.[0]?.id || "");
-  }, []);
+    const list = data.mailboxes || [];
+    // /mail?mailbox=<id> (the admin mail page links here) opens that mailbox first.
+    const wanted = linkedMailbox.current;
+    linkedMailbox.current = "";
+    if (wanted && !list.some((item) => item.id === wanted)) {
+      notify({ kind: "error", text: "เปิดกล่องนั้นไม่ได้ เพราะบัญชีนี้ไม่ได้เป็นเจ้าของหรือสมาชิกของกล่อง" });
+    }
+    setMailboxes(list);
+    setMailboxId((current) => {
+      const pick = wanted && list.some((item) => item.id === wanted) ? wanted : current;
+      return list.some((item) => item.id === pick) ? pick : list[0]?.id || "";
+    });
+  }, [notify]);
 
   const messagesUrl = useCallback((cursor = 0) =>
     `/api/mail/messages?mailboxId=${encodeURIComponent(mailboxId)}&folder=${folder}&q=${encodeURIComponent(search)}${cursor ? `&cursor=${cursor}` : ""}`,
@@ -198,6 +220,8 @@ export default function MailView({ notify }: { notify: Notice }) {
   }
   function chooseMailbox(id: string) {
     setMailboxId(id);
+    // Keep the open mailbox in the address, so a reload or a shared link comes back to it.
+    window.history.replaceState(null, "", `${window.location.pathname}?mailbox=${encodeURIComponent(id)}`);
     setItems([]);
     closeMessage();
   }
@@ -362,25 +386,9 @@ export default function MailView({ notify }: { notify: Notice }) {
       <div className={`wm-shell${selected ? " is-reading" : ""}`}>
         <nav className="wm-nav" aria-label="กล่องอีเมลและโฟลเดอร์">
           <div className="wm-box">
-            {mailbox ? (
+            {mailbox && mailboxes ? (
               <>
-                <span className="wm-avatar wm-box-avatar" aria-hidden="true">{initial(mailbox.displayName || mailbox.address)}</span>
-                <span className="wm-box-text">
-                  <strong>{mailbox.displayName || localPart(mailbox.address)}</strong>
-                  {mailboxes && mailboxes.length > 1 ? (
-                    <label className="wm-switch">
-                      <span className="wm-sr">เปลี่ยนกล่องอีเมล</span>
-                      <select value={mailboxId} onChange={(event) => chooseMailbox(event.target.value)} title="เปลี่ยนกล่องอีเมล">
-                        {mailboxes.map((item) => (
-                          <option key={item.id} value={item.id}>{item.address}{item.unread ? ` (${item.unread})` : ""}</option>
-                        ))}
-                      </select>
-                      <ChevronDown size={14} aria-hidden="true" />
-                    </label>
-                  ) : (
-                    <span className="wm-addr" title={mailbox.address}>{mailbox.address}</span>
-                  )}
-                </span>
+                <MailboxPicker mailboxes={mailboxes} current={mailbox} onChoose={chooseMailbox} />
                 <CopyButton value={mailbox.address} onError={copyFailed} />
               </>
             ) : (
