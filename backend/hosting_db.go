@@ -31,8 +31,9 @@ func (s *server) rotateTenantDatabasePassword(ctx context.Context, databaseID in
 	if databaseID <= 0 {
 		return nil
 	}
-	var dbName, dbUser string
-	err := s.db.QueryRow(ctx, `SELECT db_name, db_user FROM hosting_databases WHERE id=$1`, databaseID).Scan(&dbName, &dbUser)
+	var dbName, dbUser, oldCiphertext string
+	var siteID *int64
+	err := s.db.QueryRow(ctx, `SELECT db_name, db_user, db_password_enc, site_id FROM hosting_databases WHERE id=$1`, databaseID).Scan(&dbName, &dbUser, &oldCiphertext, &siteID)
 	if err != nil {
 		return err
 	}
@@ -50,8 +51,68 @@ func (s *server) rotateTenantDatabasePassword(ctx context.Context, databaseID in
 	if _, err := admin.ExecContext(ctx, "ALTER USER "+mysqlAccountName(dbUser)+" IDENTIFIED BY '"+escapedPass+"'"); err != nil {
 		return err
 	}
-	_, err = s.db.Exec(ctx, `UPDATE hosting_databases SET db_password_enc=$1, updated_at=NOW() WHERE id=$2`, ciphertext, databaseID)
-	return err
+	if _, err = s.db.Exec(ctx, `UPDATE hosting_databases SET db_password_enc=$1, updated_at=NOW() WHERE id=$2`, ciphertext, databaseID); err != nil {
+		return err
+	}
+	if siteID != nil {
+		if oldPass, decryptErr := decryptSecret(oldCiphertext, s.cfg.hostingEncryptionKey); decryptErr == nil {
+			s.updateSitePasswordVariables(ctx, *siteID, oldPass, newPass)
+		}
+	}
+	return nil
+}
+
+// updateSitePasswordVariables gives the new database password to the website that uses it. A
+// site keeps its database password in environment variables (DB_PASS, DB_PASSWORD...); after a
+// rotation those still held the old one and the site lost its database (124snru, 2026-10). Every
+// variable whose value was the old password gets the new one, and the site is restarted.
+func (s *server) updateSitePasswordVariables(ctx context.Context, siteID int64, oldPass, newPass string) {
+	if oldPass == "" {
+		return
+	}
+	rows, err := s.db.Query(ctx, `SELECT id, value_ciphertext FROM hosting_environment_variables WHERE site_id=$1`, siteID)
+	if err != nil {
+		log.Printf("[ERROR] site %d password variables: %v", siteID, err)
+		return
+	}
+	var matches []int64
+	for rows.Next() {
+		var id int64
+		var value string
+		if rows.Scan(&id, &value) != nil {
+			continue
+		}
+		if plain, err := decryptSecret(value, s.cfg.hostingEncryptionKey); err == nil && plain == oldPass {
+			matches = append(matches, id)
+		}
+	}
+	rows.Close()
+	if len(matches) == 0 {
+		return
+	}
+	newCiphertext, err := encryptSecret(newPass, s.cfg.hostingEncryptionKey)
+	if err != nil {
+		return
+	}
+	if _, err := s.db.Exec(ctx, `UPDATE hosting_environment_variables SET value_ciphertext=$1, updated_at=NOW() WHERE id = ANY($2)`, newCiphertext, matches); err != nil {
+		log.Printf("[ERROR] site %d password variables update: %v", siteID, err)
+		return
+	}
+	// Restart so the running container reads the new value; skipped when another job is running,
+	// which restarts it anyway.
+	_, err = s.db.Exec(ctx, `
+		INSERT INTO hosting_operations
+		  (operation_id,site_id,actor_user_id,kind,idempotency_key,request_hash,state,phase,
+		   started_at,timeout_seconds,error_code,error_message,retryable,metadata)
+		SELECT $1, s.id, s.owner_user_id, 'runtime.restart', $2, $3, 'queued', 'pending', NOW(), 300, '', '', TRUE,
+		       jsonb_build_object('sitePublicId', s.public_id, 'reason', 'database_password_rotated')
+		FROM hosting_sites s
+		WHERE s.id=$4 AND s.deleted_at IS NULL AND s.status='running'
+		ON CONFLICT DO NOTHING
+	`, randomHex(16), "db-rotate-"+randomHex(12), requestDigest("runtime.restart", []byte(newCiphertext)), siteID)
+	if err != nil {
+		log.Printf("[ERROR] site %d restart after password rotation: %v", siteID, err)
+	}
 }
 
 func quoteMySQLIdentifier(value string) string {
