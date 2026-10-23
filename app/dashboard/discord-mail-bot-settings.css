@@ -1,4 +1,5 @@
-/* Discord bots (/admin/discord-bot). Builds on .aov panels and the .hv-* fields. */
+/* Per-bot settings cards on /admin/discord-bot (mail self-service, voice rooms, protection,
+   history, messages). The bot cards themselves live in discord-bots-view.css. */
 .dbot-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
 /* Cards in a row share one height; the footer sits at the bottom of each. */
 .dbot-card { overflow: hidden; display: flex; flex-direction: column; }
@@ -14,16 +15,10 @@
 .dbot-types button:disabled { cursor: wait; }
 .dbot-count { font-variant-numeric: tabular-nums; }
 
-/* Preview: a member-list entry, drawn with theme tokens rather than Discord's own colours. */
+/* Preview block, used by the voice bot message preview. */
 .dbot-preview { display: grid; gap: 8px; }
 .dbot-preview > small { color: var(--theme-text-soft); font-size: 13px; }
-.dbot-member { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--theme-line-soft); border-radius: 10px; background: var(--theme-input); }
 .dbot-avatar { position: relative; width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center; border-radius: 50%; background: var(--primary); color: #fff; font-size: 16px; font-weight: 700; }
-.dbot-avatar i { position: absolute; right: -2px; bottom: -2px; width: 14px; height: 14px; border: 3px solid var(--theme-input); border-radius: 50%; background: var(--success-ink, #22c55e); } /* theme-ok: online dot */
-.dbot-member-copy { min-width: 0; display: grid; gap: 1px; }
-.dbot-member-copy b { display: flex; align-items: center; gap: 6px; color: var(--theme-text-strong); font-size: 15px; font-weight: 600; }
-.dbot-member-copy em { padding: 1px 5px; border-radius: 4px; background: var(--primary); color: #fff; font-size: 10.5px; font-style: normal; font-weight: 700; letter-spacing: .02em; }
-.dbot-member-copy > span { overflow: hidden; color: var(--theme-text-soft); font-size: 13.5px; white-space: nowrap; text-overflow: ellipsis; }
 
 /* Self-service card: a switch row and two number fields side by side. */
 .dbot-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--theme-line-soft); border-radius: 10px; background: var(--theme-input); }
@@ -68,29 +63,6 @@
 .dbot-secret input { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13.5px; }
 .dbot-dialog-note { margin: 0; color: var(--theme-text-soft); font-size: 14px; line-height: 1.55; }
 .dbot-token-dialog .hv-dialog-foot .hv-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none; }
-
-/* One group per bot: a heading strip (name, status, token), then that bot's cards. */
-.dbot-group { display: grid; gap: 16px; }
-.dbot-group + .dbot-group { margin-top: 32px; }
-.dbot-conn { display: grid; gap: 12px; padding: 16px 18px; }
-.dbot-conn-main { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.dbot-conn-avatar { width: 44px; height: 44px; flex: 0 0 44px; overflow: hidden; }
-.dbot-conn-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.dbot-conn-avatar.is-empty { background: var(--primary-soft); color: var(--primary-ink); }
-.dbot-conn-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
-.dbot-conn-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
-.dbot-conn-title h2 { margin: 0; color: var(--theme-text-strong); font-size: 18px; font-weight: 700; line-height: 1.35; }
-.dbot-conn-title .hv-status { padding: 3px 8px; font-size: 12.5px; }
-.dbot-conn-copy p { margin: 0; color: var(--theme-text-soft); font-size: 14px; line-height: 1.5; }
-.dbot-conn-copy small { color: var(--theme-text-soft); font-size: 13px; line-height: 1.5; }
-.dbot-conn-copy .dbot-conn-error { color: var(--danger); }
-.dbot-conn-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; flex: 0 0 auto; }
-.dbot-conn-actions .hv-btn { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; }
-.dbot-conn-actions .dbot-state { flex: 0 0 auto; }
-/* A bot with a single card: it spans the row, options on the left and the preview on the right. */
-.dbot-grid > .dbot-card:only-child { grid-column: 1 / -1; }
-.dbot-grid > .dbot-card:only-child > .dbot-body { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
-.dbot-grid > .dbot-card:only-child .dbot-preview { grid-column: 2; grid-row: 1 / span 2; align-self: start; }
 
 /* Voice bot messages: the form on the left, a Discord-like preview of the message on the right. */
 .dvm-body { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; align-items: start; }
@@ -153,8 +125,6 @@
   .dbot-grid { grid-template-columns: minmax(0, 1fr); }
   .dpr-body { grid-template-columns: minmax(0, 1fr); row-gap: 14px; }
   .dvm-body { grid-template-columns: minmax(0, 1fr); row-gap: 20px; }
-  .dbot-grid > .dbot-card:only-child > .dbot-body { grid-template-columns: minmax(0, 1fr); }
-  .dbot-grid > .dbot-card:only-child .dbot-preview { grid-column: auto; grid-row: auto; }
 }
 @media (max-width: 560px) {
   .aov-panel > .dbot-card-head, .dbot-body { padding-inline: 14px; }
@@ -164,11 +134,6 @@
   .dbot-types button { flex: 1 1 30%; padding: 0 6px; }
   .dbot-foot .hv-btn { flex: 1; }
   .dbot-fields { grid-template-columns: minmax(0, 1fr); }
-  .dbot-conn { padding: 14px; }
-  .dbot-conn-main { flex-wrap: wrap; align-items: flex-start; }
-  .dbot-conn-copy { flex-basis: calc(100% - 58px); }
-  .dbot-conn-actions { flex-basis: 100%; justify-content: stretch; }
-  .dbot-conn-actions .hv-btn { flex: 1; justify-content: center; }
   .dbot-rooms li { flex-wrap: wrap; padding-inline: 14px; }
   .dvs-tools { flex-wrap: wrap; padding-inline: 14px; }
   .dvs-search { flex-basis: 100%; }

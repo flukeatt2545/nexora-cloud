@@ -2,8 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CircleAlert, CircleCheck, ExternalLink, Eye, EyeOff, KeyRound, Plug, UserPlus, X } from "lucide-react";
-import { api } from "./DiscordMailBotSettings";
+import { CircleAlert, CircleCheck, ExternalLink, Eye, EyeOff, KeyRound, UserPlus, X } from "lucide-react";
+import { api, type BotKey } from "./DiscordMailBotSettings";
 import { useEscape, useScrollLock } from "./useScrollLock";
 
 type Notice = (notice: { kind: "success" | "error"; text: string }) => void;
@@ -46,21 +46,12 @@ function statusOf(connection: Connection) {
 }
 
 /**
- * The heading strip of one bot's group: its name, whether it is online, and (for superadmins)
- * its token and invite link, with a dialog to enter the token.
+ * One bot's connection, polled so the card shows it coming online after a new token.
+ * Only superadmins can read it; for everyone else it stays empty and nothing is fetched.
  */
-export function DiscordBotConnection({ notify, botKey, botName, description, canManage }: {
-  notify: Notice;
-  botKey: "nexora" | "mail" | "voice";
-  botName: string;
-  description: string;
-  canManage: boolean;
-}) {
+export function useBotConnection(botKey: BotKey, canManage: boolean) {
   const [connection, setConnection] = useState<Connection | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [open, setOpen] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState(false);
-  const [removing, setRemoving] = useState(false);
 
   const load = useCallback(() => {
     if (!canManage) return;
@@ -71,10 +62,33 @@ export function DiscordBotConnection({ notify, botKey, botName, description, can
 
   useEffect(() => {
     const first = window.setTimeout(load, 0);
-    // Keep the status fresh so the strip shows the bot coming online after a new token.
     const timer = window.setInterval(() => { if (!document.hidden) load(); }, 15000);
     return () => { window.clearTimeout(first); window.clearInterval(timer); };
   }, [load]);
+
+  const status = connection ? statusOf(connection) : null;
+  const fromEnv = connection?.status.source === "env";
+  const connected = Boolean(connection && (connection.configured || fromEnv));
+  const botTag = connection?.botUsername || connection?.status.botTag || "";
+  return { connection, setConnection, loadError, status, fromEnv, connected, botTag };
+}
+
+export type BotConnectionState = ReturnType<typeof useBotConnection>;
+
+/**
+ * The connection row inside a bot card: who the bot is, where its token comes from, and
+ * (for superadmins) the token and invite buttons, with a dialog to enter the token.
+ */
+export function BotConnectionStrip({ notify, botKey, botName, conn }: {
+  notify: Notice;
+  botKey: BotKey;
+  botName: string;
+  conn: BotConnectionState;
+}) {
+  const { connection, setConnection, loadError, status, fromEnv, connected, botTag } = conn;
+  const [open, setOpen] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   async function remove() {
     setRemoving(true);
@@ -90,12 +104,6 @@ export function DiscordBotConnection({ notify, botKey, botName, description, can
     }
   }
 
-  const status = connection ? statusOf(connection) : null;
-  const fromEnv = connection?.status.source === "env";
-  const connected = Boolean(connection && (connection.configured || fromEnv));
-  const botTag = connection?.botUsername || connection?.status.botTag || "";
-
-  // One short line under the description: who the bot is and where its token comes from.
   const facts: string[] = [];
   if (connection && connected) {
     if (botTag) facts.push(botTag);
@@ -106,51 +114,45 @@ export function DiscordBotConnection({ notify, botKey, botName, description, can
   }
 
   return (
-    <header className="aov-panel dbot-conn">
-      <div className="dbot-conn-main">
-        <span className={`dbot-avatar dbot-conn-avatar${connected ? "" : " is-empty"}`} aria-hidden="true">
-          {connection?.botAvatarUrl ? <img src={connection.botAvatarUrl} alt="" /> : connected ? (botTag || botName).slice(0, 1).toUpperCase() : <Plug size={18} />}
-        </span>
-        <div className="dbot-conn-copy">
-          <div className="dbot-conn-title">
-            <h2>{botName}</h2>
-            {status && <span className={`hv-status ${status.tone}`}>{status.text}</span>}
-          </div>
-          <p>{description}</p>
-          {facts.length > 0 && <small>{facts.join(" · ")}</small>}
-          {loadError && <small className="dbot-conn-error">โหลดสถานะไม่สำเร็จ: {loadError}</small>}
-        </div>
-        {canManage && connection && (
-          <div className="dbot-conn-actions">
-            {confirmRemove ? (
-              <>
-                <span className="dbot-state">บอทจะออฟไลน์</span>
-                <button type="button" className="hv-btn" onClick={() => setConfirmRemove(false)} disabled={removing}>ไม่ลบ</button>
-                <button type="button" className="hv-btn hv-btn-danger-ghost" onClick={() => void remove()} disabled={removing}>ลบเลย</button>
-              </>
-            ) : connected ? (
-              <>
-                {connection.inviteUrl && (
-                  <a className="hv-btn" href={connection.inviteUrl} target="_blank" rel="noreferrer">
-                    <UserPlus size={16} aria-hidden="true" /> เชิญเข้าเซิร์ฟเวอร์
-                  </a>
-                )}
-                {connection.configured && (
-                  <button type="button" className="hv-btn hv-btn-danger-ghost" onClick={() => setConfirmRemove(true)}>ลบ token</button>
-                )}
-                <button type="button" className="hv-btn" onClick={() => setOpen(true)}>{connection.configured ? "เปลี่ยน token" : "ใส่ token ในเว็บ"}</button>
-              </>
-            ) : (
-              <button type="button" className="hv-btn hv-btn-primary" onClick={() => setOpen(true)}>
-                <KeyRound size={16} aria-hidden="true" /> ใส่ token
-              </button>
-            )}
-          </div>
-        )}
+    <div className="dbx-conn">
+      <div className="dbx-conn-row">
+        <KeyRound size={16} className="dbx-conn-icon" aria-hidden="true" />
+        <p className="dbx-conn-facts">
+          {loadError ? <span className="dbx-conn-error">โหลดสถานะไม่สำเร็จ: {loadError}</span>
+            : connection ? facts.join(" · ")
+            : <><i className="aov-skel wide" aria-hidden="true" /><span className="sr-only">กำลังโหลดการเชื่อมต่อ</span></>}
+        </p>
       </div>
+      {connection && (
+        <div className="dbx-conn-actions">
+          {confirmRemove ? (
+            <>
+              <span className="dbx-conn-warn" role="status">บอทจะออฟไลน์</span>
+              <button type="button" className="hv-btn" onClick={() => setConfirmRemove(false)} disabled={removing}>ไม่ลบ</button>
+              <button type="button" className="hv-btn hv-btn-danger-ghost" onClick={() => void remove()} disabled={removing}>ลบเลย</button>
+            </>
+          ) : connected ? (
+            <>
+              {connection.inviteUrl && (
+                <a className="hv-btn" href={connection.inviteUrl} target="_blank" rel="noreferrer">
+                  <UserPlus size={16} aria-hidden="true" /> เชิญเข้าเซิร์ฟเวอร์
+                </a>
+              )}
+              <button type="button" className="hv-btn" onClick={() => setOpen(true)}>{connection.configured ? "เปลี่ยน token" : "ใส่ token ในเว็บ"}</button>
+              {connection.configured && (
+                <button type="button" className="hv-btn hv-btn-danger-ghost" onClick={() => setConfirmRemove(true)}>ลบ token</button>
+              )}
+            </>
+          ) : (
+            <button type="button" className="hv-btn hv-btn-primary" onClick={() => setOpen(true)}>
+              <KeyRound size={16} aria-hidden="true" /> ใส่ token
+            </button>
+          )}
+        </div>
+      )}
 
       {status?.text === "token ใช้ไม่ได้" && (
-        <div className="hv-callout is-error dbot-conn-alert">
+        <div className="hv-callout is-error">
           <CircleAlert size={18} aria-hidden="true" />
           <p><strong>Discord ไม่รับ token นี้</strong><span>{fromEnv ? "อาจถูก Reset ไปแล้ว ใส่ token ใหม่ที่นี่ได้เลย บอทจะใช้แทนตัวในไฟล์ .env" : "อาจถูก Reset ไปแล้ว ใส่ตัวใหม่"}</span></p>
         </div>
@@ -165,7 +167,7 @@ export function DiscordBotConnection({ notify, botKey, botName, description, can
           onSaved={(data) => { setConnection(data); notify({ kind: "success", text: `เชื่อม ${data.botUsername || botName} แล้ว` }); }}
         />
       )}
-    </header>
+    </div>
   );
 }
 

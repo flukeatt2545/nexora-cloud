@@ -1,0 +1,116 @@
+/* Discord bots (/admin/discord-bot): a grid of bot cards, then each bot's own settings.
+   Builds on .aov panels and the .hv-* buttons and fields; every class here starts with dbx-. */
+.dbx {
+  /* Discord's member list is dark in either theme, so the preview keeps its colours. */
+  --dbx-dc-bg: #2b2d31;
+  --dbx-dc-hover: #35373c;
+  --dbx-dc-line: #1e1f22;
+  --dbx-dc-name: #f2f3f5;
+  --dbx-dc-text: #b5bac1;
+  --dbx-dc-muted: #949ba4;
+  --dbx-dc-blurple: #5865f2;
+  --dbx-dc-online: #23a55a;
+  --dbx-dc-offline: #80848e;
+  gap: 20px;
+}
+
+/* Cards: as many columns as fit, one on a phone. */
+.dbx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 16px; align-items: stretch; }
+.dbx-card { overflow: hidden; }
+
+.dbx-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 16px 14px; }
+.dbx-mark { width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; overflow: hidden; border-radius: 12px; background: var(--primary-soft); color: var(--primary-ink); }
+.dbx-mark img { width: 100%; height: 100%; object-fit: cover; }
+.dbx-head-copy { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.dbx-title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.dbx .dbx-title h2 { margin: 0; color: var(--theme-text-strong); font-size: 17px; font-weight: 700; line-height: 1.35; }
+.dbx-head-copy > p { margin: 0; color: var(--theme-text-soft); font-size: 14px; line-height: 1.5; }
+
+.dbx-pill { padding: 3px 9px; border-radius: 999px; font-size: 12.5px; }
+.dbx-pill > i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
+.dbx-pill.is-loading > i { animation: aov-pulse 1.2s ease-in-out infinite; }
+
+/* Connection row (superadmins): what Discord reported, then the token buttons. */
+.dbx-conn { display: grid; gap: 10px; margin: 0 16px; padding: 12px 0 14px; border-top: 1px solid var(--theme-line-soft); }
+.dbx-conn-row { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.dbx-conn-icon { flex: 0 0 auto; margin-top: 2px; color: var(--theme-text-soft); }
+.dbx-conn-facts { flex: 1; min-width: 0; margin: 0; color: var(--theme-text-soft); font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.dbx-conn-facts .aov-skel { width: 80%; }
+.dbx-conn-error { color: var(--danger); }
+.dbx-conn-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.dbx-conn-actions .hv-btn { height: 34px; padding: 0 12px; font-size: 14px; }
+.dbx-conn-warn { margin-right: auto; color: var(--danger); font-size: 13.5px; font-weight: 600; }
+
+/* Status form: preview, type, text, then save. */
+.dbx-form { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.dbx-body { flex: 1; display: grid; align-content: start; gap: 16px; padding: 16px; border-top: 1px solid var(--theme-line-soft); }
+.dbx-error { align-items: flex-start; }
+.dbx-retry { justify-self: start; }
+
+.dbx-dc { display: grid; gap: 8px; margin: 0; }
+.dbx-dc > figcaption { color: var(--theme-text-soft); font-size: 13px; font-weight: 600; }
+.dbx-dc-list { padding: 12px 8px 10px; border: 1px solid var(--dbx-dc-line); border-radius: 10px; background: var(--dbx-dc-bg); }
+.dbx-dc-group { margin: 0 8px 6px; color: var(--dbx-dc-muted); font-size: 11.5px; font-weight: 700; letter-spacing: .04em; }
+.dbx-dc-member { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 6px 8px; border-radius: 6px; background: var(--dbx-dc-hover); }
+.dbx-dc-member.is-offline { opacity: .6; }
+.dbx-dc-avatar { position: relative; width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 50%; background: var(--dbx-dc-blurple); color: var(--dbx-dc-name); font-size: 15px; font-weight: 700; }
+.dbx-dc-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.dbx-dc-avatar i { position: absolute; right: -3px; bottom: -3px; width: 15px; height: 15px; border: 3px solid var(--dbx-dc-hover); border-radius: 50%; background: var(--dbx-dc-online); }
+.dbx-dc-member.is-offline .dbx-dc-avatar i { background: var(--dbx-dc-offline); }
+.dbx-dc-copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.dbx-dc-name { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.dbx-dc-name b { overflow: hidden; color: var(--dbx-dc-name); font-size: 15px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.dbx-dc-name em { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; height: 15px; padding: 0 4px; border-radius: 3px; background: var(--dbx-dc-blurple); color: var(--dbx-dc-name); font-size: 10px; font-style: normal; font-weight: 700; line-height: 1; }
+.dbx-dc-activity { overflow: hidden; color: var(--dbx-dc-text); font-size: 13px; line-height: 1.4; white-space: nowrap; text-overflow: ellipsis; }
+.dbx-dc-activity b { color: var(--dbx-dc-text); font-weight: 600; }
+.dbx-dc-activity .aov-skel { width: 60%; background: var(--dbx-dc-line); }
+
+/* Activity type: five equal segments, icon over label. */
+.dbx-seg { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; padding: 3px; border: 1px solid var(--control-line); border-radius: 10px; background: var(--theme-input); }
+.dbx-seg button { min-width: 0; display: grid; justify-items: center; gap: 4px; padding: 8px 2px 7px; border: 0; border-radius: 7px; background: none; color: var(--theme-text-soft); font: inherit; font-size: 12.5px; font-weight: 500; line-height: 1.2; cursor: pointer; transition: background-color .15s, color .15s; }
+.dbx-seg button span { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dbx-seg button:hover:not(:disabled) { background: var(--theme-hover); color: var(--theme-text-strong); }
+.dbx-seg button.is-active { background: var(--theme-elevated); color: var(--primary-ink); font-weight: 600; box-shadow: 0 0 0 1px var(--primary-border); }
+.dbx-seg button:disabled { cursor: wait; }
+.dbx-seg button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+.dbx-text input:focus-visible { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.dbx-text input[aria-invalid="true"] { border-color: var(--danger); }
+.dbx-count { font-variant-numeric: tabular-nums; transition: color .15s; }
+.dbx .dbx-count.is-warn { color: var(--warning-ink, #fbbf24); font-weight: 600; }
+.dbx .dbx-count.is-max { color: var(--danger); font-weight: 600; }
+.dbx .dbx-hint.is-error { color: var(--danger); }
+
+/* Loading: the shapes of the type and text fields. */
+.dbx-skel { display: grid; gap: 8px; }
+.dbx .dbx-skel .aov-skel { display: block; }
+.dbx .dbx-skel-label { width: 88px; height: 12px; }
+.dbx .dbx-skel-seg { width: 100%; height: 58px; border-radius: 10px; }
+.dbx .dbx-skel-input { width: 100%; height: 40px; border-radius: 9px; }
+.dbx .dbx-skel-seg + .dbx-skel-label { margin-top: 8px; }
+
+.dbx-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--theme-line-soft); }
+.dbx-dirty { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; color: var(--theme-text-soft); font-size: 13.5px; }
+.dbx .dbx-dirty.is-dirty { color: var(--warning-ink, #fbbf24); font-weight: 600; }
+.dbx-dirty > i { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
+
+/* Per-bot settings: a heading, then one group per bot that has any. */
+.dbx-extras { display: grid; gap: 20px; margin-top: 12px; }
+.dbx-section-head { display: grid; gap: 2px; }
+.dbx .dbx-section-head h2 { margin: 0; color: var(--theme-text-strong); font-size: 20px; font-weight: 700; line-height: 1.3; }
+.dbx-section-head p { margin: 0; color: var(--theme-text-soft); font-size: 14px; }
+.dbx-extra-group { display: grid; gap: 12px; }
+.dbx-extra-group > h3 { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--theme-text-strong); font-size: 15.5px; font-weight: 700; }
+.dbx-extra-mark { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; background: var(--primary-soft); color: var(--primary-ink); }
+
+@media (max-width: 560px) {
+  .dbx-head { padding: 14px 14px 12px; }
+  .dbx-conn { margin-inline: 14px; }
+  .dbx-conn-actions .hv-btn { flex: 1 1 auto; }
+  .dbx-body { padding: 14px; }
+  .dbx-seg { gap: 2px; padding: 2px; }
+  .dbx-seg button { padding-inline: 0; font-size: 11.5px; letter-spacing: -.01em; }
+  .dbx-foot { flex-wrap: wrap; padding-inline: 14px; }
+  .dbx-dirty { flex-basis: 100%; }
+  .dbx-foot .hv-btn { flex: 1; }
+}

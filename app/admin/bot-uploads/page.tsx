@@ -82,7 +82,8 @@ export default function AdminBotUploadsPage() {
   );
 
   useEffect(() => {
-    void load(0, false);
+    const timer = window.setTimeout(() => void load(0, false), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const applyFilters = () => {
@@ -200,7 +201,6 @@ export default function AdminBotUploadsPage() {
             {items.map((item) => (
               <article className="abu-card" key={item.id}>
                 <a className="abu-thumb" href={item.url} target="_blank" rel="noreferrer" title="เปิดรูปเต็ม">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={item.url} alt={item.filename || "รูปที่อัปโหลด"} loading="lazy" />
                 </a>
                 <div className="abu-meta">

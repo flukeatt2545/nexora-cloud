@@ -1,24 +1,21 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Bot, CircleAlert, MailPlus } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { CircleAlert, MailPlus } from "lucide-react";
 import { API_BASE } from "../runtime";
 import "./discord-mail-bot-settings.css";
 
 type Notice = (notice: { kind: "success" | "error"; text: string }) => void;
-type DiscordBotSettings = {
-  activityType: "playing" | "watching" | "listening" | "competing" | "custom";
+
+export type BotKey = "nexora" | "mail" | "voice";
+export type ActivityType = "playing" | "watching" | "listening" | "competing" | "custom";
+type DiscordBotPresence = {
+  activityType: ActivityType;
   activityText: string;
   preview: string;
 };
 
-const activityOptions = [
-  { value: "playing", label: "กำลังเล่น" },
-  { value: "watching", label: "กำลังดู" },
-  { value: "listening", label: "กำลังฟัง" },
-  { value: "competing", label: "กำลังแข่ง" },
-  { value: "custom", label: "กำหนดเอง" },
-] as const;
+export const ACTIVITY_TEXT_MAX = 128;
 
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -32,46 +29,24 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   return payload as T;
 }
 
-function previewLabel(type: string, text: string, fallback: string) {
-  const value = text || fallback;
-  if (type === "custom") return value;
-  const option = activityOptions.find((item) => item.value === type);
-  return `${option?.label || "กำลังดู"} ${value}`;
-}
-
-export function DiscordMailBotSettings({
-  notify,
-  botKey,
-  title,
-  description,
-  previewName,
-  defaultText,
-}: {
-  notify: Notice;
-  botKey: "nexora" | "mail" | "voice";
-  title: string;
-  description: string;
-  previewName: string;
-  defaultText: string;
-}) {
-  const [form, setForm] = useState<DiscordBotSettings>({
-    activityType: "watching",
-    activityText: defaultText,
-    preview: previewLabel("watching", defaultText, defaultText),
-  });
-  const [saved, setSaved] = useState<DiscordBotSettings | null>(null);
+/**
+ * The status under one bot's name: what the server has saved, what the admin is typing,
+ * and saving or putting it back. GET/PUT /api/admin/discord-bots/{botKey}.
+ */
+export function useBotPresence(botKey: BotKey, defaultText: string, notify: Notice) {
+  const [form, setForm] = useState<{ activityType: ActivityType; activityText: string }>({ activityType: "watching", activityText: defaultText });
+  const [saved, setSaved] = useState<DiscordBotPresence | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
-    api<DiscordBotSettings>(`/api/admin/discord-bots/${botKey}`)
+    setLoadError("");
+    api<DiscordBotPresence>(`/api/admin/discord-bots/${botKey}`)
       .then((data) => {
-        const next = { activityType: data.activityType, activityText: data.activityText, preview: data.preview };
-        setForm(next);
-        setSaved(next);
-        setLoadError("");
+        setForm({ activityType: data.activityType, activityText: data.activityText });
+        setSaved(data);
       })
       .catch((error) => setLoadError((error as Error).message || "โหลดการตั้งค่าไม่สำเร็จ"))
       .finally(() => setLoading(false));
@@ -82,24 +57,19 @@ export function DiscordMailBotSettings({
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  const preview = useMemo(
-    () => previewLabel(form.activityType, form.activityText.trim(), defaultText),
-    [defaultText, form.activityType, form.activityText],
-  );
   const dirty = Boolean(saved && (saved.activityType !== form.activityType || saved.activityText !== form.activityText));
+  const valid = form.activityText.trim().length > 0 && form.activityText.length <= ACTIVITY_TEXT_MAX;
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    if (!dirty || !valid) return;
     setBusy(true);
     try {
-      const data = await api<DiscordBotSettings>(`/api/admin/discord-bots/${botKey}`, {
+      const data = await api<DiscordBotPresence>(`/api/admin/discord-bots/${botKey}`, {
         method: "PUT",
-        body: JSON.stringify({
-          activityType: form.activityType,
-          activityText: form.activityText,
-        }),
+        body: JSON.stringify({ activityType: form.activityType, activityText: form.activityText }),
       });
-      setForm(data);
+      setForm({ activityType: data.activityType, activityText: data.activityText });
       setSaved(data);
       notify({ kind: "success", text: "บันทึกแล้ว Discord จะเปลี่ยนในไม่กี่วินาที" });
     } catch (error) {
@@ -109,88 +79,11 @@ export function DiscordMailBotSettings({
     }
   }
 
-  const textId = `dbot-text-${botKey}`;
-  return (
-    <form className="aov-panel dbot-card" onSubmit={(event) => void save(event)} aria-busy={loading}>
-      <header className="dbot-card-head">
-        <span className="dbot-mark" aria-hidden="true"><Bot size={18} /></span>
-        <div>
-          <h2>{title}</h2>
-          <p>{description}</p>
-        </div>
-      </header>
+  function reset() {
+    if (saved) setForm({ activityType: saved.activityType, activityText: saved.activityText });
+  }
 
-      {loadError ? (
-        <div className="dbot-body">
-          <div className="hv-callout is-error">
-            <CircleAlert size={18} aria-hidden="true" />
-            <p><strong>โหลดไม่ได้</strong><span>{loadError}</span></p>
-            <button type="button" onClick={load}>ลองอีกครั้ง</button>
-          </div>
-        </div>
-      ) : (
-        <div className="dbot-body">
-          <div className="hv-field">
-            <span id={`${textId}-type`}>ประเภท</span>
-            <div className="th-chips dbot-types" role="radiogroup" aria-labelledby={`${textId}-type`}>
-              {activityOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={form.activityType === option.value}
-                  className={form.activityType === option.value ? "is-active" : ""}
-                  onClick={() => setForm({ ...form, activityType: option.value })}
-                  disabled={loading}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="hv-field">
-            <div className="hv-field-row">
-              <label htmlFor={textId}>ข้อความ</label>
-              <small className="dbot-count">{form.activityText.trim().length}/128</small>
-            </div>
-            <input
-              id={textId}
-              value={form.activityText}
-              maxLength={128}
-              onChange={(event) => setForm({ ...form, activityText: event.target.value })}
-              placeholder={defaultText}
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div className="dbot-preview" aria-live="polite">
-            <small>ตัวอย่างใน Discord</small>
-            <div className="dbot-member">
-              <span className="dbot-avatar" aria-hidden="true">{previewName.slice(0, 1)}<i /></span>
-              <span className="dbot-member-copy">
-                <b>{previewName} <em>BOT</em></b>
-                <span>{loading ? <i className="aov-skel" /> : preview}</span>
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!loadError && (
-        <footer className="dbot-foot">
-          <span className="dbot-state">{loading ? "กำลังโหลด..." : dirty ? "ยังไม่ได้บันทึก" : "ไม่มีอะไรเปลี่ยน"}</span>
-          {dirty && (
-            <button type="button" className="hv-btn" onClick={() => saved && setForm(saved)} disabled={busy}>ยกเลิก</button>
-          )}
-          <button className="hv-btn hv-btn-primary" disabled={busy || loading || !dirty}>
-            {busy && <span className="hv-spinner" aria-hidden="true" />}
-            {busy ? "กำลังบันทึก..." : "บันทึก"}
-          </button>
-        </footer>
-      )}
-    </form>
-  );
+  return { form, setForm, saved, loading, loadError, busy, dirty, valid, load, save, reset };
 }
 
 type SelfServiceSettings = {
