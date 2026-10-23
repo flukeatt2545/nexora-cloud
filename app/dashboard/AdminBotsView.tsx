@@ -2,8 +2,9 @@
 
 // /admin/bots: every Discord bot users run here. Admins add a bot (their own or for someone),
 // stop one that misbehaves, give one more memory, and set how many bots a person may have.
-// Laid out as a fleet roster: one status strip, the roster itself, then quotas (bf-* classes).
-import { CircleAlert, ExternalLink, Minus, Plus, Power, RefreshCw, RotateCcw, Search, SlidersHorizontal, UserPlus, X } from "lucide-react";
+// Built on the shared admin page parts (aov-*, hv-*, th-*) like the databases and hosting pages;
+// only the bot-specific pieces live in bots-view.css (bf-*).
+import { Activity, Bot as BotIcon, CheckCircle2, CircleAlert, CircleDot, ExternalLink, MemoryStick, Minus, Plus, Power, RefreshCw, RotateCcw, Search, SlidersHorizontal, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import type { Ask, Notify } from "./types";
@@ -11,6 +12,8 @@ import { useEscape, useScrollLock } from "./useScrollLock";
 import { BotAvatar, botApi, botIsUp, botSend, botStatusView, errorMessage, runtimeLabel, type Bot, type StatusTone } from "./botsShared";
 import BotCreateWizard from "./BotCreateWizard";
 import Link from "next/link";
+import "./admin-overview.css";
+import "./hosting-view.css";
 import "./bots-view.css";
 
 type Owner = { id: number; username: string; limit: number | null; bots: number };
@@ -23,13 +26,8 @@ const filters: { id: Filter; label: string }[] = [
   { id: "off", label: "ปิดอยู่" },
 ];
 
-// The fleet strip's segments, in the order they sit on the bar.
-const segments: { tone: StatusTone; label: string }[] = [
-  { tone: "online", label: "ออนไลน์" },
-  { tone: "busy", label: "กำลังเปิด/ปิด" },
-  { tone: "bad", label: "มีปัญหา" },
-  { tone: "off", label: "ปิดอยู่" },
-];
+// Status pill per tone, in the hosting page's colours.
+const statusClass: Record<StatusTone, string> = { online: "is-running", busy: "is-provisioning", bad: "is-error", off: "" };
 
 const memoryOptions = [128, 256, 384, 512, 768, 1024, 1536, 2048];
 const cpuOptions = [100, 250, 500, 750, 1000, 1500, 2000];
@@ -38,6 +36,13 @@ const diskOptions = [256, 512, 1024, 2048, 4096];
 const megabytes = (value: number) => (value >= 1024 ? `${(value / 1024).toLocaleString("th-TH", { maximumFractionDigits: 2 })} GB` : `${value} MB`);
 const cores = (millicores: number) => (millicores / 1000).toLocaleString("th-TH", { maximumFractionDigits: 2 });
 const clock = (date: Date) => date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+function StatusIcon({ tone }: { tone: StatusTone }) {
+  if (tone === "online") return <CheckCircle2 size={13} aria-hidden="true" />;
+  if (tone === "busy") return <span className="hv-spinner bf-status-spin" aria-hidden="true" />;
+  if (tone === "bad") return <CircleAlert size={13} aria-hidden="true" />;
+  return <CircleDot size={13} aria-hidden="true" />;
+}
 
 export default function AdminBotsView({ notify, ask }: { notify: Notify; ask: Ask }) {
   const [bots, setBots] = useState<Bot[] | null>(null);
@@ -89,7 +94,7 @@ export default function AdminBotsView({ notify, ask }: { notify: Notify; ask: As
     setRefreshing(false);
   }
 
-  // Everything counts by the status the row shows, so the strip, the chips and the rows agree.
+  // Everything counts by the status the row shows, so the summary, the chips and the rows agree.
   const counts = useMemo(() => {
     const list = bots || [];
     const tones: Record<StatusTone, number> = { online: 0, busy: 0, bad: 0, off: 0 };
@@ -155,11 +160,14 @@ export default function AdminBotsView({ notify, ask }: { notify: Notify; ask: As
     const value = raw === "" ? defaultLimit : Number(raw);
     const allowed = owner.limit ?? defaultLimit;
     return (
-      <li key={owner.id} className={`bf-quota-row${dirty ? " is-dirty" : ""}`}>
-        <span className="bf-quota-name">{owner.username}</span>
-        <span className={`bf-quota-use${owner.bots > allowed ? " is-over" : ""}`}>
-          <b>{owner.bots}</b> / {allowed} ตัว{owner.limit === null && <small>ค่าเริ่มต้น</small>}
-        </span>
+      <li key={owner.id} className={`hv-row bf-quota-row${dirty ? " is-dirty" : ""}`}>
+        <div className="hv-site">
+          <span className="bf-initial" aria-hidden="true">{owner.username.charAt(0).toUpperCase()}</span>
+          <div className="hv-site-copy">
+            <span className="bf-quota-name">{owner.username}</span>
+            <small className={`hv-site-domain${owner.bots > allowed ? " bf-over" : ""}`}><span className="bf-nowrap">มี {owner.bots} จาก {allowed} ตัว</span>{owner.limit === null && <span className="bf-nowrap"> · ค่าเริ่มต้น</span>}</small>
+          </div>
+        </div>
         <form className="bf-quota-edit" onSubmit={(event: FormEvent) => { event.preventDefault(); void saveLimit(owner); }}>
           <span className="bf-stepper">
             <button type="button" onClick={() => stepLimit(owner, -1)} disabled={value <= 0} aria-label={`ลดโควตาของ ${owner.username}`}><Minus size={15} aria-hidden="true" /></button>
@@ -167,8 +175,8 @@ export default function AdminBotsView({ notify, ask }: { notify: Notify; ask: As
             <button type="button" onClick={() => stepLimit(owner, 1)} disabled={value >= 50} aria-label={`เพิ่มโควตาของ ${owner.username}`}><Plus size={15} aria-hidden="true" /></button>
           </span>
           <span className="bf-quota-save">
-            <button type="submit" className="bf-btn is-primary is-sm" disabled={!dirty}>บันทึก</button>
-            <button type="button" className="bf-icon" onClick={() => forgetLimit(owner.id)} disabled={!dirty} aria-label={`ยกเลิกการแก้โควตาของ ${owner.username}`}><X size={15} aria-hidden="true" /></button>
+            <button type="submit" className="hv-btn hv-btn-primary" disabled={!dirty}>บันทึก</button>
+            <button type="button" className="hv-btn hv-icon-btn is-sm" onClick={() => forgetLimit(owner.id)} disabled={!dirty} aria-label={`ยกเลิกการแก้โควตาของ ${owner.username}`} title="ยกเลิก"><X size={15} aria-hidden="true" /></button>
           </span>
         </form>
       </li>
@@ -177,166 +185,162 @@ export default function AdminBotsView({ notify, ask }: { notify: Notify; ask: As
 
   const loading = bots === null && !failed;
   const empty = bots !== null && bots.length === 0;
+  const filtering = filter !== "all" || Boolean(query.trim());
+  const skel = (value: string | number) => (bots ? value : <i className="aov-skel" />);
   const noResult = filter === "bad" && !query.trim()
-    ? "ตอนนี้ไม่มีบอทที่มีปัญหา ทุกตัวทำงานปกติหรือปิดไว้ตามตั้งใจ"
+    ? "ตอนนี้ไม่มีบอทที่มีปัญหา"
     : filter === "online" && !query.trim()
-      ? "ยังไม่มีบอทตัวไหนออนไลน์อยู่ในตอนนี้"
+      ? "ยังไม่มีบอทตัวไหนออนไลน์"
       : filter === "off" && !query.trim()
-        ? "ไม่มีบอทที่ปิดอยู่ ทุกตัวกำลังทำงานหรือกำลังเปิด"
-        : `ไม่พบบอทที่ตรงกับ “${query.trim()}”${filter === "all" ? "" : ` ในกลุ่ม${filters.find((item) => item.id === filter)?.label}`}`;
+        ? "ไม่มีบอทที่ปิดอยู่"
+        : "ไม่พบบอทที่ตรงกับตัวกรอง";
 
   return (
-    <div className="bt bt-admin bf">
-      <header className="bf-head">
-        <div className="bf-head-copy">
-          <span className="bf-kicker">เว็บไซต์ · บอท Discord</span>
+    <div className="bt bt-admin aov hv bf" aria-busy={loading}>
+      <header className="aov-head">
+        <div>
+          <p className="aov-eyebrow">เว็บไซต์</p>
           <h1>บอทของผู้ใช้</h1>
-          <p>บอทที่ผู้ใช้เอามารันบนเซิร์ฟเวอร์นี้ เพิ่มบอทให้ใครก็ได้ ปิดตัวที่มีปัญหา ปรับทรัพยากร และกำหนดโควตาของแต่ละคน</p>
+          <p className="aov-sub">บอท Discord ที่ผู้ใช้รันบนเซิร์ฟเวอร์ เพิ่มบอทให้ใครก็ได้ ปิดตัวที่มีปัญหา ปรับทรัพยากร และกำหนดโควตา</p>
         </div>
-        <div className="bf-head-side">
-          <span className="bf-synced" aria-live="off">{loadedAt ? <>อัปเดต <time>{clock(loadedAt)}</time></> : "กำลังเชื่อมต่อ"}</span>
-          <button type="button" className="bf-btn" onClick={() => void refresh()} disabled={refreshing}>
-            <RefreshCw size={15} aria-hidden="true" className={refreshing ? "bt-spin" : ""} />รีเฟรช
+        <div className="aov-head-actions">
+          <button type="button" className="aov-btn" onClick={() => void refresh()} disabled={refreshing} aria-label="รีเฟรชข้อมูล" title="รีเฟรชข้อมูล">
+            <RefreshCw size={16} aria-hidden="true" className={refreshing ? "spin" : ""} />
           </button>
-          <button type="button" className="bf-btn is-primary" onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />เพิ่มบอท</button>
+          <button type="button" className="aov-btn aov-btn-label aov-btn-primary" onClick={() => setCreating(true)}>
+            <Plus size={16} aria-hidden="true" /> เพิ่มบอท
+          </button>
         </div>
       </header>
 
-      <section className={`bf-fleet${loading ? " is-loading" : ""}`} aria-label="สถานะของบอททั้งหมด" aria-busy={loading}>
-        <div className="bf-fleet-lead">
-          <span className="bf-label">ออนไลน์ตอนนี้</span>
-          <p className="bf-figure"><span className="bf-figure-n">{bots ? counts.online : "–"}</span><span>/ {bots ? counts.all : "–"} ตัว</span></p>
-        </div>
-        <div className="bf-fleet-mix">
-          <div className="bf-mix-bar" role="img" aria-label={segments.map((segment) => `${segment.label} ${counts[segment.tone]}`).join(" · ")}>
-            {segments.map((segment) => (
-              <i key={segment.tone} className={`is-${segment.tone}${counts[segment.tone] ? "" : " is-zero"}`} style={{ flexGrow: counts[segment.tone] }} />
-            ))}
-          </div>
-          <ul className="bf-mix-legend">
-            {segments.map((segment) => (
-              <li key={segment.tone} className={`is-${segment.tone}${segment.tone === "bad" && counts.bad > 0 ? " is-alert" : ""}`}>
-                <i aria-hidden="true" />{segment.label}<b>{bots ? counts[segment.tone] : "–"}</b>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <dl className="bf-fleet-ram">
-          <dt className="bf-label">RAM ที่จองไว้</dt>
-          <dd><span className="bf-ram-n">{bots ? megabytes(counts.memory) : "–"}</span><small>ให้บอทที่เปิดอยู่ {bots ? counts.up : "–"} ตัว</small></dd>
-        </dl>
-      </section>
-
       {failed && (
-        <div className="bf-alert" role="alert">
-          <CircleAlert size={18} aria-hidden="true" />
-          <p><b>ดึงรายการบอทไม่สำเร็จ</b><span>{failed}{bots ? " ตัวเลขที่เห็นอยู่เป็นข้อมูลรอบก่อน" : ""}</span></p>
-          <button type="button" className="bf-btn" onClick={() => void refresh()} disabled={refreshing}>ลองอีกครั้ง</button>
+        <div className="aov-status" role="alert">
+          <div className="aov-alert is-bad">
+            <CircleAlert size={18} aria-hidden="true" />
+            <span>ดึงรายการบอทไม่สำเร็จ: {failed}{bots ? " (ข้อมูลที่เห็นเป็นรอบก่อน)" : ""}</span>
+            <button type="button" className="bf-retry" onClick={() => void refresh()} disabled={refreshing}>ลองอีกครั้ง</button>
+          </div>
         </div>
       )}
 
-      <section className="bf-roster" aria-labelledby="bf-roster-title">
-        <header className="bf-roster-head">
-          <h2 id="bf-roster-title">รายชื่อบอท</h2>
-          {!empty && (
-            <>
-              <div className="bf-filters" role="group" aria-label="กรองสถานะ">
-                {filters.map((item) => (
-                  <button key={item.id} type="button" className={filter === item.id ? "is-active" : ""} aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>
-                    {item.label}<span>{bots ? counts[item.id] : "–"}</span>
-                  </button>
-                ))}
-              </div>
-              <label className="bf-search">
-                <Search size={16} aria-hidden="true" />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นชื่อบอท ชื่อใน Discord หรือเจ้าของ" aria-label="ค้นบอท" />
-                {query && <button type="button" className="bf-icon is-sm" onClick={() => setQuery("")} aria-label="ล้างคำค้น"><X size={14} aria-hidden="true" /></button>}
-              </label>
-            </>
-          )}
-        </header>
+      <section className="aov-kpis" aria-label="สรุปบอท">
+        <div className="aov-kpi">
+          <span className="aov-kpi-label"><span className="aov-kpi-icon" aria-hidden="true"><BotIcon size={16} /></span>บอททั้งหมด</span>
+          <strong>{skel(counts.all.toLocaleString("th-TH"))}</strong>
+          <span className="aov-kpi-note">{bots ? `กำลังเปิดหรือปิด ${counts.busy} ตัว` : "กำลังโหลด"}</span>
+        </div>
+        <div className="aov-kpi">
+          <span className="aov-kpi-label"><span className="aov-kpi-icon" aria-hidden="true"><Activity size={16} /></span>ออนไลน์</span>
+          <strong className={counts.online ? "is-ok" : ""}>{skel(counts.online.toLocaleString("th-TH"))}</strong>
+          <span className="aov-kpi-note">{bots ? `ปิดอยู่ ${counts.off} ตัว` : "กำลังโหลด"}</span>
+        </div>
+        <div className="aov-kpi">
+          <span className="aov-kpi-label"><span className="aov-kpi-icon" aria-hidden="true"><CircleAlert size={16} /></span>มีปัญหา</span>
+          <strong className={counts.bad ? "is-bad" : ""}>{skel(counts.bad.toLocaleString("th-TH"))}</strong>
+          <span className="aov-kpi-note">โค้ดพังหรือเปิดไม่สำเร็จ</span>
+        </div>
+        <div className="aov-kpi">
+          <span className="aov-kpi-label"><span className="aov-kpi-icon" aria-hidden="true"><MemoryStick size={16} /></span>RAM ที่จองไว้</span>
+          <strong>{skel(megabytes(counts.memory))}</strong>
+          <span className="aov-kpi-note">{bots ? `ของบอทที่เปิดอยู่ ${counts.up} ตัว` : "กำลังโหลด"}</span>
+        </div>
+      </section>
 
-        {!empty && (bots === null || shown.length > 0) && (
-          <div className="bf-cols" aria-hidden="true"><span>บอท</span><span>เจ้าของ</span><span>สถานะ</span><span>RAM · CPU</span><span>ดิสก์</span><span /></div>
+      <section className="aov-panel" aria-label="รายการบอท">
+        {!empty && (
+          <div className="th-filters">
+            <label className="th-search" role="search">
+              <Search size={17} aria-hidden="true" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Escape" && query) { event.preventDefault(); event.stopPropagation(); setQuery(""); } }}
+                placeholder="ค้นชื่อบอท ชื่อใน Discord หรือเจ้าของ"
+                aria-label="ค้นบอท"
+              />
+              {query && <button type="button" onClick={() => setQuery("")} aria-label="ล้างคำค้น"><X size={15} /></button>}
+            </label>
+            <div className="th-chips" role="group" aria-label="กรองสถานะ">
+              {filters.map((item) => (
+                <button key={item.id} type="button" className={filter === item.id ? "is-active" : ""} aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>
+                  {item.label}{item.id !== "all" && <span className="hv-chip-count">{bots ? counts[item.id] : "–"}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {!empty && (
+          <div className="th-meta" aria-live="polite">
+            <span>{loading ? "กำลังโหลด..." : bots === null ? "ยังโหลดรายการไม่ได้" : `${shown.length.toLocaleString("th-TH")} จาก ${counts.all.toLocaleString("th-TH")} บอท`}</span>
+            {filtering
+              ? <button type="button" onClick={() => { setQuery(""); setFilter("all"); }}>ล้างตัวกรอง</button>
+              : loadedAt && <span className="bf-synced">อัปเดตอัตโนมัติ · {clock(loadedAt)}</span>}
+          </div>
         )}
 
         {loading && (
-          <ul className="bf-list" aria-busy="true" aria-label="กำลังโหลดรายชื่อบอท">
-            {[0, 1, 2, 3].map((index) => (
-              <li key={index} className="bf-row is-skeleton" style={{ animationDelay: `${index * 120}ms` }}>
-                <span className="bf-bot"><i className="bf-sk is-avatar" /><span className="bf-bot-text"><i className="bf-sk" style={{ width: `${62 - index * 7}%` }} /><i className="bf-sk is-thin" /></span></span>
-                <span className="bf-owner"><i className="bf-sk" /></span>
-                <span className="bf-state"><i className="bf-sk" /></span>
-                <span className="bf-res"><i className="bf-sk" /></span>
-                <span className="bf-disk"><i className="bf-sk" /></span>
-                <span className="bf-actions" />
-              </li>
-            ))}
+          <ul className="hv-list" aria-busy="true">
+            {[0, 1, 2].map((index) => <li className="hv-row is-skeleton" key={index}><span /><span /><span /></li>)}
           </ul>
         )}
 
-        {bots === null && failed && <p className="bf-note">รายชื่อจะขึ้นตรงนี้เมื่อเชื่อมต่อเซิร์ฟเวอร์ได้</p>}
-
         {empty && (
-          <div className="bf-empty">
-            <ol className="bf-empty-ghost" aria-hidden="true"><li /><li /><li /></ol>
-            <div className="bf-empty-copy">
-              <h3>ยังไม่มีบอทสักตัวบนเซิร์ฟเวอร์</h3>
-              <p>เมื่อผู้ใช้เพิ่มบอทจากเมนู บอท Discord บอทจะมาเรียงแถวตรงนี้ หรือแอดมินจะเพิ่มให้ใครก่อนก็ได้ แต่ละคนเริ่มต้นสร้างได้ {defaultLimit} ตัว</p>
-              <div className="bf-empty-actions">
-                <button type="button" className="bf-btn is-primary" onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />เพิ่มบอทตัวแรก</button>
-                <Link className="bf-btn" href="/bots"><ExternalLink size={15} aria-hidden="true" />ดูหน้าที่ผู้ใช้เห็น</Link>
-              </div>
+          <div className="aov-empty hv-empty bf-empty">
+            <span>ยังไม่มีใครเพิ่มบอท ผู้ใช้เพิ่มเองได้ที่เมนู บอท Discord แต่ละคนสร้างได้ {defaultLimit} ตัวเป็นค่าเริ่มต้น</span>
+            <div className="bf-empty-actions">
+              <button type="button" onClick={() => setCreating(true)}>เพิ่มบอทตัวแรก</button>
+              <Link href="/bots">ดูหน้าที่ผู้ใช้เห็น</Link>
             </div>
           </div>
         )}
 
         {bots && bots.length > 0 && shown.length === 0 && (
-          <div className="bf-none">
-            <p>{noResult}</p>
-            <button type="button" className="bf-link" onClick={() => { setQuery(""); setFilter("all"); }}>ดูบอททั้งหมด {counts.all} ตัว</button>
+          <div className="aov-empty hv-empty">
+            <span>{noResult}</span>
+            <button type="button" onClick={() => { setQuery(""); setFilter("all"); }}>ดูบอททั้งหมด</button>
           </div>
         )}
 
         {shown.length > 0 && (
-          <ul key={filter} className="bf-list">
+          <ul className="hv-list">
+            <li className="hv-row bf-row hv-row-head" aria-hidden="true">
+              <span>บอท</span><span>เจ้าของ</span><span>ทรัพยากร</span><span>สถานะ</span><span />
+            </li>
             {shown.map((bot) => {
               const view = botStatusView(bot);
               const used = bot.resources.diskUsedMb;
               const fill = used === null ? 0 : Math.min(100, (used / Math.max(1, bot.resources.diskLimitMb)) * 100);
+              const disk = `ดิสก์ ${used ?? "–"} / ${megabytes(bot.resources.diskLimitMb)}`;
               return (
-                <li key={bot.id} className={`bf-row is-${view.tone}`}>
-                  <span className="bf-bot">
+                <li key={bot.id} className={`hv-row bf-row${view.tone === "bad" ? " bf-row-bad" : ""}`}>
+                  <div className="hv-site">
                     <BotAvatar bot={bot} size={36} />
-                    <span className="bf-bot-text">
-                      <b>{bot.name}</b>
-                      <span className="bf-bot-sub">
+                    <div className="hv-site-copy">
+                      <a className="hv-site-name" href={`/bots?id=${encodeURIComponent(bot.id)}`} title={bot.name}>{bot.name}</a>
+                      <small className="hv-site-domain bf-sub">
                         <span className={`bf-rt is-${bot.runtime}`}>{runtimeLabel[bot.runtime]}</span>
-                        {bot.discord.username ? <span className="bf-handle">@{bot.discord.username}</span> : <span className="bf-handle is-missing">ยังไม่ใส่โทเคน</span>}
-                      </span>
-                    </span>
-                  </span>
-                  <span className="bf-owner"><span className="bf-cell-label">เจ้าของ</span><span className="bf-owner-name">{bot.owner?.username || "-"}</span></span>
-                  <span className={`bf-state is-${view.tone}`}>
-                    <span className="bf-cell-label">สถานะ</span>
-                    <span className="bf-state-word"><i className="bf-dot" aria-hidden="true" />{view.label}</span>
-                    {bot.restartCount > 0 && <small><RotateCcw size={12} aria-hidden="true" />รีสตาร์ตเอง {bot.restartCount} ครั้ง</small>}
-                  </span>
+                        {bot.discord.username ? <span className="bf-handle">@{bot.discord.username}</span> : <span>ยังไม่ใส่โทเคน</span>}
+                      </small>
+                      <small className="hv-site-meta">
+                        @{bot.owner?.username || "-"} · <span className="bf-nowrap">{bot.resources.memoryMb} MB · {cores(bot.resources.cpuMillicores)} คอร์</span> · <span className="bf-nowrap">{disk}</span>
+                      </small>
+                    </div>
+                  </div>
+                  <span className="hv-cell hv-owner" title={bot.owner?.username || "-"}>@{bot.owner?.username || "-"}</span>
                   <span className="bf-res">
-                    <span className="bf-cell-label">RAM · CPU</span>
-                    <span className="bf-num">{bot.resources.memoryMb} MB</span>
-                    <small>{cores(bot.resources.cpuMillicores)} คอร์</small>
-                  </span>
-                  <span className="bf-disk">
-                    <span className="bf-cell-label">ดิสก์</span>
-                    <span className="bf-num">{used ?? "–"} <span>/ {megabytes(bot.resources.diskLimitMb)}</span></span>
+                    <span>{bot.resources.memoryMb} MB · {cores(bot.resources.cpuMillicores)} คอร์</span>
+                    <small>{disk}</small>
                     <span className={`bf-meter${fill >= 95 ? " is-full" : fill >= 80 ? " is-high" : ""}`} role="img" aria-label={used === null ? "ยังไม่รู้พื้นที่ที่ใช้" : `ใช้ดิสก์ไป ${Math.round(fill)}%`}><i style={{ width: `${fill}%` }} /></span>
                   </span>
-                  <span className="bf-actions">
-                    <a className="bf-act" href={`/bots?id=${encodeURIComponent(bot.id)}`} title="เปิดหน้าบอท (คอนโซล ไฟล์)" aria-label={`เปิดหน้าบอท ${bot.name}`}><ExternalLink size={16} aria-hidden="true" /><span>หน้าบอท</span></a>
-                    <button type="button" className="bf-act" onClick={() => setEditing(bot)} title="ปรับทรัพยากร" aria-label={`ปรับทรัพยากร ${bot.name}`}><SlidersHorizontal size={16} aria-hidden="true" /><span>ทรัพยากร</span></button>
-                    <button type="button" className="bf-act is-danger" onClick={() => stop(bot)} disabled={!botIsUp(bot) || Boolean(bot.pending)} title={botIsUp(bot) ? "ปิดบอท" : "บอทปิดอยู่แล้ว"} aria-label={`ปิดบอท ${bot.name}`}><Power size={16} aria-hidden="true" /><span>ปิดบอท</span></button>
+                  <span className="bf-state">
+                    <span className={`hv-status ${statusClass[view.tone]}`}><StatusIcon tone={view.tone} />{view.label}</span>
+                    {bot.restartCount > 0 && <small><RotateCcw size={12} aria-hidden="true" />รีสตาร์ตเอง {bot.restartCount} ครั้ง</small>}
                   </span>
+                  <div className="hv-row-actions">
+                    <a className="hv-btn hv-icon-btn" href={`/bots?id=${encodeURIComponent(bot.id)}`} title="เปิดหน้าบอท (คอนโซล ไฟล์)" aria-label={`เปิดหน้าบอท ${bot.name}`}><ExternalLink size={16} aria-hidden="true" /></a>
+                    <button type="button" className="hv-btn hv-icon-btn" onClick={() => setEditing(bot)} title="ปรับทรัพยากร" aria-label={`ปรับทรัพยากร ${bot.name}`}><SlidersHorizontal size={16} aria-hidden="true" /></button>
+                    <button type="button" className="hv-btn hv-btn-danger-ghost bf-stop" onClick={() => stop(bot)} disabled={!botIsUp(bot) || Boolean(bot.pending)} title={botIsUp(bot) ? "ปิดบอท" : "บอทไม่ได้ทำงานอยู่"} aria-label={`ปิดบอท ${bot.name}`}><Power size={15} aria-hidden="true" /><span>ปิดบอท</span></button>
+                  </div>
                 </li>
               );
             })}
@@ -344,26 +348,30 @@ export default function AdminBotsView({ notify, ask }: { notify: Notify; ask: As
         )}
       </section>
 
-      <section className="bf-quota" aria-labelledby="bf-quota-title">
-        <div className="bf-quota-intro">
+      <section className="aov-panel bf-quota" aria-labelledby="bf-quota-title">
+        <header>
           <h2 id="bf-quota-title">โควตาต่อคน</h2>
-          <p>ทุกคนสร้างบอทได้ <b>{defaultLimit} ตัว</b> เป็นค่าเริ่มต้น ปรับให้บางคนได้ตั้งแต่ 0 ถึง 50 ตัว หรือลบตัวเลขออกเพื่อกลับไปใช้ค่าเริ่มต้น</p>
-          <label className="bf-search">
-            <UserPlus size={16} aria-hidden="true" />
+          <span className="bf-quota-default">ค่าเริ่มต้น {defaultLimit} ตัวต่อคน</span>
+        </header>
+        <div className="th-filters">
+          <label className="th-search" role="search">
+            <UserPlus size={17} aria-hidden="true" />
             <input value={finder} onChange={(event) => setFinder(event.target.value)} placeholder="ค้นชื่อผู้ใช้เพื่อตั้งโควตา" aria-label="ค้นชื่อผู้ใช้" />
-            {finder && <button type="button" className="bf-icon is-sm" onClick={() => setFinder("")} aria-label="ล้างคำค้น"><X size={14} aria-hidden="true" /></button>}
+            {finder && <button type="button" onClick={() => setFinder("")} aria-label="ล้างคำค้น"><X size={15} /></button>}
           </label>
         </div>
-        <div className="bf-quota-body">
-          <div className="bf-quota-cols" aria-hidden="true"><span>{found !== null ? "ผลการค้น" : "คนที่มีบอทหรือโควตาพิเศษ"}</span><span>มี / ได้</span><span>โควตา</span></div>
-          {found !== null ? (
-            found.length === 0 ? <p className="bf-note">ไม่พบผู้ใช้ชื่อ “{finder.trim()}”</p> : <ul className="bf-quota-list">{found.map(quotaRow)}</ul>
-          ) : owners.length === 0 ? (
-            <p className="bf-note">ยังไม่มีใครมีบอทหรือโควตาพิเศษ ค้นชื่อผู้ใช้ทางซ้ายเพื่อให้โควตาล่วงหน้าได้</p>
-          ) : (
-            <ul className="bf-quota-list">{owners.map(quotaRow)}</ul>
-          )}
+        <div className="th-meta">
+          <span>{found !== null ? `ผลการค้น ${found.length} คน` : "คนที่มีบอทหรือมีโควตาพิเศษ"} · ตั้งได้ 0 ถึง 50 หรือลบตัวเลขเพื่อใช้ค่าเริ่มต้น</span>
         </div>
+        {found !== null ? (
+          found.length === 0
+            ? <div className="aov-empty hv-empty"><span>ไม่พบผู้ใช้ชื่อ “{finder.trim()}”</span></div>
+            : <ul className="hv-list">{found.map(quotaRow)}</ul>
+        ) : owners.length === 0 ? (
+          <div className="aov-empty hv-empty"><span>ยังไม่มีใครมีบอทหรือโควตาพิเศษ ค้นชื่อผู้ใช้ด้านบนเพื่อให้โควตาล่วงหน้าได้</span></div>
+        ) : (
+          <ul className="hv-list">{owners.map(quotaRow)}</ul>
+        )}
       </section>
 
       {editing && <ResourceDialog bot={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void load(); }} notify={notify} />}
