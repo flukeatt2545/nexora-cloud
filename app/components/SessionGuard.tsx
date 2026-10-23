@@ -8,7 +8,7 @@
 // touched the page for a minute carries X-Nexora-Idle, so pages that refresh themselves do not
 // keep an unattended session alive (backend platform.go authenticate).
 import { Clock3, LockKeyhole, LogIn } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { API_BASE } from "../runtime";
 import "./session-guard.css";
@@ -26,6 +26,25 @@ let fetchPatched = false;
 /** Set while the "ran out" notice is up: the page's own requests are answered 401 here, without
  *  going to the network, so they stop filling the console and the toasts with the same failure. */
 let sessionEnded = false;
+let lastTtlSeconds = 0;
+const endedListeners = new Set<() => void>();
+
+function markEnded() {
+  if (sessionEnded) return;
+  sessionEnded = true;
+  endedListeners.forEach((listener) => listener());
+}
+
+/** True once the guard has confirmed with the server that the session is over. The pages use it to
+ *  drop everything they were showing, so removing the notice in the inspector reveals nothing. A new
+ *  sign-in is a full page load, so this never needs to go back to false. */
+export function useSessionEnded() {
+  return useSyncExternalStore(
+    (listener) => { endedListeners.add(listener); return () => { endedListeners.delete(listener); }; },
+    () => sessionEnded,
+    () => false,
+  );
+}
 
 function isApiRequest(url: string) {
   try {
@@ -39,6 +58,8 @@ function isApiRequest(url: string) {
 
 // 401 from these is part of signing in, not a session that ran out.
 const AUTH_PATHS = ["/api/auth/login", "/api/auth/register", "/api/auth/oauth", "/api/auth/logout"];
+// The guard's own questions are answered in the guard; they do not raise the event again.
+const QUIET_PATHS = [...AUTH_PATHS, "/api/auth/session"];
 
 function patchFetch() {
   if (fetchPatched || typeof window === "undefined") return;
@@ -59,7 +80,7 @@ function patchFetch() {
     const response = await original(input, nextInit);
     if (response.status === 401) {
       const path = new URL(url, window.location.href).pathname;
-      if (!AUTH_PATHS.some((prefix) => path.startsWith(prefix))) window.dispatchEvent(new Event(EXPIRED_EVENT));
+      if (!QUIET_PATHS.some((prefix) => path.startsWith(prefix))) window.dispatchEvent(new Event(EXPIRED_EVENT));
     }
     return response;
   };
@@ -83,7 +104,7 @@ function idleText(seconds: number) {
 
 export default function SessionGuard() {
   const [status, setStatus] = useState<Status | null>(null);
-  const [expired, setExpired] = useState(false);
+  const [expired, setExpired] = useState(() => sessionEnded);
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   // Last time activity was reported; 0 until the first status, which counts as one.
@@ -95,35 +116,40 @@ export default function SessionGuard() {
     if (!lastExtend.current) lastExtend.current = Date.now();
     // An API from before seconds only reports whole minutes.
     const ttlSeconds = data.ttlSeconds ?? data.ttlMinutes * 60;
+    lastTtlSeconds = ttlSeconds;
     activeWindow = Math.max(5_000, Math.min(60_000, ttlSeconds * 500));
     setStatus({ expiresAt: new Date(data.expiresAt).getTime() - skew, ttlSeconds });
   }, []);
 
+  const end = useCallback(() => { setExpired(true); markEnded(); }, []);
+
   const check = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/api/auth/session`, { credentials: "include", cache: "no-store" });
-      if (response.status === 401) { setExpired(true); return; }
+      if (response.status === 401) { end(); return; }
       if (response.ok) apply(await response.json());
     } catch {
       // Offline for a moment: keep the last known end time.
     }
-  }, [apply]);
+  }, [apply, end]);
 
   const extend = useCallback(async () => {
     lastExtend.current = Date.now();
     try {
       const response = await fetch(`${API_BASE}/api/auth/session/extend`, { method: "POST", credentials: "include", cache: "no-store" });
-      if (response.status === 401) { setExpired(true); return false; }
+      if (response.status === 401) { end(); return false; }
       if (response.ok) { apply(await response.json()); return true; }
     } catch {
       // Try again on the next activity.
     }
     return false;
-  }, [apply]);
+  }, [apply, end]);
 
   useEffect(() => {
     patchFetch();
-    const onExpired = () => setExpired(true);
+    // A 401 somewhere only means "ask the server": a wrong current password also answers 401, and
+    // that must not take the page away.
+    const onExpired = () => void check();
     window.addEventListener(EXPIRED_EVENT, onExpired);
     const first = window.setTimeout(() => void check(), 0);
     const poll = window.setInterval(() => void check(), 60_000);
@@ -180,10 +206,54 @@ export default function SessionGuard() {
   // While the notice is up the page behind it is frozen: no scrolling (wheel, touch, keys) and no
   // tabbing into it.
   const open = expired || warning;
+  // The notice lives in a host element of its own so it can be put back if someone takes it out.
+  const host = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const element = document.createElement("div");
+    element.className = "sg-host";
+    return element;
+  }, []);
+  const backdropRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    sessionEnded = expired;
+    if (!open || !host) return;
+    document.body.appendChild(host);
+    return () => host.remove();
+  }, [open, host]);
+  // Once the session is over the notice stays: removed from the page, hidden with a style or a
+  // hidden attribute, it comes back at once. (The page behind it is already gone; see useSessionEnded.)
+  useEffect(() => {
+    if (!expired || !host) return;
+    const force = (element: HTMLElement | null, rules: Record<string, string>) => {
+      if (!element) return;
+      for (const [name, value] of Object.entries(rules)) {
+        if (element.style.getPropertyValue(name) !== value || element.style.getPropertyPriority(name) !== "important") element.style.setProperty(name, value, "important");
+      }
+      if (element.hidden) element.hidden = false;
+    };
+    let queued = false;
+    const enforce = () => {
+      queued = false;
+      if (!host.isConnected) document.body.appendChild(host);
+      const backdrop = backdropRef.current;
+      const dialog = dialogRef.current;
+      if (backdrop && backdrop.parentNode !== host) host.appendChild(backdrop);
+      if (backdrop && dialog && dialog.parentNode !== backdrop) backdrop.appendChild(dialog);
+      force(host, { display: "block", visibility: "visible", opacity: "1" });
+      force(backdrop, { display: "grid", visibility: "visible", opacity: "1", "pointer-events": "auto" });
+      force(dialog, { display: "grid", visibility: "visible", opacity: "1" });
+    };
+    const schedule = () => { if (!queued) { queued = true; queueMicrotask(enforce); } };
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.body, { childList: true });
+    observer.observe(host, { childList: true, subtree: true, attributes: true });
+    const timer = window.setInterval(enforce, 1000);
+    enforce();
+    return () => { observer.disconnect(); window.clearInterval(timer); };
+  }, [expired, host]);
+  useEffect(() => {
     document.documentElement.classList.toggle("sg-expired", expired);
-    return () => { sessionEnded = false; document.documentElement.classList.remove("sg-expired"); };
+    return () => document.documentElement.classList.remove("sg-expired");
   }, [expired]);
   useEffect(() => {
     if (!open) return;
@@ -191,7 +261,7 @@ export default function SessionGuard() {
     root.classList.add("sg-locked");
     const frozen: Element[] = [];
     Array.from(document.body.children).forEach((element) => {
-      if (element.classList.contains("sg-backdrop") || element.hasAttribute("inert") || ["SCRIPT", "STYLE", "LINK"].includes(element.tagName)) return;
+      if (element.classList.contains("sg-host") || element.hasAttribute("inert") || ["SCRIPT", "STYLE", "LINK"].includes(element.tagName)) return;
       element.setAttribute("inert", "");
       frozen.push(element);
     });
@@ -221,17 +291,17 @@ export default function SessionGuard() {
     window.location.href = "/";
   }
 
-  if (!expired && !warning) return null;
+  if ((!expired && !warning) || !host) return null;
 
   return createPortal(
-    <div className="sg-backdrop" role="presentation">
-      <section className={`sg-dialog${expired ? " is-expired" : ""}`} role="alertdialog" aria-modal="true" aria-labelledby="sg-title" aria-describedby="sg-text">
+    <div className="sg-backdrop" role="presentation" ref={backdropRef}>
+      <section ref={dialogRef} className={`sg-dialog${expired ? " is-expired" : ""}`} role="alertdialog" aria-modal="true" aria-labelledby="sg-title" aria-describedby="sg-text">
         <span className="sg-icon" aria-hidden="true">{expired ? <LockKeyhole size={26} /> : <Clock3 size={26} />}</span>
         {expired ? (
           <>
             <h2 id="sg-title">หมดเวลาใช้งานแล้ว</h2>
             <p id="sg-text">
-              {status ? `ไม่ได้ใช้งานนานเกิน ${idleText(status.ttlSeconds)} ` : ""}ระบบจึงออกจากระบบให้เพื่อความปลอดภัย เข้าสู่ระบบอีกครั้งแล้วจะกลับมาที่หน้านี้
+              {status || lastTtlSeconds ? `ไม่ได้ใช้งานนานเกิน ${idleText(status?.ttlSeconds ?? lastTtlSeconds)} ` : ""}ระบบจึงออกจากระบบให้เพื่อความปลอดภัย เข้าสู่ระบบอีกครั้งแล้วจะกลับมาที่หน้านี้
             </p>
             <div className="sg-actions">
               <button type="button" className="sg-btn sg-btn-primary" onClick={signInAgain} autoFocus><LogIn size={17} aria-hidden="true" />เข้าสู่ระบบอีกครั้ง</button>
@@ -252,7 +322,7 @@ export default function SessionGuard() {
         )}
       </section>
     </div>,
-    document.body,
+    host,
   );
 }
 

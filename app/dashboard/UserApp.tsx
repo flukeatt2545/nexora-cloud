@@ -17,7 +17,7 @@ import { asciiInputProps, hasNonAscii } from "../lib/asciiInput";
 import { API_BASE } from "../runtime";
 import MailView from "./MailView";
 import BotsView from "./BotsView";
-import SessionGuard, { EXPIRED_EVENT } from "../components/SessionGuard";
+import SessionGuard, { EXPIRED_EVENT, useSessionEnded } from "../components/SessionGuard";
 import "./user-overview.css";
 import SmartImage from "../components/SmartImage";
 import { POINTS_EVENT, broadcastPoints } from "../components/StorePurchase";
@@ -205,6 +205,8 @@ export default function UserApp({ view }: { view: UserView }) {
     return () => window.removeEventListener(POINTS_EVENT, onPoints);
   }, []);
   const [loading, setLoading] = useState(true);
+  // Once the session is over only the notice is left on the page; nothing it showed stays in the DOM.
+  const sessionEnded = useSessionEnded();
   const [notice, setNotice] = useState<FeedbackNotice | null>(() => (typeof window === "undefined" ? null : socialNotice(window.location.search)));
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -450,6 +452,7 @@ export default function UserApp({ view }: { view: UserView }) {
     window.location.href = "/";
   }
 
+  if (sessionEnded) return <SessionGuard />;
   if (loading || !me) return <PageLoadingScreen label={userViewLoadingLabel[view] || "กำลังตรวจสอบบัญชี..."} />;
 
   return (

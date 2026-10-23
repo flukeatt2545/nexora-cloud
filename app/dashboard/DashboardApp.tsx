@@ -27,7 +27,7 @@ import SocialOAuthButton, { type SocialProvider, useSocialAvailability } from ".
 import AdminMailView from "./AdminMailView";
 import DiscordBotView from "./DiscordBotView";
 import AdminBotsView from "./AdminBotsView";
-import SessionGuard, { EXPIRED_EVENT } from "../components/SessionGuard";
+import SessionGuard, { EXPIRED_EVENT, useSessionEnded } from "../components/SessionGuard";
 import SessionTtlField from "./SessionTtlField";
 import MailSettingsPanel from "./MailSettingsPanel";
 import SmartImage from "../components/SmartImage";
@@ -531,6 +531,8 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
   const [brandSettings, setBrandSettings] = useState({ brandName: "NEXORA CLOUD", logoUrl: "", faviconUrl: "", authBackgroundUrl: "" });
   const [storeState, setStoreState] = useState<{ open: boolean; message: string }>({ open: true, message: "" });
   const [loading, setLoading] = useState(true);
+  // Once the session is over only the notice is left on the page; nothing it showed stays in the DOM.
+  const sessionEnded = useSessionEnded();
   const [authSlow, setAuthSlow] = useState(false);
   const [authError, setAuthError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -696,6 +698,7 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
     window.location.href = "/";
   }
 
+  if (sessionEnded) return <SessionGuard />;
   if (loading || !me) {
     const authState = authError ? "error" : authSlow ? "slow" : "loading";
     const destination = viewLoadingMeta[view] || { page: "แดชบอร์ด", system: "ระบบ" };
