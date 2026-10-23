@@ -16,7 +16,10 @@ import "./session-guard.css";
 /** Dispatched on window when a page learns the session is gone; the guard then shows its notice. */
 export const EXPIRED_EVENT = "nexora:session-expired";
 const RETURN_KEY = "nexora_return_to";
-const ACTIVE_WINDOW = 60_000;
+/** A request sent this long after the last touch counts as the page's own, not a person's. Shortened
+ *  once the idle time is known: with a 30 second idle time, a minute-long window would let the page's
+ *  own refreshes keep the session alive for a whole minute after the person left. */
+let activeWindow = 60_000;
 
 let lastActivity = Date.now();
 let fetchPatched = false;
@@ -42,7 +45,7 @@ function patchFetch() {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (!isApiRequest(url)) return original(input, init);
     let nextInit = init;
-    if (Date.now() - lastActivity > ACTIVE_WINDOW) {
+    if (Date.now() - lastActivity > activeWindow) {
       const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
       headers.set("X-Nexora-Idle", "1");
       nextInit = { ...init, headers };
@@ -85,7 +88,9 @@ export default function SessionGuard() {
     const skew = new Date(data.now).getTime() - Date.now();
     if (!lastExtend.current) lastExtend.current = Date.now();
     // An API from before seconds only reports whole minutes.
-    setStatus({ expiresAt: new Date(data.expiresAt).getTime() - skew, ttlSeconds: data.ttlSeconds ?? data.ttlMinutes * 60 });
+    const ttlSeconds = data.ttlSeconds ?? data.ttlMinutes * 60;
+    activeWindow = Math.max(5_000, Math.min(60_000, ttlSeconds * 500));
+    setStatus({ expiresAt: new Date(data.expiresAt).getTime() - skew, ttlSeconds });
   }, []);
 
   const check = useCallback(async () => {
@@ -118,11 +123,19 @@ export default function SessionGuard() {
     const poll = window.setInterval(() => void check(), 60_000);
     const onVisible = () => { if (document.visibilityState === "visible") void check(); };
     document.addEventListener("visibilitychange", onVisible);
+    // A tab that was asleep or offline asks again as soon as it is back, not on the next minute tick.
+    const onBack = () => void check();
+    window.addEventListener("focus", onBack);
+    window.addEventListener("pageshow", onBack);
+    window.addEventListener("online", onBack);
     return () => {
       window.removeEventListener(EXPIRED_EVENT, onExpired);
       window.clearTimeout(first);
       window.clearInterval(poll);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onBack);
+      window.removeEventListener("pageshow", onBack);
+      window.removeEventListener("online", onBack);
     };
   }, [check]);
 
