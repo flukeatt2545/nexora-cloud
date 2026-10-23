@@ -518,6 +518,16 @@ body,
   color: #777b82;
 }
 
+/* Autofill keeps the light field: the base rule paints it dark for the dark theme. */
+[data-theme="light"] .input-wrap input:-webkit-autofill,
+[data-theme="light"] .input-wrap input:-webkit-autofill:hover,
+[data-theme="light"] .input-wrap input:-webkit-autofill:focus,
+[data-theme="light"] .input-wrap input:autofill {
+  -webkit-text-fill-color: var(--theme-text-strong);
+  caret-color: var(--theme-text-strong);
+  box-shadow: 0 0 0 1000px #fff inset !important;
+}
+
 [data-theme="light"] .product-image {
   background: #f0eeee;
 }
