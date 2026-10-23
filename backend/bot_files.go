@@ -467,7 +467,8 @@ func (s *server) publishBotSource(c *fiber.Ctx, bot botApp, files map[string]sou
 		return nil, fiber.NewError(fiber.StatusInternalServerError)
 	}
 	queued := false
-	if restart || (locked.Status == "running" && locked.PendingKind == "") {
+	// Without a token the bot would only crash-loop; save the code and let the owner add the token.
+	if locked.HasToken && (restart || (locked.Status == "running" && locked.PendingKind == "")) {
 		idempotency, keyErr := operationKey(c)
 		if keyErr != nil {
 			idempotency = "source-" + randomSourceKey()

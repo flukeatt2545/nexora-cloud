@@ -146,13 +146,16 @@ function BotList({ onOpen, notify }: { onOpen: (id: string) => void; notify: Not
               <div className="bt-card-foot">
                 {!bot.source.hasCode ? (
                   <button type="button" className="bt-btn" onClick={() => onOpen(bot.id)}><FileArchive size={15} aria-hidden="true" />ใส่โค้ด</button>
+                ) : !bot.discord.hasToken && !botIsUp(bot) ? (
+                  // Starting without a token only crash-loops, and the API refuses it.
+                  <button type="button" className="bt-btn bt-btn-primary" onClick={() => onOpen(bot.id)}><KeyRound size={15} aria-hidden="true" />ใส่โทเคนก่อนเปิด</button>
                 ) : (
                   <button type="button" className={`bt-btn ${botIsUp(bot) ? "" : "bt-btn-primary"}`} onClick={() => void toggle(bot)} disabled={Boolean(bot.pending)}>
                     {bot.pending ? <span className="bt-spinner" aria-hidden="true" /> : botIsUp(bot) ? <Power size={15} aria-hidden="true" /> : <Play size={15} aria-hidden="true" />}
                     {botIsUp(bot) ? "ปิดบอท" : "เปิดบอท"}
                   </button>
                 )}
-                {bot.discord.tokenState !== "valid" && bot.source.hasCode && (
+                {bot.discord.tokenState !== "valid" && bot.source.hasCode && bot.discord.hasToken && (
                   <button type="button" className="bt-link" onClick={() => onOpen(bot.id)}><KeyRound size={14} aria-hidden="true" />ใส่โทเคน</button>
                 )}
               </div>

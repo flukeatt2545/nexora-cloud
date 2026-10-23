@@ -2,14 +2,17 @@
 
 // Adding a bot in three steps: name and language, where the code comes from, then the token.
 // The bot is created when step two finishes, so closing at step three still leaves it in place.
-import { ArrowLeft, Check, ChevronDown, Eye, EyeOff, FileArchive, GitBranch, LayoutTemplate, Play, Upload, X } from "lucide-react";
-import { useId, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { ArrowLeft, Check, ChevronDown, Eye, EyeOff, FileArchive, FileCode, FolderOpen, GitBranch, LayoutTemplate, Play, Upload, X } from "lucide-react";
+import { useId, useRef, useState, type DragEvent, type FormEvent, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { useEscape, useScrollLock } from "./useScrollLock";
 import { BotAvatar, botApi, botSend, errorMessage, runtimeLabel, runtimeLibrary, uploadBotZip, type Bot, type BotRuntime, type SourceReport } from "./botsShared";
+import { formatBytes, makeBotPick, pickedFromEntries, pickedFromInput, zipPickedFiles, type BotPick, type PickedFile } from "./botSourcePack";
 
 type Notify = (notice: { kind: "success" | "error"; text: string; title?: string }) => void;
 type Source = "zip" | "github" | "template";
+
+const LISTED_FILES = 6;
 
 const steps = ["ตั้งชื่อ", "ใส่โค้ด", "ใส่โทเคน"];
 
@@ -21,7 +24,8 @@ export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin =
   const [owner, setOwner] = useState("");
   const [runtime, setRuntime] = useState<BotRuntime>("node");
   const [source, setSource] = useState<Source>("zip");
-  const [file, setFile] = useState<File | null>(null);
+  const [pick, setPick] = useState<BotPick | null>(null);
+  const [reading, setReading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [repo, setRepo] = useState("");
   const [ref, setRef] = useState("");
@@ -35,6 +39,7 @@ export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin =
   const [variable, setVariable] = useState("DISCORD_TOKEN");
   const [verified, setVerified] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const folderInput = useRef<HTMLInputElement>(null);
   const titleId = useId();
 
   const close = () => (bot ? onCreated(bot) : onClose());
@@ -47,24 +52,44 @@ export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin =
     setStep(next);
   }
 
-  function pickFile(picked: File | undefined | null) {
-    if (!picked) return;
-    if (!/\.zip$/i.test(picked.name)) {
-      setError("เลือกไฟล์ .zip เท่านั้น");
-      return;
+  function choose(picked: PickedFile[], skipped = 0) {
+    if (picked.length === 0 && skipped === 0) return; // the picker was cancelled
+    try {
+      setPick(makeBotPick(picked, skipped));
+      setError("");
+    } catch (pickError) {
+      setPick(null);
+      setError(errorMessage(pickError));
     }
-    if (picked.size > 50 * 1024 * 1024) {
-      setError("ไฟล์ใหญ่เกิน 50 MB ลบโฟลเดอร์ node_modules ออกก่อนบีบอัด");
-      return;
-    }
-    setError("");
-    setFile(picked);
   }
 
-  function onDrop(event: DragEvent) {
+  function openPicker(input: HTMLInputElement | null, event?: MouseEvent) {
+    event?.stopPropagation();
+    if (!input) return;
+    input.value = "";
+    input.click();
+  }
+
+  async function onDrop(event: DragEvent) {
     event.preventDefault();
     setDragging(false);
-    pickFile(event.dataTransfer.files?.[0]);
+    // Take the entries now: the browser empties dataTransfer as soon as this handler yields.
+    const entries = Array.from(event.dataTransfer.items ?? [], (item) => item.webkitGetAsEntry?.()).filter((entry): entry is FileSystemEntry => Boolean(entry));
+    if (entries.length === 0) {
+      choose(pickedFromInput(event.dataTransfer.files));
+      return;
+    }
+    setReading(true);
+    try {
+      const walked = await pickedFromEntries(entries);
+      if (walked.files.length === 0 && walked.skipped === 0) setError("โฟลเดอร์ที่ลากมาว่างเปล่า");
+      else choose(walked.files, walked.skipped);
+    } catch {
+      setPick(null);
+      setError("อ่านไฟล์ที่ลากมาไม่ได้ ลองกดเลือกโฟลเดอร์แทน");
+    } finally {
+      setReading(false);
+    }
   }
 
   function submitName(event: FormEvent) {
@@ -78,8 +103,8 @@ export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin =
 
   async function submitSource(event: FormEvent) {
     event.preventDefault();
-    if (source === "zip" && !file) {
-      setError("เลือกไฟล์ ZIP ของบอทก่อน");
+    if (source === "zip" && !pick) {
+      setError("เลือกโฟลเดอร์ ไฟล์โค้ด หรือไฟล์ ZIP ของบอทก่อน");
       return;
     }
     if (source === "github" && !repo.trim()) {
@@ -88,6 +113,17 @@ export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin =
     }
     setBusy(true);
     setError("");
+    let file: File | null = null;
+    if (source === "zip" && pick) {
+      // Pack before creating the bot, so a selection that is too big never leaves an empty bot behind.
+      try {
+        file = pick.kind === "zip" ? pick.file : await zipPickedFiles(pick.files);
+      } catch (packError) {
+        setError(errorMessage(packError));
+        setBusy(false);
+        return;
+      }
+    }
     try {
       const created = await botApi<{ bot: Bot; source: SourceReport | null }>("/api/bots", botSend("POST", {
         name: name.trim(), runtime, source, githubRepo: repo.trim(), githubRef: ref.trim(), ownerUsername: owner.trim(),
@@ -208,7 +244,7 @@ export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin =
           {step === 1 && (
             <form className="bt-form" onSubmit={submitSource}>
               <div className="bt-segment" role="radiogroup" aria-label="เอาโค้ดมาจากไหน">
-                {([["zip", "ไฟล์ ZIP", FileArchive], ["github", "GitHub", GitBranch], ["template", "บอทตัวอย่าง", LayoutTemplate]] as const).map(([value, label, Icon]) => (
+                {([["zip", "อัปโหลดไฟล์", FileArchive], ["github", "GitHub", GitBranch], ["template", "บอทตัวอย่าง", LayoutTemplate]] as const).map(([value, label, Icon]) => (
                   <label key={value} className={source === value ? "is-picked" : ""}>
                     <input type="radio" name="source" value={value} checked={source === value} onChange={() => { setSource(value); setError(""); }} />
                     <Icon size={16} aria-hidden="true" />{label}
@@ -217,25 +253,54 @@ export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin =
               </div>
 
               {source === "zip" && (
-                <div
-                  className={`bt-drop${dragging ? " is-over" : ""}${file ? " has-file" : ""}`}
-                  onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={onDrop}
-                  onClick={() => fileInput.current?.click()}
-                  onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); fileInput.current?.click(); } }}
-                  role="button"
-                  tabIndex={0}
-                  aria-label="เลือกไฟล์ ZIP"
-                >
-                  <input ref={fileInput} type="file" accept=".zip,application/zip" hidden onChange={(event) => pickFile(event.target.files?.[0])} />
-                  <span className="bt-drop-icon"><Upload size={22} aria-hidden="true" /></span>
-                  {file ? (
-                    <><b>{file.name}</b><small>{(file.size / 1024 / 1024).toFixed(1)} MB · คลิกเพื่อเปลี่ยนไฟล์</small></>
-                  ) : (
-                    <><b>ลากไฟล์ ZIP มาวาง หรือคลิกเพื่อเลือก</b><small>ไม่เกิน 50 MB · ไม่ต้องใส่ node_modules ระบบติดตั้งให้เอง</small></>
+                <div className="bt-form-stack">
+                  <div
+                    className={`bt-drop${dragging ? " is-over" : ""}${pick ? " has-file" : ""}`}
+                    onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(event) => void onDrop(event)}
+                    onClick={() => openPicker(fileInput.current)}
+                    onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openPicker(fileInput.current); } }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="เลือกไฟล์โค้ดหรือไฟล์ ZIP ของบอท"
+                    aria-busy={reading}
+                  >
+                    {/* Any file type: loose code files are zipped here, and .zip still goes up as it is. */}
+                    <input ref={fileInput} type="file" multiple hidden onChange={(event) => choose(pickedFromInput(event.target.files))} />
+                    <span className="bt-drop-icon"><Upload size={22} aria-hidden="true" /></span>
+                    {reading ? (
+                      <><b>กำลังอ่านไฟล์</b><small>โฟลเดอร์ใหญ่อาจใช้เวลาสักครู่</small></>
+                    ) : pick?.kind === "zip" ? (
+                      <><b>{pick.file.name}</b><small>{formatBytes(pick.file.size)} · คลิกเพื่อเปลี่ยน</small></>
+                    ) : pick ? (
+                      <><b>{pick.files.length} ไฟล์ · {formatBytes(pick.size)}</b><small>ระบบบีบอัดเป็น ZIP ให้ตอนกดสร้างบอท · คลิกเพื่อเปลี่ยน</small></>
+                    ) : (
+                      <><b>ลากโฟลเดอร์บอท ไฟล์โค้ด หรือไฟล์ ZIP มาวาง</b><small>หรือคลิกเพื่อเลือกไฟล์ · ไม่เกิน 50 MB · ข้าม node_modules, .venv, __pycache__ ให้เอง</small></>
+                    )}
+                    {progress !== null && <span className="bt-progress" style={{ ["--value" as string]: `${progress}%` }} aria-label={`อัปโหลดแล้ว ${progress}%`} />}
+                  </div>
+                  <div className="bt-pick-actions">
+                    <input ref={(node) => { folderInput.current = node; if (node) node.webkitdirectory = true; }} type="file" hidden onChange={(event) => choose(pickedFromInput(event.target.files))} />
+                    <button type="button" className="bt-link" onClick={() => openPicker(folderInput.current)} disabled={busy || reading}>
+                      <FolderOpen size={15} aria-hidden="true" />เลือกทั้งโฟลเดอร์
+                    </button>
+                    {pick && <button type="button" className="bt-link" onClick={() => setPick(null)} disabled={busy}><X size={14} aria-hidden="true" />ล้างที่เลือก</button>}
+                  </div>
+                  {pick?.kind === "files" && (
+                    <div className="bt-pick-list">
+                      <ul aria-label="ไฟล์ที่จะอัปโหลด">
+                        {pick.files.slice(0, LISTED_FILES).map((item) => (
+                          <li key={item.path}><FileCode size={14} aria-hidden="true" /><span>{item.path}</span><small>{formatBytes(item.file.size)}</small></li>
+                        ))}
+                      </ul>
+                      <p>
+                        {pick.files.length > LISTED_FILES && <>และอีก {pick.files.length - LISTED_FILES} ไฟล์ · </>}
+                        รวม {pick.files.length} ไฟล์ {formatBytes(pick.size)}
+                        {pick.skipped > 0 && <> · ข้าม {pick.skipped} รายการ (node_modules, .venv, __pycache__, .git)</>}
+                      </p>
+                    </div>
                   )}
-                  {progress !== null && <span className="bt-progress" style={{ ["--value" as string]: `${progress}%` }} aria-label={`อัปโหลดแล้ว ${progress}%`} />}
                 </div>
               )}
 
@@ -265,7 +330,7 @@ export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin =
               {error && <p className="bt-error" role="alert">{error}</p>}
               <footer className="bt-dialog-foot">
                 <button type="button" className="bt-btn" onClick={() => go(0)} disabled={busy}><ArrowLeft size={16} aria-hidden="true" />ย้อนกลับ</button>
-                <button type="submit" className="bt-btn bt-btn-primary" disabled={busy}>
+                <button type="submit" className="bt-btn bt-btn-primary" disabled={busy || reading}>
                   {busy && <span className="bt-spinner" aria-hidden="true" />}
                   {busy ? (progress !== null ? `กำลังอัปโหลด ${progress}%` : source === "github" ? "กำลังดึงจาก GitHub" : "กำลังสร้าง") : "สร้างบอท"}
                 </button>

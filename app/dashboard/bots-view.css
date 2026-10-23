@@ -498,6 +498,14 @@
 .bt-drop.is-over .bt-drop-icon { transform: translateY(-4px); }
 .bt-drop.has-file { border-style: solid; border-color: var(--primary-border); }
 @media (hover: hover) { .bt-drop:hover { border-color: var(--primary-border); } }
+.bt-pick-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; }
+.bt-pick-actions .bt-link:disabled { opacity: .5; cursor: not-allowed; }
+.bt-pick-list { display: grid; gap: 6px; padding: 10px 12px; border-radius: 10px; background: var(--bt-sunken); font-size: 13px; }
+.bt-pick-list ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.bt-pick-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; color: var(--theme-text-strong); }
+.bt-pick-list li span { overflow: hidden; font-family: var(--bt-mono); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.bt-pick-list li small, .bt-pick-list p { color: var(--theme-text-soft); }
+.bt-pick-list p { margin: 0; }
 .bt-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--theme-hover); }
 .bt-progress::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--value, 0%); background: var(--primary); transition: width .2s ease-out; }
 

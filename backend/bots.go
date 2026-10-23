@@ -58,10 +58,13 @@ type botApp struct {
 	TokenVariable     string
 	TokenState        string
 	TokenCheckedAt    *time.Time
-	CreatedAt         time.Time
-	PendingKind       string
-	PendingState      string
-	PendingPhase      string
+	// HasToken: a variable that can hold the Discord token is set, either the one saved
+	// through the token step or any variable named like *TOKEN*.
+	HasToken     bool
+	CreatedAt    time.Time
+	PendingKind  string
+	PendingState string
+	PendingPhase string
 }
 
 const botSelect = `
@@ -70,6 +73,8 @@ const botSelect = `
 	       b.status,b.status_message,b.last_exit_code,b.restart_count,b.started_at,b.stopped_at,
 	       b.cpu_millicores,b.memory_mb,b.disk_limit_mb,b.disk_used_mb,
 	       b.discord_bot_id,b.discord_username,b.discord_avatar,b.token_variable,b.token_state,b.token_checked_at,
+	       EXISTS (SELECT 1 FROM bot_environment_variables e
+	               WHERE e.bot_id=b.id AND (e.name=b.token_variable OR e.name LIKE '%TOKEN%')),
 	       b.created_at,
 	       COALESCE(op.kind,''),COALESCE(op.state,''),COALESCE(op.phase,'')
 	FROM bot_apps b
@@ -89,6 +94,7 @@ func scanBot(row pgx.Row) (botApp, error) {
 		&b.Status, &b.StatusMessage, &b.LastExitCode, &b.RestartCount, &b.StartedAt, &b.StoppedAt,
 		&b.CPUMillicores, &b.MemoryMB, &b.DiskLimitMB, &b.DiskUsedMB,
 		&b.DiscordBotID, &b.DiscordUsername, &b.DiscordAvatar, &b.TokenVariable, &b.TokenState, &b.TokenCheckedAt,
+		&b.HasToken,
 		&b.CreatedAt,
 		&b.PendingKind, &b.PendingState, &b.PendingPhase,
 	)
@@ -176,6 +182,7 @@ func botJSON(b botApp, withOwner bool) fiber.Map {
 			"tokenVariable": b.TokenVariable,
 			"tokenState":    b.TokenState,
 			"checkedAt":     b.TokenCheckedAt,
+			"hasToken":      b.HasToken,
 		},
 	}
 	if withOwner {
@@ -496,6 +503,8 @@ func (s *server) deleteBot(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+const botNoTokenMessage = "ยังไม่ได้ใส่โทเคนบอท ใส่โทเคนจาก Discord Developer Portal ในแท็บโทเคน หรือเพิ่มตัวแปรลับชื่อ DISCORD_TOKEN ก่อนเปิดบอท"
+
 var botOperationKinds = map[string]string{"start": "bot.start", "stop": "bot.stop", "restart": "bot.restart", "rebuild": "bot.deploy"}
 
 func botOperationTimeout(kind string) int {
@@ -568,6 +577,9 @@ func (s *server) createBotOperation(c *fiber.Ctx) error {
 	}
 	if kind != "bot.stop" && bot.SourceKey == "" {
 		return c.Status(fiber.StatusConflict).JSON(apiError{Error: "ยังไม่มีโค้ดของบอท อัปโหลดไฟล์หรือดึงจาก GitHub ก่อน", Code: "bot_no_source"})
+	}
+	if kind != "bot.stop" && !bot.HasToken {
+		return c.Status(fiber.StatusConflict).JSON(apiError{Error: botNoTokenMessage, Code: "bot_no_token"})
 	}
 	operationID, err := enqueueBotOperation(c.Context(), tx, bot.ID, actor.ID, kind, key, nil)
 	if err != nil {

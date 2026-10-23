@@ -23,7 +23,7 @@ export type Bot = {
   pending: BotPending;
   source: { kind: "zip" | "github" | "template"; githubRepo: string; githubRef: string; hasCode: boolean; updatedAt: string | null; pendingChanges: boolean };
   resources: { cpuMillicores: number; memoryMb: number; diskLimitMb: number; diskUsedMb: number | null };
-  discord: { id: string; username: string; avatarUrl: string; inviteUrl: string; tokenVariable: string; tokenState: "unknown" | "valid" | "invalid"; checkedAt: string | null };
+  discord: { id: string; username: string; avatarUrl: string; inviteUrl: string; tokenVariable: string; tokenState: "unknown" | "valid" | "invalid"; checkedAt: string | null; hasToken: boolean };
   owner?: { id: number; username: string };
 };
 

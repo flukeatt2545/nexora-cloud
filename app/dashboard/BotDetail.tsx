@@ -103,6 +103,8 @@ export default function BotDetail({ botId, onBack, notify, ask }: { botId: strin
   // The worker names its step in the job's phase (runtime-worker bots.go setBotPhase).
   const phase = bot.pending ? (phaseStep[bot.pending.phase] ?? 0) : -1;
   const startingJob = bot.pending && bot.pending.kind !== "bot.stop" && bot.pending.kind !== "bot.delete";
+  // The API refuses start/restart without a token (code bot_no_token); keep the buttons in step.
+  const needsToken = bot.source.hasCode && !bot.discord.hasToken;
 
   return (
     <div className="bt">
@@ -123,13 +125,13 @@ export default function BotDetail({ botId, onBack, notify, ask }: { botId: strin
         <div className="bt-hero-actions">
           {up ? (
             <>
-              <button type="button" className="bt-btn" onClick={() => void operate("restart")} disabled={busy || !bot.source.hasCode}><RotateCcw size={16} aria-hidden="true" />รีสตาร์ต</button>
+              <button type="button" className="bt-btn" onClick={() => void operate("restart")} disabled={busy || !bot.source.hasCode || needsToken}><RotateCcw size={16} aria-hidden="true" />รีสตาร์ต</button>
               <button type="button" className="bt-btn bt-btn-stop" onClick={() => ask({ title: "ปิดบอท", message: `${bot.name} จะออฟไลน์จนกว่าจะเปิดใหม่`, confirmLabel: "ปิดบอท", action: () => operate("stop") })} disabled={busy}>
                 {acting === "stop" || bot.pending?.kind === "bot.stop" ? <span className="bt-spinner" aria-hidden="true" /> : <Power size={16} aria-hidden="true" />}ปิดบอท
               </button>
             </>
           ) : (
-            <button type="button" className="bt-btn bt-btn-primary bt-btn-lg" onClick={() => void operate("start")} disabled={busy || !bot.source.hasCode}>
+            <button type="button" className="bt-btn bt-btn-primary bt-btn-lg" onClick={() => void operate("start")} disabled={busy || !bot.source.hasCode || needsToken} title={needsToken ? "ใส่โทเคนบอทก่อนถึงจะเปิดได้" : undefined}>
               {busy ? <span className="bt-spinner" aria-hidden="true" /> : <Play size={17} aria-hidden="true" />}{busy ? "กำลังเปิด" : "เปิดบอท"}
             </button>
           )}
@@ -156,10 +158,10 @@ export default function BotDetail({ botId, onBack, notify, ask }: { botId: strin
           <button type="button" className="bt-btn" onClick={() => setTab("files")}>ไปที่ไฟล์</button>
         </div>
       )}
-      {bot.source.hasCode && !bot.discord.tokenVariable && (
-        <div className="bt-callout is-warn">
+      {needsToken && (
+        <div className="bt-callout is-warn" role="status">
           <KeyRound size={18} aria-hidden="true" />
-          <span>ยังไม่ได้ใส่โทเคนบอท บอทจะเข้า Discord ไม่ได้จนกว่าจะใส่</span>
+          <span>ยังไม่ได้ใส่โทเคนบอท ต้องใส่ก่อนถึงจะเปิดบอทได้</span>
           <button type="button" className="bt-btn" onClick={() => setTab("env")}>ใส่โทเคน</button>
         </div>
       )}
