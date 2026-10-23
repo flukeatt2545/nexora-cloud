@@ -486,6 +486,36 @@
 .bt-wizard .bt-field input:focus { border-color: var(--primary-border); box-shadow: 0 0 0 3px var(--primary-soft); }
 .bt-wizard .bt-error { padding: 10px 12px; border-left: 3px solid var(--danger); border-radius: 0 8px 8px 0; background: rgb(var(--danger-rgb) / .07); color: var(--theme-text-strong); }
 
+/* Owner picker (admins only): the current owner as a field, opening a searchable list in place. */
+.bw-owner { position: relative; display: grid; min-width: 0; }
+.bw-owner-current {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 54px; padding: 8px 12px;
+  border: 1px solid var(--control-line); border-radius: 9px; background: var(--theme-input, transparent); color: var(--theme-text-strong);
+  font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, box-shadow .15s;
+}
+.bw-owner-current:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.bw-owner.is-open .bw-owner-current { border-color: var(--primary-border); box-shadow: 0 0 0 3px var(--primary-soft); }
+@media (hover: hover) { .bw-owner-current:hover { border-color: var(--primary-border); } }
+.bw-owner-avatar { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px; overflow: hidden; border-radius: 50%; background: var(--control-surface-strong); color: var(--theme-text-soft); font-size: 14px; font-weight: 600; }
+.bw-owner-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.bw-owner-text { flex: 1 1 auto; display: grid; min-width: 0; line-height: 1.45; }
+.bw-owner-text b { overflow: hidden; font-size: 14.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.bw-owner-text small { overflow: hidden; color: var(--theme-text-soft); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.bw-owner-chevron { flex: 0 0 auto; color: var(--theme-text-soft); transition: transform .2s var(--bt-ease); }
+.bw-owner.is-open .bw-owner-chevron { transform: rotate(180deg); }
+.bw-owner-panel { display: grid; margin-top: 6px; overflow: hidden; border: 1px solid var(--control-line); border-radius: 10px; background: var(--control-surface, var(--bt-surface)); box-shadow: 0 12px 28px -18px var(--theme-shadow); animation: bt-fade .15s ease-out; }
+.bw-owner-search { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border-bottom: 1px solid var(--control-line); color: var(--theme-text-soft); }
+.bt-wizard .bw-owner-search input { padding: 0; border-radius: 0; flex: 1 1 auto; min-width: 0; height: 100%; border: 0; outline: 0; background: none; color: var(--theme-text-strong); font: inherit; font-size: 14.5px; }
+.bw-owner-search input::placeholder { color: var(--theme-text-soft); opacity: 1; }
+.bt-wizard .bw-owner-search input:focus, .bt-wizard .bw-owner-search input:focus-visible { outline: none; box-shadow: none; }
+.bw-owner-search:focus-within { color: var(--primary-ink); }
+.bw-owner-list { max-height: 248px; margin: 0; padding: 4px; overflow-y: auto; overscroll-behavior: contain; list-style: none; }
+.bw-owner-list li { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 10px; border-radius: 7px; cursor: pointer; }
+.bw-owner-list li.is-active { background: var(--theme-hover); }
+.bw-owner-list li.is-selected .bw-owner-text b { color: var(--primary-ink); }
+.bw-owner-check { flex: 0 0 auto; color: var(--primary-ink); }
+.bw-owner-note { margin: 0; padding: 10px 14px 12px; color: var(--theme-text-soft); font-size: 13.5px; }
+
 /* Language: two plain options with a radio; the runtime colour stays on its tag. */
 .bt-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .bt-choice {

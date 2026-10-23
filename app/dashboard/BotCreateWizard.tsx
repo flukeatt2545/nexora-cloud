@@ -2,8 +2,8 @@
 
 // Adding a bot in three steps: name and language, where the code comes from, then the token.
 // The bot is created when step two finishes, so closing at step three still leaves it in place.
-import { ArrowLeft, Check, ChevronDown, Eye, EyeOff, FileArchive, FileCode, FolderOpen, GitBranch, LayoutTemplate, Play, Upload, X } from "lucide-react";
-import { useId, useRef, useState, type DragEvent, type FormEvent, type MouseEvent } from "react";
+import { ArrowLeft, Check, ChevronDown, Eye, EyeOff, FileArchive, FileCode, FolderOpen, GitBranch, LayoutTemplate, Play, Search, Upload, UserRound, X } from "lucide-react";
+import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { useEscape, useScrollLock } from "./useScrollLock";
 import { BotAvatar, botApi, botSend, errorMessage, runtimeLabel, runtimeLibrary, uploadBotZip, type Bot, type BotRuntime, type SourceReport } from "./botsShared";
@@ -11,6 +11,7 @@ import { formatBytes, makeBotPick, pickedFromEntries, pickedFromInput, zipPicked
 
 type Notify = (notice: { kind: "success" | "error"; text: string; title?: string }) => void;
 type Source = "zip" | "github" | "template";
+type OwnerOption = { id: number; username: string; displayName?: string; avatarUrl?: string };
 
 const LISTED_FILES = 6;
 
@@ -21,7 +22,7 @@ export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin =
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [name, setName] = useState("");
-  const [owner, setOwner] = useState("");
+  const [owner, setOwner] = useState<OwnerOption | null>(null);
   const [runtime, setRuntime] = useState<BotRuntime>("node");
   const [source, setSource] = useState<Source>("zip");
   const [pick, setPick] = useState<BotPick | null>(null);
@@ -126,7 +127,7 @@ export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin =
     }
     try {
       const created = await botApi<{ bot: Bot; source: SourceReport | null }>("/api/bots", botSend("POST", {
-        name: name.trim(), runtime, source, githubRepo: repo.trim(), githubRef: ref.trim(), ownerUsername: owner.trim(),
+        name: name.trim(), runtime, source, githubRepo: repo.trim(), githubRef: ref.trim(), ownerUsername: owner?.username ?? "",
       }));
       let result = created.source;
       setBot(created.bot);
@@ -217,11 +218,11 @@ export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin =
                   <small>ใช้เรียกในเว็บนี้เท่านั้น ชื่อที่เห็นใน Discord มาจากหน้า Developer Portal</small>
                 </label>
                 {forAdmin && (
-                  <label className="bt-field">
-                    <span>เจ้าของบอท <em>ไม่ใส่ก็ได้</em></span>
-                    <input value={owner} onChange={(event) => setOwner(event.target.value.replace(/[^A-Za-z0-9@]/g, ""))} maxLength={40} placeholder="ชื่อผู้ใช้ เว้นว่างไว้ถ้าเป็นบอทของคุณเอง" spellCheck={false} />
+                  <div className="bt-field">
+                    <span id={`${titleId}-owner`}>เจ้าของบอท</span>
+                    <OwnerPicker value={owner} onChange={setOwner} labelId={`${titleId}-owner`} />
                     <small>บอทจะไปอยู่ในหน้าบอทของผู้ใช้คนนั้น และนับในโควตาของเขา</small>
-                  </label>
+                  </div>
                 )}
                 <fieldset className="bt-field">
                   <legend>เขียนด้วยภาษาอะไร</legend>
@@ -418,5 +419,131 @@ export default function BotCreateWizard({ onClose, onCreated, notify, forAdmin =
       </section>
     </div>,
     document.body,
+  );
+}
+
+/** Whose bot it is: the admin by default, or anyone picked from the user list (searchable). */
+function OwnerPicker({ value, onChange, labelId }: { value: OwnerOption | null; onChange: (owner: OwnerOption | null) => void; labelId: string }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [items, setItems] = useState<OwnerOption[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [active, setActive] = useState(0);
+  const listId = useId();
+  const trigger = useRef<HTMLButtonElement>(null);
+  const search = useRef<HTMLInputElement>(null);
+  const selectedId = value?.id ?? 0;
+
+  // Newest accounts first while the search is empty; the server filters as the admin types.
+  useEffect(() => {
+    if (!open) return;
+    const needle = query.trim().replace(/^@/, "");
+    const timer = window.setTimeout(() => {
+      botApi<{ items: OwnerOption[] }>(`/api/admin/users?limit=30${needle ? `&q=${encodeURIComponent(needle)}` : ""}`)
+        .then((data) => {
+          setItems(data.items);
+          setFailed(false);
+          // Start on the current owner when the list first opens ("yourself" is row 0).
+          setActive(needle ? 0 : data.items.findIndex((item) => item.id === selectedId) + 1);
+        })
+        .catch(() => { setItems([]); setFailed(true); });
+    }, needle ? 250 : 0);
+    return () => window.clearTimeout(timer);
+  }, [open, query, selectedId]);
+
+  // "Yourself" leads the list until the admin searches for someone.
+  const options: (OwnerOption | null)[] = query.trim() ? items || [] : [null, ...(items || [])];
+
+  function show() {
+    setQuery("");
+    setActive(0);
+    setOpen(true);
+    window.setTimeout(() => search.current?.focus(), 0);
+  }
+
+  function pick(option: OwnerOption | null) {
+    onChange(option);
+    setOpen(false);
+    trigger.current?.focus();
+  }
+
+  function onKey(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!options.length) return;
+      setActive((current) => (current + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (options[active] !== undefined) pick(options[active]);
+    } else if (event.key === "Escape") {
+      event.preventDefault(); // keeps the wizard open
+      setOpen(false);
+      trigger.current?.focus();
+    }
+  }
+
+  const who = (option: OwnerOption | null) => (option ? option.displayName || option.username : "ตัวคุณเอง");
+  const avatar = (option: OwnerOption | null) => (
+    <span className="bw-owner-avatar" aria-hidden="true">
+      {option?.avatarUrl ? <img src={option.avatarUrl} alt="" width={32} height={32} loading="lazy" referrerPolicy="no-referrer" /> : option ? who(option).charAt(0).toUpperCase() : <UserRound size={17} />}
+    </span>
+  );
+
+  return (
+    <div className={`bw-owner${open ? " is-open" : ""}`} onBlur={(event) => { if (open && !event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}>
+      <button ref={trigger} type="button" className="bw-owner-current" onClick={() => (open ? setOpen(false) : show())} aria-haspopup="listbox" aria-expanded={open} aria-labelledby={`${labelId} ${listId}-current`}>
+        {avatar(value)}
+        <span className="bw-owner-text" id={`${listId}-current`}>
+          <b>{who(value)}</b>
+          <small>{value ? `@${value.username}` : "บอทจะอยู่ในบัญชีที่ล็อกอินอยู่"}</small>
+        </span>
+        <ChevronDown size={18} className="bw-owner-chevron" aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="bw-owner-panel">
+          <label className="bw-owner-search">
+            <Search size={16} aria-hidden="true" />
+            <input
+              ref={search}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={onKey}
+              placeholder="ค้นชื่อผู้ใช้หรือชื่อที่แสดง"
+              role="combobox"
+              aria-expanded="true"
+              aria-controls={listId}
+              aria-autocomplete="list"
+              aria-activedescendant={options.length ? `${listId}-${active}` : undefined}
+              aria-label="ค้นเจ้าของบอท"
+              spellCheck={false}
+            />
+          </label>
+          <ul id={listId} className="bw-owner-list" role="listbox" aria-label="ผู้ใช้">
+            {options.map((option, index) => {
+              const selected = option ? value?.id === option.id : value === null;
+              return (
+                <li
+                  key={option ? option.id : "self"}
+                  id={`${listId}-${index}`}
+                  role="option"
+                  aria-selected={selected}
+                  className={`${index === active ? "is-active" : ""}${selected ? " is-selected" : ""}`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setActive(index)}
+                  onClick={() => pick(option)}
+                >
+                  {avatar(option)}
+                  <span className="bw-owner-text"><b>{who(option)}</b><small>{option ? `@${option.username}` : "บัญชีที่ล็อกอินอยู่"}</small></span>
+                  {selected && <Check size={16} className="bw-owner-check" aria-hidden="true" />}
+                </li>
+              );
+            })}
+          </ul>
+          {items === null && <p className="bw-owner-note">กำลังโหลดรายชื่อ...</p>}
+          {items !== null && failed && <p className="bw-owner-note">โหลดรายชื่อไม่ได้ ลองพิมพ์ค้นอีกครั้ง</p>}
+          {items !== null && !failed && query.trim() && items.length === 0 && <p className="bw-owner-note">ไม่พบผู้ใช้ “{query.trim()}”</p>}
+        </div>
+      )}
+    </div>
   );
 }
