@@ -1,7 +1,8 @@
 import type { Client, GuildBasedChannel } from "discord.js";
 import { logBotError } from "./api";
 import { homeGuild } from "./guild";
-import { settings } from "./settings";
+import { nameStyle, settings } from "./settings";
+import { channelName } from "./style";
 import { siteUp } from "./status";
 
 // Voice channels whose names show the member count, how many are online, and whether the
@@ -24,9 +25,9 @@ async function rename(channel: GuildBasedChannel | undefined, name: string) {
 }
 
 export const statsNames = {
-  members: (count: number) => `👥 สมาชิก: ${count.toLocaleString("th-TH")}`,
-  online: (count: number) => `🟢 ออนไลน์: ${count.toLocaleString("th-TH")}`,
-  site: (up: boolean) => (up ? "🌐 เว็บ: ใช้งานได้" : "🔴 เว็บ: ล่ม"),
+  members: (count: number) => channelName(nameStyle(), "👥", `สมาชิก: ${count.toLocaleString("th-TH")}`),
+  online: (count: number) => channelName(nameStyle(), "🟢", `ออนไลน์: ${count.toLocaleString("th-TH")}`),
+  site: (up: boolean) => (up ? channelName(nameStyle(), "🌐", "เว็บ: ใช้งานได้") : channelName(nameStyle(), "🔴", "เว็บ: ล่ม")),
 };
 
 export async function updateStats(client: Client) {

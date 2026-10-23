@@ -1,6 +1,7 @@
 /* Community bot settings: the server it looks after on top, then one box per feature in two
    columns. Built on the voice bot's card parts (dbot-*, dpr-*); only what is new lives here. */
-.cmb-server { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.cmb-server { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.cmb-server-fields { display: grid; gap: 14px; min-width: 0; }
 .cmb-guild { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--theme-line-soft); border-radius: 10px; background: var(--theme-input); }
 .cmb-guild > div { display: grid; gap: 2px; min-width: 0; }
 .cmb-guild b { color: var(--theme-text-strong); font-size: 14.5px; font-weight: 600; overflow-wrap: anywhere; }

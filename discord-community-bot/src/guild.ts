@@ -1,16 +1,14 @@
 import { ChannelType, PermissionFlagsBits, type Client, type Guild } from "discord.js";
 import { assignable } from "./access";
 import { api, logBotError } from "./api";
-import { ENV_GUILD_ID } from "./config";
+import { GUILD_ID } from "./config";
 import { settings, settingsVersion } from "./settings";
 
-// The bot looks after one server. Which one: the page's setting, else .env, else the only
-// server it is in. In any other server it answers only with a note that it is not set up there.
+// The bot looks after one server (GUILD_ID). In any other server it answers only with a note,
+// and it leaves such a server as soon as it notices (see index.ts).
 
-export function homeGuildId(client: Client) {
-  const configured = settings()?.guildId || ENV_GUILD_ID;
-  if (configured) return configured;
-  return client.guilds.cache.size === 1 ? client.guilds.cache.first()!.id : "";
+export function homeGuildId(_client?: Client) {
+  return GUILD_ID;
 }
 
 export function homeGuild(client: Client): Guild | undefined {

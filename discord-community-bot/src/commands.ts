@@ -27,13 +27,17 @@ export const commands = [
       ))
       .addChannelOption((option) => option.setName("category").setNameLocalizations({ th: "หมวด" }).setDescription("อยู่ในหมวดไหน").addChannelTypes(ChannelType.GuildCategory))
       .addRoleOption((option) => option.setName("only").setNameLocalizations({ th: "เห็นเฉพาะยศ" }).setDescription("ให้เห็นเฉพาะยศนี้ (ไม่ใส่ = ตามหมวด)"))
-      .addBooleanOption((option) => option.setName("read_only").setNameLocalizations({ th: "อ่านอย่างเดียว" }).setDescription("สมาชิกพิมพ์ไม่ได้ (เช่นห้องประกาศ)")))
+      .addBooleanOption((option) => option.setName("read_only").setNameLocalizations({ th: "อ่านอย่างเดียว" }).setDescription("สมาชิกพิมพ์ไม่ได้ (เช่นห้องประกาศ)"))
+      .addStringOption((option) => option.setName("emoji").setDescription("อีโมจิหน้าชื่อ (ไม่ใส่ = ใช้แบบเริ่มต้น)").setMaxLength(16))
+      .addBooleanOption((option) => option.setName("plain").setNameLocalizations({ th: "ไม่ตกแต่ง" }).setDescription("ใช้ชื่อตามที่พิมพ์ ไม่ใส่กรอบและอักษรพิเศษ")))
     .addSubcommand((sub) => sub
       .setName("category")
       .setNameLocalizations({ th: "หมวด" })
       .setDescription("สร้างหมวดหมู่")
       .addStringOption((option) => option.setName("name").setNameLocalizations({ th: "ชื่อ" }).setDescription("ชื่อหมวด").setRequired(true).setMaxLength(100))
-      .addRoleOption((option) => option.setName("only").setNameLocalizations({ th: "เห็นเฉพาะยศ" }).setDescription("ให้เห็นเฉพาะยศนี้ (ไม่ใส่ = ทุกคน)")))
+      .addRoleOption((option) => option.setName("only").setNameLocalizations({ th: "เห็นเฉพาะยศ" }).setDescription("ให้เห็นเฉพาะยศนี้ (ไม่ใส่ = ทุกคน)"))
+      .addStringOption((option) => option.setName("emoji").setDescription("อีโมจิหน้าชื่อ (ไม่ใส่ = ใช้แบบเริ่มต้น)").setMaxLength(16))
+      .addBooleanOption((option) => option.setName("plain").setNameLocalizations({ th: "ไม่ตกแต่ง" }).setDescription("ใช้ชื่อตามที่พิมพ์ ไม่ใส่กรอบและอักษรพิเศษ")))
     .addSubcommand((sub) => sub
       .setName("role")
       .setNameLocalizations({ th: "ยศ" })
@@ -41,7 +45,9 @@ export const commands = [
       .addStringOption((option) => option.setName("name").setNameLocalizations({ th: "ชื่อ" }).setDescription("ชื่อยศ").setRequired(true).setMaxLength(100))
       .addStringOption((option) => option.setName("color").setNameLocalizations({ th: "สี" }).setDescription("สีแบบ #2e7eff (ไม่ใส่ก็ได้)").setMaxLength(7))
       .addBooleanOption((option) => option.setName("separate").setNameLocalizations({ th: "แยกกลุ่ม" }).setDescription("แสดงแยกในรายชื่อสมาชิก"))
-      .addBooleanOption((option) => option.setName("mentionable").setNameLocalizations({ th: "แท็กได้" }).setDescription("ให้ทุกคนแท็กยศนี้ได้"))),
+      .addBooleanOption((option) => option.setName("mentionable").setNameLocalizations({ th: "แท็กได้" }).setDescription("ให้ทุกคนแท็กยศนี้ได้"))
+      .addStringOption((option) => option.setName("emoji").setDescription("อีโมจิหน้าชื่อ (ไม่ใส่ = ใช้แบบเริ่มต้น)").setMaxLength(16))
+      .addBooleanOption((option) => option.setName("plain").setNameLocalizations({ th: "ไม่ตกแต่ง" }).setDescription("ใช้ชื่อตามที่พิมพ์ ไม่ใส่กรอบและอักษรพิเศษ"))),
 
   new SlashCommandBuilder()
     .setName("ticket")

@@ -8,8 +8,19 @@ import "./discord-community.css";
 type Notice = (notice: { kind: "success" | "error"; text: string }) => void;
 
 // Same fields as communitySettings in backend/discord_community.go.
+type NameStyle = "plain" | "frame" | "line" | "cute";
+
+// The same examples as STYLE_LABELS in discord-community-bot/src/style.ts.
+const NAME_STYLES: { value: NameStyle; label: string }[] = [
+  { value: "frame", label: "กรอบ  『👋』ยินดีต้อนรับ · 『👑』𝐎𝐰𝐧𝐞𝐫" },
+  { value: "line", label: "เส้นคั่น  ┊👋┊ยินดีต้อนรับ · ┊👑┊𝗢𝘄𝗻𝗲𝗿" },
+  { value: "cute", label: "น่ารัก  ꒰👋꒱・ยินดีต้อนรับ · ꒰👑꒱ ᴏᴡɴᴇʀ" },
+  { value: "plain", label: "เรียบ ๆ  👋・ยินดีต้อนรับ · 👑 Owner" },
+];
+
 type Settings = {
   guildId: string;
+  nameStyle: NameStyle;
   welcomeEnabled: boolean;
   welcomeChannelId: string;
   welcomeMessage: string;
@@ -281,7 +292,6 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
   const loading = !form;
   const off = loading || busy;
   const set = (next: Partial<Settings>) => form && setForm({ ...form, ...next });
-  const otherServer = Boolean(guild && form?.guildId && guild.guildId !== form.guildId);
 
   return (
     <>
@@ -296,11 +306,19 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
         {form && (
           <div className="dbot-body">
             <div className="cmb-server">
-              <div className="hv-field">
-                <label htmlFor="cmb-guild">Server ID</label>
-                <input id="cmb-guild" inputMode="numeric" value={form.guildId} onChange={(event) => set({ guildId: event.target.value.trim() })}
-                  placeholder="เว้นไว้ = เซิร์ฟที่บอทอยู่" disabled={off} />
-                <small>คลิกขวาที่ชื่อเซิร์ฟใน Discord แล้วกด คัดลอก ID (เปิด Developer Mode ก่อน)</small>
+              <div className="cmb-server-fields">
+                <div className="hv-field">
+                  <label htmlFor="cmb-guild">Server ID</label>
+                  <input id="cmb-guild" value={form.guildId || "1164629034248974418"} readOnly disabled />
+                  <small>บอทนี้ล็อกไว้ที่เซิร์ฟนี้เซิร์ฟเดียว ถ้าถูกเชิญไปเซิร์ฟอื่นจะออกเอง</small>
+                </div>
+                <div className="hv-field">
+                  <label htmlFor="cmb-style">สไตล์ชื่อห้องและยศ</label>
+                  <select id="cmb-style" className="hv-select" value={form.nameStyle} onChange={(event) => set({ nameStyle: event.target.value as NameStyle })} disabled={off}>
+                    {NAME_STYLES.map((style) => <option key={style.value} value={style.value}>{style.label}</option>)}
+                  </select>
+                  <small>ใช้กับห้อง หมวด และยศที่บอทสร้าง · เปลี่ยนชื่อห้องที่มีอยู่ด้วยปุ่ม 🎨 แต่งชื่อ ใน /setup</small>
+                </div>
               </div>
               <div className={`cmb-guild${guild?.problems.length ? " is-warn" : ""}`} role="status">
                 <span className="dpr-dot" aria-hidden="true">{guild && !guild.problems.length ? <CircleCheck size={16} /> : <CircleAlert size={16} />}</span>
@@ -312,7 +330,6 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                         {guild.memberCount.toLocaleString("th-TH")} สมาชิก · {guild.channels.length} ห้อง · {guild.roles.length} ยศ · รายงานล่าสุด {ago(guild.updatedAt)}
                       </small>
                       <small>{waiting ? "บอทกำลังใช้ค่าใหม่..." : guild.problems.length ? "ใช้งานได้บางส่วน" : "ใช้งานได้ครบ"}</small>
-                      {otherServer && <small className="dpr-problem">Server ID ที่ใส่ไม่ตรงกับเซิร์ฟที่บอทรายงานมา บันทึกแล้วรอบอทรายงานใหม่</small>}
                       {guild.problems.map((problem) => <small key={problem} className="dpr-problem">{problem}</small>)}
                     </>
                   ) : (

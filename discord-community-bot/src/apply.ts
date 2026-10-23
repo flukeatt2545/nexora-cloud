@@ -1,5 +1,6 @@
 import { REST, Routes, type Client } from "discord.js";
 import { logBotError } from "./api";
+import { ensureSetupChannel } from "./build";
 import { commands } from "./commands";
 import { homeGuild, homeGuildId, markApplied, reportGuild } from "./guild";
 import { syncPanels } from "./panels";
@@ -25,24 +26,33 @@ async function registerCommands(client: Client) {
   console.log(`[INFO] Community bot commands registered in ${home || "no server"}`);
 }
 
-/** A server joined later: make it the home server if none was chosen. */
+/** Any server other than the one it looks after: leave it. */
+async function leaveOtherServers(client: Client) {
+  for (const guild of client.guilds.cache.values()) {
+    if (guild.id === homeGuildId()) continue;
+    console.log(`[INFO] Leaving server ${guild.id}: this bot only works in ${homeGuildId()}`);
+    await guild.leave().catch((error) => logBotError(`leave ${guild.id}`, error));
+  }
+}
+
 export function forgetRegistration() {
   registeredIn = "";
 }
 
 async function run(client: Client, repost: boolean) {
-  // No server chosen anywhere, and the bot is in exactly one: that one, saved for the web page.
+  // The web page shows which server the bot is locked to.
   const current = settings();
-  const home = homeGuild(client);
-  if (current && !current.guildId && home) {
-    await updateSettings("", { guildId: home.id }).catch((error) => logBotError("save guild", error));
+  if (current && current.guildId !== homeGuildId()) {
+    await updateSettings("", { guildId: homeGuildId() }).catch((error) => logBotError("save guild", error));
   }
+  await leaveOtherServers(client);
   await registerCommands(client);
   const guild = homeGuild(client);
   if (!guild || !settings()) {
     markApplied();
     return;
   }
+  await ensureSetupChannel(guild);
   await syncPanels(guild, repost);
   await updateStats(client);
   markApplied(settingsVersion());

@@ -1,22 +1,31 @@
 import {
+  ButtonBuilder,
+  ButtonStyle,
   ChannelType,
+  EmbedBuilder,
   OverwriteType,
   PermissionFlagsBits,
   type CategoryChannel,
   type Guild,
   type GuildBasedChannel,
   type OverwriteResolvable,
+  type PermissionResolvable,
   type Role,
+  type TextChannel,
 } from "discord.js";
 import { assignable } from "./access";
 import { logBotError } from "./api";
-import { settings, type Settings } from "./settings";
+import { nameStyle, settings, type Settings } from "./settings";
 import { statsNames } from "./stats";
 import { siteUp } from "./status";
+import { categoryName, channelName, fancy, restyle, roleName, splitName } from "./style";
+import { COLOR, row } from "./ui";
 
-// "Make what is missing": the roles, categories and channels each turned-on feature needs.
-// A setting that points at something that still exists is left alone; otherwise a channel or
-// role with the expected name is used, and only then a new one is made.
+// "Make what is missing": a tidy server in one go. Roles in the usual order (owner, admin,
+// moderator, staff, VIP, member, bots, then roles members pick), and categories for getting
+// started, chatting, voice, support, stats and staff, each with its channels. Names follow the
+// style chosen in the settings. Anything that already exists (same words, any style) is used
+// as it is; a setting that points at something still there is left alone.
 
 const view = PermissionFlagsBits.ViewChannel;
 const send = PermissionFlagsBits.SendMessages;
@@ -24,12 +33,9 @@ const connect = PermissionFlagsBits.Connect;
 const botAllow = [view, send, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles,
   PermissionFlagsBits.ManageChannels, connect, PermissionFlagsBits.MoveMembers];
 
-type Plan = {
-  change: Partial<Settings>;
-  created: string[];
-};
+type Plan = { change: Partial<Settings>; created: string[] };
 
-/** Who sees a channel: everyone (read only or not), members only, or staff only. */
+/** Who sees a channel: everyone (read only or not), members only, staff only, or only before verifying. */
 type Audience = "everyone-read" | "everyone" | "members" | "members-read" | "staff" | "unverified";
 
 function overwrites(guild: Guild, audience: Audience, memberRoleId: string, staffRoleIds: string[], voice = false): OverwriteResolvable[] {
@@ -60,63 +66,183 @@ function overwrites(guild: Guild, audience: Audience, memberRoleId: string, staf
   }
 }
 
-function exists(guild: Guild, id: string, type: ChannelType) {
+/** Words of a name without emoji, frame or style, for "is this the same channel/role?". */
+function key(name: string) {
+  return splitName(name).words.toLowerCase().replace(/[-\s]+/g, " ");
+}
+
+function exists(guild: Guild, id: string, types: ChannelType[]) {
   const channel = id ? guild.channels.cache.get(id) : undefined;
-  return channel?.type === type ? channel : undefined;
+  return channel && types.includes(channel.type) ? channel : undefined;
 }
 
-function byName(guild: Guild, name: string, type: ChannelType, parentId?: string) {
-  return guild.channels.cache.find((channel) => channel.type === type && channel.name === name && (!parentId || ("parentId" in channel && channel.parentId === parentId)));
+function byWords(guild: Guild, words: string[], types: ChannelType[]) {
+  const wanted = words.map((word) => word.toLowerCase().replace(/[-\s]+/g, " "));
+  // "สมาชิก: 128" is still the members stats channel.
+  return guild.channels.cache.find((channel) => types.includes(channel.type)
+    && wanted.some((word) => key(channel.name) === word || key(channel.name).startsWith(`${word} `)));
 }
 
-async function ensureRole(guild: Guild, plan: Plan, key: "memberRoleId", name: string, color: number): Promise<Role | undefined> {
-  const current = settings()!;
-  const id = (plan.change[key] as string | undefined) ?? current[key];
-  const found = (id && guild.roles.cache.get(id)) || guild.roles.cache.find((role) => role.name === name);
-  if (found) {
-    if (found.id !== id) plan.change[key] = found.id;
-    return found;
-  }
-  const role = await guild.roles.create({ name, color, reason: "/setup: สร้างยศที่ขาด" });
-  plan.change[key] = role.id;
+// Roles
+
+type RoleSpec = {
+  id: string;
+  emoji: string;
+  english: string;
+  /** Older or Thai names that count as this role already. */
+  aliases: string[];
+  color: number;
+  hoist: boolean;
+  permissions: PermissionResolvable[];
+};
+
+const MOD_PERMISSIONS = [PermissionFlagsBits.KickMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ManageMessages,
+  PermissionFlagsBits.ManageNicknames, PermissionFlagsBits.MoveMembers, PermissionFlagsBits.MuteMembers, PermissionFlagsBits.ViewAuditLog];
+
+const ROLES: RoleSpec[] = [
+  { id: "owner", emoji: "👑", english: "Owner", aliases: ["เจ้าของ", "owner", "เจ้าของเซิร์ฟ"], color: 0xf1c40f, hoist: true, permissions: [] },
+  { id: "admin", emoji: "🛡️", english: "Admin", aliases: ["แอดมิน", "admin", "administrator"], color: 0xe74c3c, hoist: true,
+    permissions: [...MOD_PERMISSIONS, PermissionFlagsBits.BanMembers, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageRoles,
+      PermissionFlagsBits.ManageGuild, PermissionFlagsBits.MentionEveryone, PermissionFlagsBits.DeafenMembers] },
+  { id: "mod", emoji: "⚔️", english: "Moderator", aliases: ["ม็อด", "mod", "moderator"], color: 0xe67e22, hoist: true, permissions: MOD_PERMISSIONS },
+  { id: "staff", emoji: "🎫", english: "Staff", aliases: ["ทีมงาน", "staff"], color: 0x2e7eff, hoist: true, permissions: [PermissionFlagsBits.ManageMessages, PermissionFlagsBits.MoveMembers] },
+  { id: "vip", emoji: "💎", english: "VIP", aliases: ["vip", "วีไอพี"], color: 0x9b59b6, hoist: true, permissions: [] },
+  { id: "member", emoji: "✨", english: "Member", aliases: ["สมาชิก", "member", "members"], color: 0x18b77a, hoist: false, permissions: [] },
+  { id: "bots", emoji: "🤖", english: "Bots", aliases: ["บอท", "bot", "bots"], color: 0x95a5a6, hoist: true, permissions: [] },
+];
+
+// Roles members pick for themselves on the roles panel, made when none are set yet.
+const SELF_ROLES: RoleSpec[] = [
+  { id: "gamer", emoji: "🎮", english: "Gamer", aliases: ["เกมเมอร์", "gamer"], color: 0x5865f2, hoist: false, permissions: [] },
+  { id: "music", emoji: "🎵", english: "Music", aliases: ["ฟังเพลง", "music"], color: 0x1abc9c, hoist: false, permissions: [] },
+  { id: "coder", emoji: "💻", english: "Coder", aliases: ["โปรแกรมเมอร์", "coder", "dev"], color: 0x3498db, hoist: false, permissions: [] },
+  { id: "artist", emoji: "🎨", english: "Artist", aliases: ["ศิลปิน", "artist"], color: 0xe91e63, hoist: false, permissions: [] },
+  { id: "student", emoji: "📚", english: "Student", aliases: ["นักเรียน", "นักศึกษา", "student"], color: 0xf39c12, hoist: false, permissions: [] },
+  { id: "updates", emoji: "🔔", english: "Updates", aliases: ["แจ้งเตือน", "updates", "แจ้งเตือนประกาศ"], color: 0x95a5a6, hoist: false, permissions: [] },
+];
+
+function findRole(guild: Guild, spec: RoleSpec, preferId: string) {
+  const known = preferId ? guild.roles.cache.get(preferId) : undefined;
+  if (known) return known;
+  const names = [spec.english, ...spec.aliases].map((name) => name.toLowerCase());
+  return guild.roles.cache.find((role) => !role.managed && names.includes(key(role.name)));
+}
+
+async function ensureRole(guild: Guild, plan: Plan, spec: RoleSpec, preferId = ""): Promise<Role> {
+  const found = findRole(guild, spec, preferId);
+  if (found) return found;
+  const name = roleName(nameStyle(), spec.emoji, spec.english);
+  const base = { name, color: spec.color, hoist: spec.hoist, mentionable: false, reason: "/setup: สร้างยศที่ขาด" };
+  // Without Administrator the bot cannot hand out permissions it lacks; make the role plain then.
+  const role = await guild.roles.create({ ...base, permissions: spec.permissions })
+    .catch(() => guild.roles.create({ ...base, permissions: [] }));
   plan.created.push(`ยศ ${name}`);
   return role;
 }
 
-async function ensureCategory(guild: Guild, plan: Plan, name: string, audience: Audience, idHint = ""): Promise<CategoryChannel> {
+async function buildRoles(guild: Guild, plan: Plan, problems: string[]) {
   const current = settings()!;
-  const memberRoleId = plan.change.memberRoleId ?? current.memberRoleId;
-  const staff = plan.change.staffRoleIds ?? current.staffRoleIds;
-  const found = exists(guild, idHint, ChannelType.GuildCategory) ?? byName(guild, name, ChannelType.GuildCategory);
+  const made = new Map<string, Role>();
+  for (const spec of ROLES) {
+    const preferId = spec.id === "member" ? current.memberRoleId : spec.id === "staff" ? current.staffRoleIds[0] ?? "" : "";
+    try {
+      made.set(spec.id, await ensureRole(guild, plan, spec, preferId));
+    } catch (error) {
+      logBotError(`role ${spec.id}`, error);
+      problems.push(`สร้างยศ ${spec.english} ไม่ได้ (บอทอาจไม่มีสิทธิ์ Manage Roles)`);
+    }
+  }
+  const member = made.get("member");
+  const staff = made.get("staff");
+  if (member && member.id !== current.memberRoleId) plan.change.memberRoleId = member.id;
+  if (staff && !current.staffRoleIds.some((id) => guild.roles.cache.has(id))) plan.change.staffRoleIds = [staff.id];
+
+  if (!current.selfRoleIds.some((id) => guild.roles.cache.has(id))) {
+    const picks: Role[] = [];
+    for (const spec of SELF_ROLES) {
+      try {
+        picks.push(await ensureRole(guild, plan, spec));
+      } catch (error) {
+        logBotError(`self role ${spec.id}`, error);
+      }
+    }
+    if (picks.length) plan.change.selfRoleIds = picks.map((role) => role.id);
+    picks.forEach((role, index) => made.set(`self-${index}`, role));
+  }
+
+  // Top to bottom, right under the bot's own role. Roles the bot cannot move stay where they are.
+  const me = guild.members.me;
+  if (me) {
+    const order = [...made.values()].filter((role) => assignable(guild, role.id));
+    const top = me.roles.highest.position - 1;
+    await guild.roles.setPositions(order.map((role, index) => ({ role: role.id, position: Math.max(1, top - index) })))
+      .catch((error) => logBotError("order roles", error));
+  }
+
+  // The owner gets the owner role and bots get the bots role, so the member list reads well.
+  const owner = made.get("owner");
+  if (owner && assignable(guild, owner.id)) {
+    const ownerMember = await guild.members.fetch(guild.ownerId).catch(() => null);
+    if (ownerMember && !ownerMember.roles.cache.has(owner.id)) await ownerMember.roles.add(owner.id, "/setup: ยศเจ้าของเซิร์ฟ").catch(() => undefined);
+  }
+  const bots = made.get("bots");
+  if (bots && assignable(guild, bots.id)) {
+    const all = await guild.members.fetch().catch(() => null);
+    for (const botMember of all?.filter((item) => item.user.bot && !item.roles.cache.has(bots.id)).values() ?? []) {
+      await botMember.roles.add(bots.id, "/setup: ยศบอท").catch(() => undefined);
+    }
+  }
+}
+
+// Channels
+
+async function ensureCategory(guild: Guild, plan: Plan, emoji: string, english: string, thai: string, audience: Audience, idHint = ""): Promise<CategoryChannel> {
+  const current = settings()!;
+  const found = exists(guild, idHint, [ChannelType.GuildCategory]) ?? byWords(guild, [thai, english, `${english} ${thai}`], [ChannelType.GuildCategory]);
   if (found) return found as CategoryChannel;
+  const name = categoryName(nameStyle(), emoji, english, thai);
   const category = await guild.channels.create({
-    name, type: ChannelType.GuildCategory, permissionOverwrites: overwrites(guild, audience, memberRoleId, staff), reason: "/setup: สร้างหมวดที่ขาด",
+    name, type: ChannelType.GuildCategory, reason: "/setup: สร้างหมวดที่ขาด",
+    permissionOverwrites: overwrites(guild, audience, plan.change.memberRoleId ?? current.memberRoleId, plan.change.staffRoleIds ?? current.staffRoleIds),
   });
   plan.created.push(`หมวด ${name}`);
   return category;
 }
 
-async function ensureChannel(guild: Guild, plan: Plan, key: keyof Settings, name: string, type: ChannelType.GuildText | ChannelType.GuildVoice,
-  parent: CategoryChannel, audience: Audience): Promise<GuildBasedChannel> {
+type ChannelSpec = {
+  key?: keyof Settings;
+  emoji: string;
+  name: string;
+  type: ChannelType.GuildText | ChannelType.GuildVoice;
+  audience: Audience;
+  /** Older names that count as this channel already. */
+  aliases?: string[];
+};
+
+async function ensureChannel(guild: Guild, plan: Plan, parent: CategoryChannel, spec: ChannelSpec, exactName?: string): Promise<GuildBasedChannel> {
   const current = settings()!;
-  const memberRoleId = plan.change.memberRoleId ?? current.memberRoleId;
-  const staff = plan.change.staffRoleIds ?? current.staffRoleIds;
-  const id = (plan.change[key] as string | undefined) ?? (current[key] as string);
-  const found = exists(guild, id, type) ?? byName(guild, name, type, parent.id);
+  const id = spec.key ? ((plan.change[spec.key] as string | undefined) ?? (current[spec.key] as string)) : "";
+  const found = exists(guild, id, [spec.type, ...(spec.type === ChannelType.GuildText ? [ChannelType.GuildAnnouncement] : [])])
+    ?? byWords(guild, [spec.name, ...(spec.aliases ?? [])], [spec.type]);
   if (found) {
-    if (found.id !== id) (plan.change as Record<string, unknown>)[key] = found.id;
+    if (spec.key && found.id !== id) (plan.change as Record<string, unknown>)[spec.key] = found.id;
     return found;
   }
+  const name = exactName ?? channelName(nameStyle(), spec.emoji, spec.type === ChannelType.GuildText ? spec.name.replace(/\s+/g, "-") : spec.name);
   const channel = await guild.channels.create({
-    name, type, parent: parent.id, reason: "/setup: สร้างห้องที่ขาด",
-    permissionOverwrites: overwrites(guild, audience, memberRoleId, staff, type === ChannelType.GuildVoice),
+    name, type: spec.type, parent: parent.id, reason: "/setup: สร้างห้องที่ขาด",
+    permissionOverwrites: overwrites(guild, spec.audience, plan.change.memberRoleId ?? current.memberRoleId,
+      plan.change.staffRoleIds ?? current.staffRoleIds, spec.type === ChannelType.GuildVoice),
   });
-  (plan.change as Record<string, unknown>)[key] = channel.id;
-  plan.created.push(`${type === ChannelType.GuildVoice ? "ห้องเสียง" : "ห้อง"} ${name}`);
+  if (spec.key) (plan.change as Record<string, unknown>)[spec.key] = channel.id;
+  plan.created.push(`${spec.type === ChannelType.GuildVoice ? "ห้องเสียง" : "ห้อง"} ${name}`);
   return channel;
 }
 
-/** Builds what the turned-on features need. Returns the settings to save and what was made. */
+const text = ChannelType.GuildText as const;
+const voice = ChannelType.GuildVoice as const;
+
+/** Builds the roles, categories and channels. Returns the settings to save and what was made. */
 export async function buildMissing(guild: Guild): Promise<Plan & { problems: string[] }> {
   const current = settings()!;
   const plan: Plan = { change: {}, created: [] };
@@ -131,67 +257,90 @@ export async function buildMissing(guild: Guild): Promise<Plan & { problems: str
   };
 
   // Roles first: the channels' permissions refer to them.
-  if (current.verifyEnabled || current.memberRoleId) {
-    await step("ยศสมาชิก", () => ensureRole(guild, plan, "memberRoleId", "สมาชิก", 0x18b77a));
-  }
-  if (current.ticketsEnabled && !current.staffRoleIds.some((id) => guild.roles.cache.has(id))) {
-    await step("ยศทีมงาน", async () => {
-      let staff = guild.roles.cache.find((role) => role.name === "ทีมงาน");
-      if (!staff) {
-        staff = await guild.roles.create({ name: "ทีมงาน", color: 0x2e7eff, hoist: true, reason: "/setup: สร้างยศที่ขาด" });
-        plan.created.push("ยศ ทีมงาน");
-      }
-      plan.change.staffRoleIds = [staff.id];
-    });
-  }
-
+  await buildRoles(guild, plan, problems);
   const memberRoleId = plan.change.memberRoleId ?? current.memberRoleId;
   if (memberRoleId && !assignable(guild, memberRoleId)) problems.push("ยศสมาชิกอยู่สูงกว่ายศของบอท ลากยศของบอทขึ้นไปไว้บนสุดในตั้งค่าเซิร์ฟ");
 
-  const startHere = current.welcomeEnabled || current.verifyEnabled || current.statusEnabled || current.selfRoleIds.length > 0;
-  if (startHere) {
-    await step("หมวดเริ่มต้น", async () => {
-      const hint = exists(guild, current.welcomeChannelId, ChannelType.GuildText);
-      const category = await ensureCategory(guild, plan, "📌 เริ่มต้นที่นี่", "everyone", hint && "parentId" in hint ? hint.parentId ?? "" : "");
-      if (current.welcomeEnabled) await ensureChannel(guild, plan, "welcomeChannelId", "👋・ยินดีต้อนรับ", ChannelType.GuildText, category, "everyone-read");
-      if (current.verifyEnabled) await ensureChannel(guild, plan, "verifyChannelId", "✅・ยืนยันตัวตน", ChannelType.GuildText, category, "unverified");
-      if (current.selfRoleIds.length) await ensureChannel(guild, plan, "rolesChannelId", "🎭・เลือกยศ", ChannelType.GuildText, category, "members-read");
-      if (current.statusEnabled) await ensureChannel(guild, plan, "statusChannelId", "📢・สถานะระบบ", ChannelType.GuildText, category, "members-read");
+  if (current.statsEnabled) {
+    await step("ห้องสถิติ", async () => {
+      const category = await ensureCategory(guild, plan, "📊", "Stats", "สถิติเซิร์ฟ", "everyone", current.statsCategoryId);
+      if (category.id !== current.statsCategoryId) plan.change.statsCategoryId = category.id;
+      // Stats sit at the top of the channel list.
+      if (plan.created.some((item) => item.includes(category.name))) await category.setPosition(0).catch(() => undefined);
+      const counts = await guild.client.guilds.fetch({ guild: guild.id, withCounts: true, force: true }).catch(() => guild);
+      const stat = (key: keyof Settings, words: string, name: string) =>
+        ensureChannel(guild, plan, category, { key, emoji: "", name: words, type: voice, audience: "everyone-read" }, name);
+      await stat("statsMembersChannelId", "สมาชิก", statsNames.members(counts.approximateMemberCount ?? guild.memberCount));
+      await stat("statsOnlineChannelId", "ออนไลน์", statsNames.online(counts.approximatePresenceCount ?? 0));
+      await stat("statsSiteChannelId", "เว็บ", statsNames.site(siteUp()));
     });
   }
+
+  await step("หมวดเริ่มต้น", async () => {
+    const hint = exists(guild, current.welcomeChannelId, [text]);
+    const category = await ensureCategory(guild, plan, "📌", "Start", "เริ่มต้นที่นี่", "everyone", hint && "parentId" in hint ? hint.parentId ?? "" : "");
+    if (current.welcomeEnabled) await ensureChannel(guild, plan, category, { key: "welcomeChannelId", emoji: "👋", name: "ยินดีต้อนรับ", type: text, audience: "everyone-read", aliases: ["welcome"] });
+    if (current.verifyEnabled) await ensureChannel(guild, plan, category, { key: "verifyChannelId", emoji: "✅", name: "ยืนยันตัวตน", type: text, audience: "unverified", aliases: ["verify"] });
+    await ensureChannel(guild, plan, category, { emoji: "📜", name: "กฎ", type: text, audience: "everyone-read", aliases: ["กฎเซิร์ฟ", "rules"] });
+    await ensureChannel(guild, plan, category, { emoji: "📢", name: "ประกาศ", type: text, audience: "members-read", aliases: ["announcements", "news"] });
+    await ensureChannel(guild, plan, category, { key: "rolesChannelId", emoji: "🎭", name: "เลือกยศ", type: text, audience: "members-read", aliases: ["roles"] });
+    if (current.statusEnabled) await ensureChannel(guild, plan, category, { key: "statusChannelId", emoji: "📡", name: "สถานะระบบ", type: text, audience: "members-read", aliases: ["status"] });
+  });
+
+  await step("หมวดพูดคุย", async () => {
+    const category = await ensureCategory(guild, plan, "💬", "Community", "พูดคุย", "members");
+    await ensureChannel(guild, plan, category, { emoji: "💬", name: "แชททั่วไป", type: text, audience: "members", aliases: ["general", "แชท", "ทั่วไป"] });
+    await ensureChannel(guild, plan, category, { emoji: "🖼️", name: "รูปภาพ", type: text, audience: "members", aliases: ["media", "รูป"] });
+    await ensureChannel(guild, plan, category, { emoji: "🤖", name: "คำสั่งบอท", type: text, audience: "members", aliases: ["bot commands", "commands"] });
+  });
+
+  await step("หมวดห้องเสียง", async () => {
+    const hub = exists(guild, current.tempHubChannelId, [voice]);
+    const parent = hub && "parentId" in hub && hub.parentId ? hub.parentId : "";
+    const category = await ensureCategory(guild, plan, "🔊", "Voice", "ห้องเสียง", "members", parent);
+    if (current.tempVoiceEnabled) await ensureChannel(guild, plan, category, { key: "tempHubChannelId", emoji: "➕", name: "สร้างห้องเสียง", type: voice, audience: "members" });
+    await ensureChannel(guild, plan, category, { emoji: "🛋️", name: "นั่งเล่น", type: voice, audience: "members", aliases: ["lounge", "general"] });
+  });
 
   if (current.ticketsEnabled) {
     await step("หมวด Ticket", async () => {
-      const category = await ensureCategory(guild, plan, "🎫 ช่วยเหลือ", "members", current.ticketCategoryId);
+      const category = await ensureCategory(guild, plan, "🎫", "Support", "ช่วยเหลือ", "members", current.ticketCategoryId);
       if (category.id !== current.ticketCategoryId) plan.change.ticketCategoryId = category.id;
-      await ensureChannel(guild, plan, "ticketChannelId", "🎫・เปิด-ticket", ChannelType.GuildText, category, "members-read");
-      await ensureChannel(guild, plan, "ticketLogChannelId", "📝・ticket-log", ChannelType.GuildText, category, "staff");
+      await ensureChannel(guild, plan, category, { key: "ticketChannelId", emoji: "🎫", name: "เปิด ticket", type: text, audience: "members-read" });
+      await ensureChannel(guild, plan, category, { key: "ticketLogChannelId", emoji: "📝", name: "ticket log", type: text, audience: "staff" });
     });
   }
 
-  if (current.tempVoiceEnabled) {
-    await step("ห้องสร้างห้องเสียง", async () => {
-      const hub = exists(guild, current.tempHubChannelId, ChannelType.GuildVoice);
-      if (hub) return;
-      const category = await ensureCategory(guild, plan, "🔊 ห้องเสียง", "members");
-      await ensureChannel(guild, plan, "tempHubChannelId", "➕ สร้างห้องเสียง", ChannelType.GuildVoice, category, "members");
-    });
-  }
-
-  if (current.statsEnabled) {
-    await step("ห้องสถิติ", async () => {
-      const category = await ensureCategory(guild, plan, "📊 สถิติเซิร์ฟ", "everyone", current.statsCategoryId);
-      if (category.id !== current.statsCategoryId) plan.change.statsCategoryId = category.id;
-      // Stats sit at the top of the channel list.
-      if (plan.created.includes("หมวด 📊 สถิติเซิร์ฟ")) await category.setPosition(0).catch(() => undefined);
-      const counts = await guild.client.guilds.fetch({ guild: guild.id, withCounts: true, force: true }).catch(() => guild);
-      await ensureChannel(guild, plan, "statsMembersChannelId", statsNames.members(counts.approximateMemberCount ?? guild.memberCount), ChannelType.GuildVoice, category, "everyone-read");
-      await ensureChannel(guild, plan, "statsOnlineChannelId", statsNames.online(counts.approximatePresenceCount ?? 0), ChannelType.GuildVoice, category, "everyone-read");
-      await ensureChannel(guild, plan, "statsSiteChannelId", statsNames.site(siteUp()), ChannelType.GuildVoice, category, "everyone-read");
-    });
-  }
+  await step("หมวดทีมงาน", async () => {
+    const category = await ensureCategory(guild, plan, "🛡️", "Staff", "ทีมงาน", "staff");
+    await ensureChannel(guild, plan, category, { emoji: "🛡️", name: "ห้องทีมงาน", type: text, audience: "staff", aliases: ["staff chat"] });
+    await ensureChannel(guild, plan, category, { emoji: "⚙️", name: "ตั้งค่าบอท", type: text, audience: "staff", aliases: ["bot setup"] });
+  });
 
   return { ...plan, problems };
+}
+
+/**
+ * Renames every channel and category to the chosen style, keeping each one's emoji and words.
+ * Channels the bot cannot manage are skipped; the stats channels get their numbers next update.
+ */
+export async function decorateAll(guild: Guild) {
+  const style = nameStyle();
+  let changed = 0;
+  let failed = 0;
+  for (const channel of guild.channels.cache.values()) {
+    if (channel.isThread()) continue;
+    const name = restyle(style, channel.type, channel.name);
+    if (!name || name === channel.name) continue;
+    try {
+      await channel.setName(name, "แต่งชื่อห้องด้วยอักษรพิเศษ");
+      changed += 1;
+    } catch (error) {
+      logBotError("decorate channel", error);
+      failed += 1;
+    }
+  }
+  return { changed, failed };
 }
 
 /**
@@ -225,4 +374,65 @@ export async function hideFromUnverified(guild: Guild) {
     }
   }
   return { changed, failed, missingRole: false };
+}
+
+// An empty server (no text channel at all, e.g. right after "delete everything") gets one room
+// only admins see, with a button that opens the settings, so there is somewhere to type /setup.
+
+let makingSetupRoom = false;
+
+export async function ensureSetupChannel(guild: Guild, note?: string): Promise<TextChannel | null> {
+  const textChannels = guild.channels.cache.filter((channel) => channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement);
+  if ((textChannels.size > 0 && !note) || makingSetupRoom) return null;
+  makingSetupRoom = true;
+  try {
+    const managers = (settings()?.managerRoleIds ?? []).filter((id) => guild.roles.cache.has(id));
+    const existing = textChannels.find((channel) => key(channel.name) === "ตั้งค่าบอท") as TextChannel | undefined;
+    const channel = existing ?? await guild.channels.create({
+      name: channelName(nameStyle(), "⚙️", "ตั้งค่าบอท"),
+      type: ChannelType.GuildText,
+      reason: "เซิร์ฟยังไม่มีห้องพิมพ์ สร้างห้องไว้ตั้งค่าบอท",
+      permissionOverwrites: [
+        { id: guild.id, type: OverwriteType.Role, deny: [view] },
+        { id: guild.client.user.id, type: OverwriteType.Member, allow: botAllow },
+        ...managers.map((id) => ({ id, type: OverwriteType.Role, allow: [view, send] })),
+      ],
+    });
+    const embed = new EmbedBuilder()
+      .setColor(COLOR.brand)
+      .setTitle(`${fancy("Setup", "bold")} ・ ตั้งค่าบอทดูแลเซิร์ฟ`)
+      .setDescription([
+        note ?? "เซิร์ฟนี้ยังไม่มีห้องพิมพ์ บอทเลยสร้างห้องนี้ไว้ให้ตั้งค่า (เห็นเฉพาะแอดมิน)",
+        "",
+        "กด **เปิดหน้าตั้งค่า** หรือพิมพ์ `/setup` แล้วกด **🛠️ สร้างที่ขาดให้** บอทจะสร้างยศ หมวด และห้องที่ต้องใช้ทั้งหมด",
+      ].join("\n"));
+    await channel.send({ embeds: [embed], components: [row(new ButtonBuilder().setCustomId("cm:setup:open").setStyle(ButtonStyle.Primary).setLabel("เปิดหน้าตั้งค่า").setEmoji("⚙️"))] });
+    return channel;
+  } catch (error) {
+    logBotError("setup channel", error);
+    return null;
+  } finally {
+    makingSetupRoom = false;
+  }
+}
+
+// Delete everything: every channel and category (the server owner or an Administrator only).
+
+export async function deleteAllChannels(guild: Guild) {
+  // Rooms inside categories first, then the categories.
+  const channels = [...guild.channels.cache.values()].filter((channel) => !channel.isThread())
+    .sort((a, b) => Number(a.type === ChannelType.GuildCategory) - Number(b.type === ChannelType.GuildCategory));
+  let deleted = 0;
+  const failed: string[] = [];
+  for (const channel of channels) {
+    try {
+      await channel.delete("ลบห้องและหมวดทั้งหมดผ่าน /setup");
+      deleted += 1;
+    } catch (error) {
+      logBotError("delete channel", error);
+      // A Community server's rules and updates rooms cannot be deleted while Community is on.
+      failed.push(channel.name);
+    }
+  }
+  return { deleted, failed };
 }

@@ -4,8 +4,8 @@ dotenv.config();
 
 // A token set on the admin web page wins; otherwise the bot uses the one in .env.
 export const ENV_TOKEN = process.env.COMMUNITY_DISCORD_BOT_TOKEN || "";
-// The server set on the admin web page wins over this one.
-export const ENV_GUILD_ID = (process.env.COMMUNITY_DISCORD_GUILD_ID || "").trim();
+// The one server this bot looks after. It leaves any other server it is added to.
+export const GUILD_ID = (process.env.COMMUNITY_DISCORD_GUILD_ID || "").trim() || "1164629034248974418";
 export const API_URL = (process.env.NEXORA_API_URL || "http://localhost:8080").replace(/\/+$/, "");
 export const BOT_SECRET = process.env.BOT_INTERNAL_SECRET || "";
 export const PUBLIC_APP_URL = (process.env.PUBLIC_APP_URL || "https://nkn02.com").replace(/\/+$/, "");

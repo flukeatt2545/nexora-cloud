@@ -12,12 +12,13 @@ import { api, logBotError } from "./api";
 import { applySettings, forgetRegistration, watchSettings } from "./apply";
 import { startBot } from "./bot-token";
 import { API_URL, BOT_SECRET, ENV_TOKEN } from "./config";
+import { ensureSetupChannel } from "./build";
 import { isHome, reportGuild, reportSoon } from "./guild";
 import { checkRateLimit } from "./limits";
 import { onMemberJoin, onRolesOpen, onRolesSet, onVerify } from "./members";
 import { onMessageDeleted } from "./panels";
 import { loadSettings } from "./settings";
-import { onCreateCommand, onSetupCommand, onSetupComponent, onSetupText } from "./setup";
+import { onCreateCommand, onSetupCommand, onSetupComponent, onSetupText, onWipeSubmit } from "./setup";
 import { startStats, updateStats } from "./stats";
 import { startStatusChecks } from "./status";
 import { onChannelGone as onTempChannelGone, onVoiceState as onTempVoiceState, syncTempRooms } from "./tempvoice";
@@ -91,6 +92,7 @@ client.once(Events.ClientReady, async (ready) => {
   setInterval(() => void reportGuild(client), 60000).unref();
 });
 
+// Added to a server: the one it looks after gets set up; any other is left (apply.ts).
 client.on(Events.GuildCreate, (guild) => {
   console.log(`[INFO] Added to server ${guild.id}`);
   forgetRegistration();
@@ -109,11 +111,16 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
   onTempVoiceState(oldState, newState).catch((error) => logBotError("voice state", error));
 });
 
+// The last text channel deleted: make the setup room, so there is somewhere to type /setup.
+let emptyCheck: NodeJS.Timeout | null = null;
+
 client.on(Events.ChannelDelete, (channel) => {
   if (channel.isDMBased() || !isHome(channel.guild)) return;
   onTicketChannelGone(channel.id);
   onTempChannelGone(channel.id);
   reportSoon(client);
+  if (emptyCheck) clearTimeout(emptyCheck);
+  emptyCheck = setTimeout(() => void ensureSetupChannel(channel.guild), 5000);
 });
 
 // Channels and roles changed by hand: the web page's pickers get the new lists.
@@ -155,6 +162,7 @@ async function route(interaction: Interaction) {
     if (id === "cm:ticket:create") await onTicketCreate(interaction);
     else if (id.startsWith("cm:ticket:closing:")) await onTicketCloseSubmit(interaction);
     else if (id.startsWith("cm:text:")) await onSetupText(interaction);
+    else if (id === "cm:wipe") await onWipeSubmit(interaction);
     return;
   }
   if (!interaction.isMessageComponent()) return;

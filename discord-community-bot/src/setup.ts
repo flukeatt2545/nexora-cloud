@@ -25,11 +25,12 @@ import {
 import { isManager } from "./access";
 import { api, apiMessage, logBotError } from "./api";
 import { applySettings } from "./apply";
-import { buildMissing, hideFromUnverified } from "./build";
-import { SETTINGS_URL } from "./config";
+import { buildMissing, decorateAll, deleteAllChannels, ensureSetupChannel, hideFromUnverified } from "./build";
+import { isBotAdmin, SETTINGS_URL } from "./config";
 import { reportSoon } from "./guild";
-import { settings, updateSettings, type Settings } from "./settings";
-import { COLOR, errorEmbed, linkButton, okEmbed, row } from "./ui";
+import { nameStyle, savePanel, settings, updateSettings, type PanelKey, type Settings } from "./settings";
+import { restyle, roleName, splitName, STYLE_LABELS, type NameStyle } from "./style";
+import { COLOR, errorEmbed, okEmbed, row } from "./ui";
 
 const ephemeral = MessageFlags.Ephemeral as const;
 
@@ -101,7 +102,11 @@ function homePage(current: Settings) {
   const embed = new EmbedBuilder()
     .setColor(COLOR.brand)
     .setTitle("ตั้งค่าบอทดูแลเซิร์ฟ")
-    .setDescription("ตั้งที่นี่หรือที่หน้าเว็บแอดมินก็ได้ ค่าเดียวกัน\nกด **สร้างที่ขาดให้** แล้วบอทจะสร้างห้อง หมวด และยศที่ฟีเจอร์ที่เปิดอยู่ต้องใช้")
+    .setDescription([
+      `ตั้งที่นี่หรือที่[หน้าเว็บแอดมิน](${SETTINGS_URL})ก็ได้ ค่าเดียวกัน`,
+      "**🛠️ สร้างที่ขาดให้** สร้างยศ หมวด และห้องที่ยังไม่มี (ชื่อตามสไตล์ที่เลือก) · **🎨 แต่งชื่อ** เปลี่ยนชื่อห้องที่มีอยู่เป็นสไตล์นี้",
+      `สไตล์ชื่อตอนนี้: ${STYLE_LABELS[current.nameStyle] ?? STYLE_LABELS.frame}`,
+    ].join("\n"))
     .addFields(
       { name: `ต้อนรับ ${on(current.welcomeEnabled)} · ยืนยันตัวตน ${on(current.verifyEnabled)}`,
         value: `ห้องต้อนรับ ${slotText(current, "welcomeChannelId")}\nห้องยืนยัน ${slotText(current, "verifyChannelId")} · ยศสมาชิก ${slotText(current, "memberRoleId")}` },
@@ -127,13 +132,18 @@ function homePage(current: Settings) {
     .setCustomId("cm:setup:text")
     .setPlaceholder("แก้ข้อความ")
     .addOptions(TEXTS.map((item) => ({ label: item.label, value: item.key })));
+  const style = new StringSelectMenuBuilder()
+    .setCustomId("cm:setup:style")
+    .setPlaceholder("สไตล์ชื่อห้องและยศ")
+    .addOptions((Object.keys(STYLE_LABELS) as NameStyle[]).map((value) => ({ label: STYLE_LABELS[value], value, default: value === current.nameStyle })));
   const buttons = row(
     new ButtonBuilder().setCustomId("cm:setup:build").setStyle(ButtonStyle.Primary).setLabel("สร้างที่ขาดให้").setEmoji("🛠️"),
-    new ButtonBuilder().setCustomId("cm:setup:hide").setStyle(ButtonStyle.Secondary).setLabel("ซ่อนห้องจากคนยังไม่ยืนยัน").setEmoji("🔒"),
+    new ButtonBuilder().setCustomId("cm:setup:decorate").setStyle(ButtonStyle.Secondary).setLabel("แต่งชื่อ").setEmoji("🎨"),
+    new ButtonBuilder().setCustomId("cm:setup:hide").setStyle(ButtonStyle.Secondary).setLabel("ซ่อนห้อง").setEmoji("🔒"),
     new ButtonBuilder().setCustomId("cm:setup:repost").setStyle(ButtonStyle.Secondary).setLabel("ลงแผงใหม่").setEmoji("🔁"),
-    linkButton(SETTINGS_URL, "ตั้งค่าบนเว็บ"),
+    new ButtonBuilder().setCustomId("cm:setup:wipe").setStyle(ButtonStyle.Danger).setLabel("ลบห้องทั้งหมด").setEmoji("🗑️"),
   );
-  return { embeds: [embed], components: [row(features), row(pick), row(text), buttons] };
+  return { embeds: [embed], components: [row(features), row(pick), row(text), row(style), buttons] };
 }
 
 function pickerPage(current: Settings, slot: Slot) {
@@ -208,8 +218,48 @@ export async function onSetupComponent(interaction: ButtonInteraction | StringSe
   }
   const id = interaction.customId;
 
-  if (id === "cm:setup:home") {
+  if (id === "cm:setup:open") {
+    // The button in the setup room: a fresh panel only this admin sees.
+    await interaction.reply({ ...homePage(current), flags: ephemeral });
+  } else if (id === "cm:setup:home") {
     await interaction.update(homePage(current));
+  } else if (id === "cm:setup:style" && interaction.isStringSelectMenu()) {
+    await save(interaction, { nameStyle: interaction.values[0] as NameStyle });
+  } else if (id === "cm:setup:decorate") {
+    await interaction.deferUpdate();
+    const result = await decorateAll(interaction.guild!);
+    reportSoon(interaction.client);
+    await interaction.editReply({
+      embeds: [new EmbedBuilder().setColor(result.failed ? COLOR.warn : COLOR.ok).setTitle("แต่งชื่อห้องแล้ว").setDescription(
+        `เปลี่ยนชื่อ ${result.changed} ห้อง/หมวด เป็นสไตล์ ${STYLE_LABELS[nameStyle()]}` +
+        (result.failed ? `\nเปลี่ยนไม่ได้ ${result.failed} ห้อง (บอทไม่มีสิทธิ์จัดการห้องนั้น หรือ Discord จำกัดการเปลี่ยนชื่อถี่ ๆ ลองใหม่ใน 10 นาที)` : ""))],
+      components: [row(new ButtonBuilder().setCustomId("cm:setup:home").setStyle(ButtonStyle.Secondary).setLabel("กลับไปหน้าตั้งค่า"))],
+    });
+  } else if (id === "cm:setup:wipe") {
+    if (!mayWipe(interaction.member as GuildMember)) {
+      await interaction.update({ embeds: [errorEmbed("ลบไม่ได้", "ลบห้องทั้งหมดได้เฉพาะเจ้าของเซิร์ฟและคนที่มีสิทธิ์ Administrator")],
+        components: [row(new ButtonBuilder().setCustomId("cm:setup:home").setStyle(ButtonStyle.Secondary).setLabel("กลับ"))] });
+      return;
+    }
+    const guild = interaction.guild!;
+    const count = guild.channels.cache.filter((channel) => !channel.isThread()).size;
+    await interaction.update({
+      embeds: [new EmbedBuilder().setColor(COLOR.danger).setTitle("⚠️ ลบห้องและหมวดทั้งหมด?").setDescription([
+        `บอทจะลบห้องและหมวด **ทั้งหมด ${count} อัน** ในเซิร์ฟ **${guild.name}** รวมข้อความในห้องเหล่านั้น **กู้คืนไม่ได้**`,
+        "ยศและสมาชิกไม่ถูกแตะ เสร็จแล้วบอทจะสร้างห้อง ⚙️ ตั้งค่าบอท ไว้ 1 ห้องให้ตั้งต่อ",
+        "",
+        "กด **ยืนยัน** แล้วพิมพ์ชื่อเซิร์ฟให้ตรงเพื่อลบ",
+      ].join("\n"))],
+      components: [row(
+        new ButtonBuilder().setCustomId("cm:setup:wipe:yes").setStyle(ButtonStyle.Danger).setLabel("ยืนยัน"),
+        new ButtonBuilder().setCustomId("cm:setup:home").setStyle(ButtonStyle.Secondary).setLabel("ยกเลิก"),
+      )],
+    });
+  } else if (id === "cm:setup:wipe:yes") {
+    if (!mayWipe(interaction.member as GuildMember)) return;
+    await interaction.showModal(new ModalBuilder().setCustomId("cm:wipe").setTitle("ลบห้องและหมวดทั้งหมด").addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(new TextInputBuilder().setCustomId("name").setLabel("พิมพ์ชื่อเซิร์ฟเพื่อยืนยัน")
+        .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100).setPlaceholder(interaction.guild!.name.slice(0, 100)))));
   } else if (id === "cm:setup:features" && interaction.isStringSelectMenu()) {
     const change: Partial<Settings> = {};
     for (const feature of FEATURES) (change as Record<string, boolean>)[feature.key] = interaction.values.includes(feature.key);
@@ -303,6 +353,45 @@ export async function onSetupText(interaction: ModalSubmitInteraction) {
   await save(interaction, { [key]: raw });
 }
 
+/** Deleting every channel is for the server owner and Administrators only, not manager roles. */
+function mayWipe(member: GuildMember) {
+  return member.id === member.guild.ownerId || isBotAdmin(member.id) || member.permissions.has(PermissionFlagsBits.Administrator);
+}
+
+const CHANNEL_KEYS: (keyof Settings)[] = ["welcomeChannelId", "verifyChannelId", "rolesChannelId", "ticketChannelId", "ticketCategoryId",
+  "ticketLogChannelId", "tempHubChannelId", "statsCategoryId", "statsMembersChannelId", "statsOnlineChannelId", "statsSiteChannelId", "statusChannelId"];
+
+export async function onWipeSubmit(interaction: ModalSubmitInteraction) {
+  const member = interaction.member as GuildMember;
+  const guild = interaction.guild!;
+  if (!mayWipe(member)) {
+    await interaction.reply({ embeds: [errorEmbed("ลบไม่ได้", "ลบห้องทั้งหมดได้เฉพาะเจ้าของเซิร์ฟและคนที่มีสิทธิ์ Administrator")], flags: ephemeral });
+    return;
+  }
+  if (interaction.fields.getTextInputValue("name").trim() !== guild.name.trim()) {
+    await interaction.reply({ embeds: [errorEmbed("ชื่อเซิร์ฟไม่ตรง", "ไม่ได้ลบอะไร พิมพ์ชื่อเซิร์ฟให้ตรงทุกตัวอักษรแล้วลองใหม่")], flags: ephemeral });
+    return;
+  }
+  await interaction.deferReply({ flags: ephemeral });
+  console.log(`[INFO] ${interaction.user.username} is deleting every channel in ${guild.id}`);
+  const result = await deleteAllChannels(guild);
+  // The settings pointed at channels that are gone now.
+  const cleared: Partial<Settings> = {};
+  for (const key of CHANNEL_KEYS) (cleared as Record<string, string>)[key] = "";
+  await updateSettings(interaction.user, cleared).catch((error) => logBotError("clear channel settings", error));
+  for (const key of ["verify", "roles", "ticket"] as PanelKey[]) await savePanel(key, { channelId: "", messageId: "" });
+  await api(interaction.user).post("/api/internal/bot/community/event", {
+    kind: "wipe", guildId: guild.id, name: guild.name, created: [`ลบ ${result.deleted} ห้อง/หมวด`, ...result.failed.map((name) => `ลบไม่ได้: ${name}`)],
+  }).catch((error) => logBotError("log wipe", error));
+  const note = [
+    `<@${member.id}> ลบห้องและหมวดทั้งหมดแล้ว (${result.deleted} อัน)`,
+    result.failed.length ? `ลบไม่ได้ ${result.failed.length} ห้อง: ${result.failed.join(", ")} (ห้องกฎ/ประกาศของเซิร์ฟ Community ต้องปิด Community ก่อน)` : "",
+  ].filter(Boolean).join("\n");
+  const room = await ensureSetupChannel(guild, note);
+  await interaction.editReply({ embeds: [okEmbed("ลบเสร็จแล้ว", room ? `ไปตั้งค่าต่อที่ ${room}` : note)] }).catch(() => undefined);
+  reportSoon(interaction.client);
+}
+
 // /create
 
 function onlyRole(guild: GuildMember["guild"], roleId: string, readOnly: boolean): OverwriteResolvable[] {
@@ -319,7 +408,11 @@ export async function onCreateCommand(interaction: ChatInputCommandInteraction) 
   if (await denyUnlessManager(interaction)) return;
   const guild = interaction.guild!;
   const sub = interaction.options.getSubcommand();
-  const name = interaction.options.getString("name", true).trim();
+  const typed = interaction.options.getString("name", true).trim();
+  // Decorated in the server's name style unless asked not to; an emoji typed at the start is kept.
+  const plain = interaction.options.getBoolean("plain") ?? false;
+  const emoji = interaction.options.getString("emoji")?.trim() ?? "";
+  const styled = (type: ChannelType) => (plain ? typed : restyle(nameStyle(), type, `${emoji} ${typed}`) || typed);
   await interaction.deferReply({ flags: ephemeral });
   try {
     if (sub === "role") {
@@ -329,7 +422,7 @@ export async function onCreateCommand(interaction: ChatInputCommandInteraction) 
         return;
       }
       const role = await guild.roles.create({
-        name, color: colorText ? parseInt(colorText.replace("#", ""), 16) : undefined,
+        name: plain ? typed : roleName(nameStyle(), emoji || splitName(typed).emoji || "✨", splitName(typed).words || typed), color: colorText ? parseInt(colorText.replace("#", ""), 16) : undefined,
         hoist: interaction.options.getBoolean("separate") ?? false, mentionable: interaction.options.getBoolean("mentionable") ?? false,
         reason: `/create โดย ${interaction.user.username}`,
       });
@@ -339,7 +432,7 @@ export async function onCreateCommand(interaction: ChatInputCommandInteraction) 
     }
     const roleId = interaction.options.getRole("only")?.id ?? "";
     if (sub === "category") {
-      const category = await guild.channels.create({ name, type: ChannelType.GuildCategory, permissionOverwrites: onlyRole(guild, roleId, false), reason: `/create โดย ${interaction.user.username}` });
+      const category = await guild.channels.create({ name: styled(ChannelType.GuildCategory), type: ChannelType.GuildCategory, permissionOverwrites: onlyRole(guild, roleId, false), reason: `/create โดย ${interaction.user.username}` });
       await api(interaction.user).post("/api/internal/bot/community/event", { kind: "category", guildId: guild.id, name: category.name, id: category.id }).catch(() => undefined);
       await interaction.editReply({ embeds: [okEmbed("สร้างหมวดแล้ว", `**${category.name}**${roleId ? ` เห็นเฉพาะ <@&${roleId}>` : ""}`)] });
       return;
@@ -349,7 +442,7 @@ export async function onCreateCommand(interaction: ChatInputCommandInteraction) 
     const readOnly = interaction.options.getBoolean("read_only") ?? false;
     const custom = Boolean(roleId) || readOnly;
     const channel = await guild.channels.create({
-      name, type: type as ChannelType.GuildText,
+      name: styled(type), type: type as ChannelType.GuildText,
       parent: parent?.id,
       // Without a role or read-only it simply follows its category's permissions.
       permissionOverwrites: custom ? onlyRole(guild, roleId, readOnly && type !== ChannelType.GuildVoice) : undefined,

@@ -2,6 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { api, logBotError, type Actor } from "./api";
+import type { NameStyle } from "./style";
 
 // The bot's settings live on the site (admin Discord bot page, or /setup here). The last copy is
 // kept in memory and on disk, so the bot keeps working (and can say the site is down) while the
@@ -9,6 +10,7 @@ import { api, logBotError, type Actor } from "./api";
 
 export type Settings = {
   guildId: string;
+  nameStyle: NameStyle;
   welcomeEnabled: boolean;
   welcomeChannelId: string;
   welcomeMessage: string;
@@ -69,6 +71,11 @@ function remember(next: Snapshot) {
 /** The settings the bot is using now (null until the site has answered once). */
 export function settings(): Settings | null {
   return snapshot?.settings ?? null;
+}
+
+/** The name style to use (the default until the site has answered). */
+export function nameStyle(): NameStyle {
+  return snapshot?.settings.nameStyle ?? "frame";
 }
 
 export function panels(): Panels {

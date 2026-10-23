@@ -20,6 +20,8 @@ import (
 
 type communitySettings struct {
 	GuildID string `json:"guildId"`
+	// How the bot decorates the names it makes: plain, frame 『』, line ┊ or cute ꒰꒱.
+	NameStyle string `json:"nameStyle"`
 
 	WelcomeEnabled   bool   `json:"welcomeEnabled"`
 	WelcomeChannelID string `json:"welcomeChannelId"`
@@ -139,6 +141,7 @@ const (
 
 func defaultCommunitySettings() communitySettings {
 	return communitySettings{
+		NameStyle:      "frame",
 		WelcomeEnabled: true, WelcomeMessage: communityDefaultWelcome,
 		VerifyEnabled: true, VerifyMessage: communityDefaultVerify,
 		RolesMessage: communityDefaultRoles, SelfRoleIDs: []string{},
@@ -219,6 +222,13 @@ func validateCommunitySettings(in communitySettings) (communitySettings, error) 
 		if utf8.RuneCountInString(*text.value) > text.max {
 			return in, errors.New(text.label + "ยาวได้ไม่เกิน " + strconv.Itoa(text.max) + " ตัว")
 		}
+	}
+	switch in.NameStyle {
+	case "plain", "frame", "line", "cute":
+	case "":
+		in.NameStyle = "frame"
+	default:
+		return in, errors.New("สไตล์ชื่อไม่ถูกต้อง")
 	}
 	if in.TicketMaxOpen < 1 || in.TicketMaxOpen > 5 {
 		return in, errors.New("Ticket ที่เปิดค้างได้ต่อคนต้องอยู่ระหว่าง 1–5")
@@ -667,6 +677,8 @@ func (s *server) botCommunityEvent(c *fiber.Ctx) error {
 		action, target = "discord.community.role_created", "discord_role"
 	case "setup":
 		action, target = "discord.community.setup_ran", "community_settings"
+	case "wipe":
+		action, target = "discord.community.server_wiped", "discord_guild"
 	default:
 		return fiber.NewError(fiber.StatusBadRequest, "ข้อมูลไม่ถูกต้อง")
 	}
