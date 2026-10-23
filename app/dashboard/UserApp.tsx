@@ -17,7 +17,7 @@ import { asciiInputProps, hasNonAscii } from "../lib/asciiInput";
 import { API_BASE } from "../runtime";
 import MailView from "./MailView";
 import BotsView from "./BotsView";
-import SessionGuard from "../components/SessionGuard";
+import SessionGuard, { EXPIRED_EVENT } from "../components/SessionGuard";
 import "./user-overview.css";
 import SmartImage from "../components/SmartImage";
 import { POINTS_EVENT, broadcastPoints } from "../components/StorePurchase";
@@ -217,6 +217,7 @@ export default function UserApp({ view }: { view: UserView }) {
   const [mailUnread, setMailUnread] = useState(0);
   const [mailboxes, setMailboxes] = useState<OverviewMailbox[]>([]);
   const accountRef = useRef<HTMLDivElement>(null);
+  const wasSignedIn = useRef(false);
 
   useEffect(() => {
     if (!me) return;
@@ -407,9 +408,13 @@ export default function UserApp({ view }: { view: UserView }) {
     api<{ authenticated: boolean; user: AuthUser | null }>("/api/auth/me")
       .then((result) => {
         if (!result.authenticated || !result.user) {
-          window.location.href = "/";
+          // A session that ran out while the page was open is the session guard's to announce; it
+          // keeps its notice up until the person signs in again.
+          if (wasSignedIn.current) window.dispatchEvent(new Event(EXPIRED_EVENT));
+          else window.location.href = "/";
           return;
         }
+        wasSignedIn.current = true;
         if (!result.user.passwordEnabled && view !== "profile" && view !== "store") {
           window.location.href = "/profile?password_setup=required";
           return;
@@ -423,7 +428,7 @@ export default function UserApp({ view }: { view: UserView }) {
         setMe(result.user);
         setLoading(false);
       })
-      .catch(() => window.location.href = "/")
+      .catch(() => { if (!wasSignedIn.current) window.location.href = "/"; })
       .finally(() => setLoading(false));
   }, [view]);
 

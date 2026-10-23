@@ -1,24 +1,31 @@
-/* Idle-time field on the sign-in settings (SessionTtlField). */
+/* Idle-time field on the sign-in settings (SessionTtlField).
+   Weights use !important because theme.css forces every button, strong and heading to 600,
+   which makes small Thai text dense. */
 .ttl-field { display: grid; gap: 10px; width: 100%; max-width: 460px; }
 .ttl-row { display: flex; align-items: stretch; min-height: 44px; overflow: hidden; border: 1px solid var(--control-line); border-radius: 11px; background: var(--theme-input, var(--control-surface)); transition: border-color .15s, box-shadow .15s; }
 .ttl-row:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
 .ttl-row.is-invalid { border-color: var(--danger); }
-.ttl-row input { flex: 1 1 auto; min-width: 0; padding: 0 14px; border: 0; background: none; color: var(--theme-text-strong); font: inherit; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; outline: none; }
+.ttl-row input { flex: 1 1 auto; min-width: 0; padding: 0 14px; border: 0; background: none; color: var(--theme-text-strong); font: inherit; font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; outline: none; }
 .ttl-row input::-webkit-outer-spin-button, .ttl-row input::-webkit-inner-spin-button { margin: 0; -webkit-appearance: none; }
 .ttl-row input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .ttl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.ttl-unit { position: relative; display: flex; flex: 0 0 auto; align-items: stretch; border-left: 1px solid var(--control-line); background: var(--control-surface-strong); }
-.ttl-unit select { min-width: 118px; padding: 0 38px 0 14px; border: 0; background: none; color: var(--theme-text-strong); font: inherit; font-size: 14px; font-weight: 600; appearance: none; cursor: pointer; outline: none; }
+.ttl-unit { position: relative; display: flex; flex: 0 0 auto; align-items: center; padding-right: 12px; border-left: 1px solid var(--control-line); background: var(--control-surface-strong); }
+.ttl-unit select { align-self: stretch; min-width: 96px; padding: 0 6px 0 14px; border: 0; background: none; color: var(--theme-text-strong); font: inherit; font-size: 15px; font-weight: 500; appearance: none; cursor: pointer; outline: none; }
 .ttl-unit select option { background: var(--theme-elevated); color: var(--theme-text-strong); }
-.ttl-unit svg { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); color: var(--theme-text-soft); pointer-events: none; }
+.ttl-unit svg { flex: 0 0 auto; color: var(--theme-text-soft); pointer-events: none; }
 .ttl-unit:focus-within { background: var(--primary-soft); }
 .ttl-presets button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-.ttl-note { margin: 0; color: var(--theme-text-soft); font-size: 13px; }
-.ttl-note strong { color: var(--primary-ink); }
+.ttl-note { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; color: var(--theme-text-soft); font-size: 13.5px; line-height: 1.5; }
+.ttl-note > svg { flex: 0 0 auto; }
+.ttl-note .ttl-short { color: var(--warning-ink, var(--theme-text-soft)); }
+.ttl-note.is-short { color: var(--theme-text-soft); }
+.ttl-note strong { color: var(--primary-ink); font-weight: 500 !important; }
 .ttl-note.is-invalid { color: var(--danger); }
 .ttl-presets { display: flex; flex-wrap: wrap; gap: 6px; }
-.ttl-presets button { min-height: 32px; padding: 0 12px; border: 1px solid var(--control-line); border-radius: 20px; background: var(--theme-elevated); color: var(--theme-text-strong); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: border-color .15s, background-color .15s, color .15s; }
-.ttl-presets button.is-active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-ink); }
+.ttl-presets button { min-height: 36px; padding: 0 14px; border: 1px solid var(--control-line); border-radius: 9px; background: var(--theme-elevated); color: var(--theme-text-strong); font: inherit; font-size: 13.5px; font-weight: 400 !important; cursor: pointer; transition: border-color .15s, background-color .15s, color .15s; }
+.ttl-presets button.is-active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-ink); font-weight: 500 !important; }
+.ttl-note .ttl-fix { padding: 2px 0; border: 0; background: none; color: var(--primary-ink); font: inherit; font-weight: 500 !important; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.ttl-fix:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
 @media (hover: hover) {
   .ttl-unit:hover svg { color: var(--primary-ink); }
   .ttl-presets button:hover:not(.is-active) { border-color: var(--primary-border); color: var(--primary-ink); }

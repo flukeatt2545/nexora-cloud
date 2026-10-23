@@ -508,8 +508,12 @@ func (s *server) updateAdminSettings(c *fiber.Ctx) error {
 	if body.BrandName == "" || body.SiteTitle == "" || body.LoginTitle == "" || body.RegisterTitle == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(apiError{Error: "กรุณากรอกข้อมูลสำคัญให้ครบ"})
 	}
-	if body.SessionTTLMinutes < 5 || body.SessionTTLMinutes > 43200 {
-		return c.Status(fiber.StatusBadRequest).JSON(apiError{Error: "อายุ Session ต้องอยู่ระหว่าง 5–43,200 นาที"})
+	// Seconds are the setting; an older web build only sends whole minutes.
+	if body.SessionTTLSeconds == 0 {
+		body.SessionTTLSeconds = body.SessionTTLMinutes * 60
+	}
+	if body.SessionTTLSeconds < 10 || body.SessionTTLSeconds > 2592000 {
+		return c.Status(fiber.StatusBadRequest).JSON(apiError{Error: "อายุ Session ต้องอยู่ระหว่าง 10 วินาที ถึง 30 วัน"})
 	}
 	if !validHexColor(body.PrimaryColor) {
 		return c.Status(fiber.StatusBadRequest).JSON(apiError{Error: "สีหลักไม่ถูกต้อง"})
@@ -575,7 +579,8 @@ func (s *server) updateAdminSettings(c *fiber.Ctx) error {
 		  logo_url=$6, favicon_url=$7, auth_background_url=$8,
 		  login_title=$9, login_subtitle=$10, register_title=$11, register_subtitle=$12,
 		  local_login_enabled=$13, registration_enabled=$14, store_section_enabled=$15, quick_actions_enabled=$16, footer_enabled=$17, discord_enabled=$18,
-		  google_enabled=$19, github_enabled=$20, session_ttl_minutes=$21,
+		  google_enabled=$19, github_enabled=$20, session_ttl_seconds=$21,
+		  session_ttl_minutes=LEAST(43200, GREATEST(5, ($21::int + 59) / 60)),
 		  webhook_enabled=$22, discord_webhook_ciphertext=$23, webhook_events=$24,
 		  updated_by=$25, site_title_mode=$26, auth_background_tint_enabled=$27,
 		  og_title=$28, og_description=$29, og_image_url=$30, og_card_type=$31, og_color=$32,
@@ -585,7 +590,7 @@ func (s *server) updateAdminSettings(c *fiber.Ctx) error {
 		body.LogoURL, body.FaviconURL, body.AuthBackgroundURL, body.LoginTitle,
 		body.LoginSubtitle, body.RegisterTitle, body.RegisterSubtitle,
 		body.LocalLoginEnabled, body.RegistrationEnabled, body.StoreSectionEnabled, body.QuickActionsEnabled, body.FooterEnabled, body.DiscordEnabled,
-		body.GoogleEnabled, body.GitHubEnabled, body.SessionTTLMinutes,
+		body.GoogleEnabled, body.GitHubEnabled, body.SessionTTLSeconds,
 		body.WebhookEnabled, ciphertext, rawEvents, actor.ID, body.SiteTitleMode, body.AuthBackgroundTint,
 		body.OGTitle, body.OGDescription, body.OGImageURL, body.OGCardType, body.OGColor,
 		store.Enabled, store.Message)

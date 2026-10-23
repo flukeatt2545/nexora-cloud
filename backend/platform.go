@@ -65,7 +65,8 @@ type publicSettings struct {
 	DiscordEnabled      bool     `json:"discordEnabled"`
 	GoogleEnabled       bool     `json:"googleEnabled"`
 	GitHubEnabled       bool     `json:"githubEnabled"`
-	SessionTTLMinutes   int      `json:"sessionTtlMinutes,omitempty"`
+	SessionTTLMinutes   int      `json:"sessionTtlMinutes,omitempty"` // whole minutes, rounded up; kept for older web builds
+	SessionTTLSeconds   int      `json:"sessionTtlSeconds,omitempty"`
 	DiscordConfigured   bool     `json:"discordConfigured"`
 	GoogleConfigured    bool     `json:"googleConfigured"`
 	GitHubConfigured    bool     `json:"githubConfigured"`
@@ -318,20 +319,20 @@ const sessionIdleHeader = "X-Nexora-Idle"
 // once per minute (or tenth of the idle time) unless forced, and re-sends the cookie each time:
 // the cookie's own lifetime was fixed at login and used to end a busy session early.
 func (s *server) extendSession(c *fiber.Ctx, user *currentUser, hash, token string, force bool) {
-	var ttlMinutes int
+	var ttlSeconds int
 	err := s.db.QueryRow(c.Context(), `
 		UPDATE user_sessions s
 		SET last_seen_at = NOW(),
-		    expires_at = NOW() + make_interval(mins => t.ttl)
-		FROM (SELECT COALESCE((SELECT session_ttl_minutes FROM system_settings WHERE id = 1), 30) AS ttl) t
+		    expires_at = NOW() + make_interval(secs => t.ttl)
+		FROM (SELECT COALESCE((SELECT session_ttl_seconds FROM system_settings WHERE id = 1), 1800)::float8 AS ttl) t
 		WHERE s.id = $1
-		  AND ($2 OR s.last_seen_at < NOW() - LEAST(INTERVAL '5 minutes', make_interval(secs => t.ttl * 6)))
-		RETURNING t.ttl
-	`, user.SessionID, force).Scan(&ttlMinutes)
-	if err != nil || ttlMinutes <= 0 {
+		  AND ($2 OR s.last_seen_at < NOW() - LEAST(INTERVAL '5 minutes', make_interval(secs => t.ttl / 10)))
+		RETURNING t.ttl::int
+	`, user.SessionID, force).Scan(&ttlSeconds)
+	if err != nil || ttlSeconds <= 0 {
 		return
 	}
-	ttl := time.Duration(ttlMinutes) * time.Minute
+	ttl := time.Duration(ttlSeconds) * time.Second
 	s.redis.Expire(c.Context(), "session:"+hash, ttl)
 	c.Cookie(&fiber.Cookie{
 		Name:     s.cfg.cookieName,
@@ -375,14 +376,14 @@ func (s *server) extendSessionNow(c *fiber.Ctx) error {
 
 func (s *server) writeSessionStatus(c *fiber.Ctx, user *currentUser) error {
 	var expiresAt time.Time
-	var ttlMinutes int
+	var ttlSeconds int
 	if err := s.db.QueryRow(c.Context(), `
-		SELECT s.expires_at, COALESCE((SELECT session_ttl_minutes FROM system_settings WHERE id = 1), 30)
+		SELECT s.expires_at, COALESCE((SELECT session_ttl_seconds FROM system_settings WHERE id = 1), 1800)
 		FROM user_sessions s WHERE s.id = $1
-	`, user.SessionID).Scan(&expiresAt, &ttlMinutes); err != nil {
+	`, user.SessionID).Scan(&expiresAt, &ttlSeconds); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError)
 	}
-	return c.JSON(fiber.Map{"expiresAt": expiresAt, "now": time.Now(), "ttlMinutes": ttlMinutes})
+	return c.JSON(fiber.Map{"expiresAt": expiresAt, "now": time.Now(), "ttlSeconds": ttlSeconds, "ttlMinutes": (ttlSeconds + 59) / 60})
 }
 
 func (s *server) requireUser(c *fiber.Ctx) error {
@@ -436,7 +437,7 @@ func (s *server) loadSettings(ctx context.Context) (publicSettings, error) {
 		SELECT brand_name, site_title, site_description, primary_color, theme_mode, logo_url, favicon_url,
 		       auth_background_url, login_title, login_subtitle, register_title, register_subtitle,
 		       local_login_enabled, registration_enabled, store_section_enabled, quick_actions_enabled, footer_enabled, discord_enabled, google_enabled,
-		       github_enabled, session_ttl_minutes, site_title_mode, auth_background_tint_enabled,
+		       github_enabled, session_ttl_seconds, site_title_mode, auth_background_tint_enabled,
 		       COALESCE(og_title, ''), COALESCE(og_description, ''), COALESCE(og_image_url, ''),
 		       COALESCE(og_card_type, 'summary_large_image'), COALESCE(og_color, '#5e5ee6'),
 		       store_enabled, store_closed_message
@@ -446,10 +447,11 @@ func (s *server) loadSettings(ctx context.Context) (publicSettings, error) {
 		&settings.LogoURL, &settings.FaviconURL, &settings.AuthBackgroundURL, &settings.LoginTitle,
 		&settings.LoginSubtitle, &settings.RegisterTitle, &settings.RegisterSubtitle,
 		&settings.LocalLoginEnabled, &settings.RegistrationEnabled, &settings.StoreSectionEnabled, &settings.QuickActionsEnabled, &settings.FooterEnabled, &settings.DiscordEnabled,
-		&settings.GoogleEnabled, &settings.GitHubEnabled, &settings.SessionTTLMinutes, &settings.SiteTitleMode, &settings.AuthBackgroundTint,
+		&settings.GoogleEnabled, &settings.GitHubEnabled, &settings.SessionTTLSeconds, &settings.SiteTitleMode, &settings.AuthBackgroundTint,
 		&settings.OGTitle, &settings.OGDescription, &settings.OGImageURL, &settings.OGCardType, &settings.OGColor,
 		&settings.StoreEnabled, &settings.StoreClosedMessage,
 	)
+	settings.SessionTTLMinutes = (settings.SessionTTLSeconds + 59) / 60
 	settings.DiscordConfigured = s.oauthConfigured(ctx, "discord")
 	settings.GoogleConfigured = s.oauthConfigured(ctx, "google")
 	settings.GitHubConfigured = s.oauthConfigured(ctx, "github")
@@ -482,6 +484,7 @@ func (s *server) publicSettingsHandler(c *fiber.Ctx) error {
 	settings.AuthBackgroundURL = s.sanitizeAssetURL(c, settings.AuthBackgroundURL)
 	settings.OGImageURL = s.sanitizeAssetURL(c, settings.OGImageURL)
 	settings.SessionTTLMinutes = 0
+	settings.SessionTTLSeconds = 0
 	settings.WebhookEnabled = false
 	settings.WebhookEvents = nil
 	settings.WebhookConfigured = false

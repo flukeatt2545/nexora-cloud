@@ -27,7 +27,7 @@ import SocialOAuthButton, { type SocialProvider, useSocialAvailability } from ".
 import AdminMailView from "./AdminMailView";
 import DiscordBotView from "./DiscordBotView";
 import AdminBotsView from "./AdminBotsView";
-import SessionGuard from "../components/SessionGuard";
+import SessionGuard, { EXPIRED_EVENT } from "../components/SessionGuard";
 import SessionTtlField from "./SessionTtlField";
 import MailSettingsPanel from "./MailSettingsPanel";
 import SmartImage from "../components/SmartImage";
@@ -54,7 +54,7 @@ type SettingsData = {
   storeEnabled: boolean; storeClosedMessage: string;
   quickActionsEnabled: boolean;
   footerEnabled: boolean;
-  googleEnabled: boolean; githubEnabled: boolean; sessionTtlMinutes: number;
+  googleEnabled: boolean; githubEnabled: boolean; sessionTtlMinutes: number; sessionTtlSeconds: number;
   discordConfigured: boolean; googleConfigured: boolean; githubConfigured: boolean;
   discordClientId?: string; googleClientId?: string; githubClientId?: string;
   discordClientSecret?: string; googleClientSecret?: string; githubClientSecret?: string;
@@ -594,7 +594,12 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
         const result = await api<{ authenticated: boolean; user: AuthUser | null }>("/api/auth/me");
         if (!active) return;
         if (!result.authenticated || !result.user) {
-          window.location.href = "/";
+          // Nobody signed in when the page opened: go to the home page. Later it means the session
+          // ran out while the page was open: the session guard keeps its notice in the middle of the
+          // screen until the person signs in again, so do not navigate away underneath it (that
+          // also set off the browser's "leave this site?" prompt).
+          if (initial) window.location.href = "/";
+          else window.dispatchEvent(new Event(EXPIRED_EVENT));
           return;
         }
         if (view !== "profile" && view !== "hosting" && result.user.role === "user") {
@@ -4121,7 +4126,9 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
     api<LockdownState>("/api/admin/lockdown").then(setLockdown).catch(() => undefined);
   }, [activeTab]);
 
-  const fetchSettings = useCallback(() => api<SettingsData>("/api/admin/settings").then((value) => {
+  const fetchSettings = useCallback(() => api<SettingsData>("/api/admin/settings").then((loaded) => {
+    // An API from before the idle time was kept in seconds only reports whole minutes.
+    const value = { ...loaded, sessionTtlSeconds: loaded.sessionTtlSeconds ?? loaded.sessionTtlMinutes * 60 };
     savedLook.current = { themeMode: value.themeMode, primaryColor: value.primaryColor };
     setSettings(value);
     setSavedSettings(JSON.stringify(value));
@@ -4156,6 +4163,14 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
   useEscape(Boolean(assetPreview), () => setAssetPreview(null));
   async function save(event: FormEvent) {
     event.preventDefault(); if (!settings) return;
+    // The idle time has a range the server enforces; say so at the field instead of after a round trip.
+    const idle = settings.sessionTtlSeconds;
+    if (!Number.isInteger(idle) || idle < 10 || idle > 2592000) {
+      setSaveState("error");
+      notify({ kind: "error", text: "ตั้งระยะเวลาอยู่ในระบบให้อยู่ระหว่าง 10 วินาที ถึง 30 วัน ก่อนบันทึก" });
+      document.querySelector<HTMLInputElement>(".ttl-field input")?.focus();
+      return;
+    }
     setSaveState("saving");
     try {
       const value = await api<SettingsData>("/api/admin/settings", { method: "PATCH", body: JSON.stringify(settings) });
@@ -4715,7 +4730,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                     title="อยู่ในระบบได้นานแค่ไหน"
                     description="ไม่ได้ใช้งานเกินนี้ต้องเข้าสู่ระบบใหม่ ก่อนหมดเวลาจะมีหน้าต่างถามว่ายังใช้งานอยู่ไหม มีผลกับทุกคนตั้งแต่การใช้งานครั้งถัดไป"
                   >
-                    <SessionTtlField value={settings.sessionTtlMinutes} onChange={(minutes) => set("sessionTtlMinutes", minutes)} />
+                    <SessionTtlField value={settings.sessionTtlSeconds} onChange={(seconds) => set("sessionTtlSeconds", seconds)} />
                   </SettingRow>
                 </div>
 

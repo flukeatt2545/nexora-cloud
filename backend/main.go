@@ -2023,7 +2023,7 @@ func (s *server) createSession(c *fiber.Ctx, user *currentUser) error {
 	if err != nil {
 		return err
 	}
-	ttl := time.Duration(settings.SessionTTLMinutes) * time.Minute
+	ttl := time.Duration(settings.SessionTTLSeconds) * time.Second
 	expiresAt := time.Now().Add(ttl)
 	var sessionID int64
 	err = s.db.QueryRow(c.Context(), `

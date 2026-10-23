@@ -13,7 +13,8 @@ import { createPortal } from "react-dom";
 import { API_BASE } from "../runtime";
 import "./session-guard.css";
 
-const EXPIRED_EVENT = "nexora:session-expired";
+/** Dispatched on window when a page learns the session is gone; the guard then shows its notice. */
+export const EXPIRED_EVENT = "nexora:session-expired";
 const RETURN_KEY = "nexora_return_to";
 const ACTIVE_WINDOW = 60_000;
 
@@ -55,7 +56,7 @@ function patchFetch() {
   };
 }
 
-type Status = { expiresAt: number; ttlMinutes: number };
+type Status = { expiresAt: number; ttlSeconds: number };
 
 function clock(ms: number) {
   const total = Math.max(0, Math.ceil(ms / 1000));
@@ -64,10 +65,11 @@ function clock(ms: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function idleText(minutes: number) {
-  if (minutes >= 1440 && minutes % 1440 === 0) return `${minutes / 1440} วัน`;
-  if (minutes >= 60 && minutes % 60 === 0) return `${minutes / 60} ชั่วโมง`;
-  return `${minutes} นาที`;
+function idleText(seconds: number) {
+  if (seconds >= 86400 && seconds % 86400 === 0) return `${seconds / 86400} วัน`;
+  if (seconds >= 3600 && seconds % 3600 === 0) return `${seconds / 3600} ชั่วโมง`;
+  if (seconds >= 60 && seconds % 60 === 0) return `${seconds / 60} นาที`;
+  return seconds < 60 ? `${seconds} วินาที` : `${Math.floor(seconds / 60)} นาที ${seconds % 60} วินาที`;
 }
 
 export default function SessionGuard() {
@@ -78,11 +80,12 @@ export default function SessionGuard() {
   // Last time activity was reported; 0 until the first status, which counts as one.
   const lastExtend = useRef(0);
 
-  const apply = useCallback((data: { expiresAt: string; now: string; ttlMinutes: number }) => {
+  const apply = useCallback((data: { expiresAt: string; now: string; ttlSeconds?: number; ttlMinutes: number }) => {
     // Kept in this device's clock, whatever the server's clock says.
     const skew = new Date(data.now).getTime() - Date.now();
     if (!lastExtend.current) lastExtend.current = Date.now();
-    setStatus({ expiresAt: new Date(data.expiresAt).getTime() - skew, ttlMinutes: data.ttlMinutes });
+    // An API from before seconds only reports whole minutes.
+    setStatus({ expiresAt: new Date(data.expiresAt).getTime() - skew, ttlSeconds: data.ttlSeconds ?? data.ttlMinutes * 60 });
   }, []);
 
   const check = useCallback(async () => {
@@ -129,7 +132,7 @@ export default function SessionGuard() {
     const onActivity = () => {
       lastActivity = Date.now();
       if (!status || expired) return;
-      const every = Math.min(5 * 60_000, status.ttlMinutes * 6_000);
+      const every = Math.min(5 * 60_000, status.ttlSeconds * 100);
       if (Date.now() - lastExtend.current > every) void extend();
     };
     const events = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
@@ -143,7 +146,7 @@ export default function SessionGuard() {
   }, []);
 
   const remaining = status ? status.expiresAt - now : Infinity;
-  const warnAt = status ? Math.min(2 * 60_000, status.ttlMinutes * 12_000) : 0;
+  const warnAt = status ? Math.min(2 * 60_000, status.ttlSeconds * 200) : 0;
   const warning = !expired && status !== null && remaining <= warnAt;
 
   // Another tab may have kept the session going, so ask the server when the warning starts and
@@ -185,7 +188,7 @@ export default function SessionGuard() {
           <>
             <h2 id="sg-title">หมดเวลาใช้งานแล้ว</h2>
             <p id="sg-text">
-              {status ? `ไม่ได้ใช้งานนานเกิน ${idleText(status.ttlMinutes)} ` : ""}ระบบจึงออกจากระบบให้เพื่อความปลอดภัย เข้าสู่ระบบอีกครั้งแล้วจะกลับมาที่หน้านี้
+              {status ? `ไม่ได้ใช้งานนานเกิน ${idleText(status.ttlSeconds)} ` : ""}ระบบจึงออกจากระบบให้เพื่อความปลอดภัย เข้าสู่ระบบอีกครั้งแล้วจะกลับมาที่หน้านี้
             </p>
             <div className="sg-actions">
               <button type="button" className="sg-btn sg-btn-primary" onClick={signInAgain} autoFocus><LogIn size={17} aria-hidden="true" />เข้าสู่ระบบอีกครั้ง</button>
