@@ -58,6 +58,7 @@ html.sg-expired :is(.toast-region, .fl-toast, .gal-toasts, .dashboard-toast) { d
 }
 .sg-dialog h2 { margin: 6px 0 0; font-size: 19px; font-weight: 700; }
 .sg-dialog p { margin: 0; color: var(--theme-text-soft); font-size: 14px; line-height: 1.6; }
+.sg-dialog .sg-note { font-size: 13px; opacity: .8; }
 .sg-icon {
   display: grid; place-items: center; width: 56px; height: 56px;
   border-radius: 16px; background: var(--primary-soft); color: var(--primary-ink);

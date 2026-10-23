@@ -327,23 +327,23 @@ export default function SessionGuard() {
         <span className="sg-icon" aria-hidden="true">{expired ? <LockKeyhole size={26} /> : <Clock3 size={26} />}</span>
         {expired ? (
           <>
-            <h2 id="sg-title">{endInfo.reason === "idle" ? "หมดเวลาใช้งานแล้ว" : "เซสชันสิ้นสุดแล้ว"}</h2>
+            <h2 id="sg-title">{endInfo.reason === "idle" ? "หมดเวลาใช้งานแล้ว" : "ออกจากระบบแล้ว"}</h2>
             <p id="sg-text">
               {endInfo.reason === "idle" && endInfo.ttlSeconds > 0
-                ? `ไม่มีการใช้งานนานเกิน ${idleText(endInfo.ttlSeconds)} ระบบจึงออกจากระบบให้อัตโนมัติ`
+                ? `ไม่ได้ใช้งานเกิน ${idleText(endInfo.ttlSeconds)} ระบบเลยออกจากระบบให้`
                 : endInfo.reason === "other"
-                  ? "เซสชันนี้ถูกปิดก่อนครบเวลา อาจเพราะออกจากระบบในอุปกรณ์หรือแท็บอื่น ยกเลิกเซสชัน หรือบัญชีถูกปิดการใช้งาน"
-                  : "การเข้าสู่ระบบนี้สิ้นสุดแล้ว"}
-              {" "}เข้าสู่ระบบอีกครั้งเพื่อทำงานต่อ ถ้าเข้าภายใน 1 ชั่วโมงจะกลับมาที่หน้านี้
+                  ? "เซสชันนี้ถูกปิดก่อนหมดเวลา เช่น ออกจากระบบจากอุปกรณ์อื่น หรือบัญชีถูกปิดใช้งาน"
+                  : "เซสชันนี้สิ้นสุดแล้ว"}
             </p>
+            <p className="sg-note">เข้าสู่ระบบใหม่ภายใน 1 ชั่วโมง จะกลับมาหน้านี้ให้</p>
             <div className="sg-actions">
-              <button type="button" className="sg-btn sg-btn-primary" onClick={signInAgain} autoFocus><LogIn size={17} aria-hidden="true" />เข้าสู่ระบบอีกครั้ง</button>
+              <button type="button" className="sg-btn sg-btn-primary" onClick={signInAgain} autoFocus><LogIn size={17} aria-hidden="true" />เข้าสู่ระบบ</button>
             </div>
           </>
         ) : (
           <>
             <h2 id="sg-title">ยังใช้งานอยู่ไหม</h2>
-            <p id="sg-text">ไม่ได้ใช้งานมาสักพัก ระบบจะออกจากระบบให้ใน</p>
+            <p id="sg-text">ไม่ได้ใช้งานมาสักพัก จะออกจากระบบใน</p>
             <strong className="sg-count" aria-live="polite">{clock(remaining)}</strong>
             <div className="sg-actions">
               <button type="button" className="sg-btn" onClick={() => void signOut()} disabled={busy}>ออกจากระบบ</button>
