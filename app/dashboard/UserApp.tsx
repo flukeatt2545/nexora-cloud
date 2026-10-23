@@ -614,7 +614,7 @@ export default function UserApp({ view }: { view: UserView }) {
                 )}
                 <Link href="/hosting" className="ud-stat">
                   <span className="ud-stat-label">เว็บไซต์ออนไลน์</span>
-                  <strong className="ud-stat-value">{dashStats.loaded ? <>{dashStats.runningSitesCount.toLocaleString("th-TH")}<small> / {dashStats.sitesCount.toLocaleString("th-TH")}</small></> : <i className="ud-skel" />}</strong>
+                  <strong className="ud-stat-value">{dashStats.loaded ? <>{dashStats.runningSitesCount.toLocaleString("th-TH")}{dashStats.sitesCount > 0 && <small> / {dashStats.sitesCount.toLocaleString("th-TH")}</small>}</> : <i className="ud-skel" />}</strong>
                 </Link>
                 <Link href="/files" className="ud-stat">
                   <span className="ud-stat-label">พื้นที่ที่ใช้</span>
@@ -642,33 +642,15 @@ export default function UserApp({ view }: { view: UserView }) {
             )}
 
             <nav className="ud-launch" aria-label="ทางลัด">
-              <Link href="/hosting" className="ud-tile">
-                <span className="ud-tile-icon" aria-hidden="true"><Cloud size={19} /></span>
-                <span className="ud-tile-text"><strong>เว็บไซต์</strong><small>โดเมนและ SSL</small></span>
+              <Link href="/hosting" className="ud-chip"><Cloud size={16} aria-hidden="true" />เว็บไซต์</Link>
+              <a href="https://nove666.pro" target="_blank" rel="noopener noreferrer" className="ud-chip" title="phpMyAdmin"><Database size={16} aria-hidden="true" />ฐานข้อมูล<ArrowUpRight size={13} aria-hidden="true" /></a>
+              <Link href="/files" className="ud-chip"><FolderOpen size={16} aria-hidden="true" />คลังไฟล์</Link>
+              <Link href="/mail" className="ud-chip">
+                <Mail size={16} aria-hidden="true" />อีเมล
+                {mailUnread > 0 && <b className="ud-chip-badge">{mailUnread > 99 ? "99+" : mailUnread}</b>}
               </Link>
-              <a href="https://nove666.pro" target="_blank" rel="noopener noreferrer" className="ud-tile">
-                <span className="ud-tile-icon" aria-hidden="true"><Database size={19} /></span>
-                <span className="ud-tile-text"><strong>ฐานข้อมูล <ArrowUpRight size={13} aria-hidden="true" /></strong><small>phpMyAdmin</small></span>
-              </a>
-              <Link href="/files" className="ud-tile">
-                <span className="ud-tile-icon" aria-hidden="true"><FolderOpen size={19} /></span>
-                <span className="ud-tile-text"><strong>คลังไฟล์</strong><small>อัปโหลดและแชร์</small></span>
-              </Link>
-              <Link href="/mail" className="ud-tile">
-                <span className="ud-tile-icon" aria-hidden="true"><Mail size={19} /></span>
-                <span className="ud-tile-text"><strong>อีเมล</strong><small>{mailUnread > 0 ? `ยังไม่อ่าน ${mailUnread.toLocaleString("th-TH")} ฉบับ` : "กล่องจดหมาย"}</small></span>
-                {mailUnread > 0 && <b className="ud-tile-badge">{mailUnread > 99 ? "99+" : mailUnread}</b>}
-              </Link>
-              {store.open && (
-                <Link href="/store" className="ud-tile">
-                  <span className="ud-tile-icon" aria-hidden="true"><Store size={19} /></span>
-                  <span className="ud-tile-text"><strong>ร้านค้า</strong><small>แพ็กเกจและสินค้า</small></span>
-                </Link>
-              )}
-              <Link href="/profile" className="ud-tile">
-                <span className="ud-tile-icon" aria-hidden="true"><User size={19} /></span>
-                <span className="ud-tile-text"><strong>บัญชีของฉัน</strong><small>รหัสผ่าน อุปกรณ์</small></span>
-              </Link>
+              {store.open && <Link href="/store" className="ud-chip"><Store size={16} aria-hidden="true" />ร้านค้า</Link>}
+              <Link href="/profile" className="ud-chip"><User size={16} aria-hidden="true" />บัญชีของฉัน</Link>
             </nav>
 
             <div className="ud-main">
@@ -796,23 +778,24 @@ export default function UserApp({ view }: { view: UserView }) {
                       <span style={{ width: `${(setupDone / setupSteps.length) * 100}%` }} />
                     </div>
                     <ul className="ud-steps">
-                      {setupSteps.map((step) => (
-                        <li key={step.label} className={step.done ? "is-done" : undefined}>
-                          {step.done ? (
-                            <span className="ud-step">
-                              <CircleCheck size={18} aria-hidden="true" />
-                              <span><strong>{step.label}</strong><small>เสร็จแล้ว</small></span>
-                            </span>
-                          ) : (
-                            <a href={step.href} className="ud-step">
-                              <Circle size={18} aria-hidden="true" />
-                              <span><strong>{step.label}</strong><small>{step.hint}</small></span>
-                              <ChevronRight size={15} className="ud-step-arrow" aria-hidden="true" />
-                            </a>
-                          )}
+                      {setupSteps.filter((step) => !step.done).map((step) => (
+                        <li key={step.label}>
+                          <a href={step.href} className="ud-step">
+                            <Circle size={18} aria-hidden="true" />
+                            <span><strong>{step.label}</strong><small>{step.hint}</small></span>
+                            <ChevronRight size={15} className="ud-step-arrow" aria-hidden="true" />
+                          </a>
                         </li>
                       ))}
                     </ul>
+                    {setupDone > 0 && (
+                      <details className="ud-done">
+                        <summary><CircleCheck size={16} aria-hidden="true" />เสร็จแล้ว {setupDone} ขั้นตอน<ChevronDown size={15} className="ud-done-chevron" aria-hidden="true" /></summary>
+                        <ul>
+                          {setupSteps.filter((step) => step.done).map((step) => <li key={step.label}>{step.label}</li>)}
+                        </ul>
+                      </details>
+                    )}
                   </section>
                 )}
 
