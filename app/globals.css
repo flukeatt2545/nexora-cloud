@@ -2866,6 +2866,24 @@ footer { border-top: 1px solid rgba(255,255,255,.07); color: var(--muted); font-
 }
 .home-page .quick-section { padding-bottom: clamp(8px, 2vw, 20px); }
 
+/* The sign-in / register choice: no tinted "alert" card for the recommended step. The recommended one
+   is marked by its filled icon and brand-coloured title and arrow. On wide screens the two choices
+   share one panel with a divider; phones keep the grouped list from the block above. */
+.home-page .quick-grid.user-action-grid a.is-primary { background: transparent; border-color: var(--theme-line-soft); }
+.home-page .quick-grid.user-action-grid a.is-primary:hover { background: color-mix(in srgb, var(--theme-elevated) 90%, var(--primary)); border-color: var(--primary-border); }
+.home-page .quick-grid.user-action-grid a.is-primary h3 { color: var(--primary-ink); }
+@media (min-width: 651px) {
+  .home-page .quick-grid.guest-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; overflow: hidden; border: 1px solid var(--theme-line-soft); border-radius: 14px; background: var(--theme-elevated); }
+  .home-page .quick-grid.guest-action-grid:has(> a:only-child) { grid-template-columns: minmax(0, 560px); }
+  .home-page .quick-grid.guest-action-grid a { min-height: 92px; padding: 20px 24px; border: 0; border-radius: 0; background: transparent; }
+  .home-page .quick-grid.guest-action-grid a + a { border-left: 1px solid var(--theme-line-soft); }
+  .home-page .quick-grid.guest-action-grid a:last-child { grid-column: auto; }
+  .home-page .quick-grid.guest-action-grid a:hover, .home-page .quick-grid.guest-action-grid a.is-primary:hover { border-color: var(--theme-line-soft); background: color-mix(in srgb, var(--theme-elevated) 92%, var(--primary)); }
+  .home-page .quick-grid.guest-action-grid a:focus-visible { outline-offset: -3px; }
+  .home-page .quick-grid.guest-action-grid h3 { font-size: 17px; }
+  .home-page .quick-grid.guest-action-grid p { font-size: 13.5px; }
+}
+
 /* A label wrapped around a text field is not a button: the popup-wide "labels are clickable"
    rule above gave the field's title and padding a hand cursor before the pointer even reached
    the box. Keep the arrow on the label, the I-beam over the field box, and text inputs as text. */
