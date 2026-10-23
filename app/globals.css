@@ -2881,7 +2881,8 @@ footer { border-top: 1px solid rgba(255,255,255,.07); color: var(--muted); font-
 .home-page .quick-grid.user-action-grid a.is-primary h3 { color: var(--primary-ink); }
 @media (min-width: 651px) {
   .home-page .quick-grid.guest-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; overflow: hidden; border: 1px solid var(--theme-line-soft); border-radius: 14px; background: var(--theme-elevated); }
-  .home-page .quick-grid.guest-action-grid:has(> a:only-child) { grid-template-columns: minmax(0, 560px); }
+  /* Sign-up closed: one card, so the frame is the card's width, not a wide frame around half an empty row. */
+  .home-page .quick-grid.guest-action-grid:has(> a:only-child) { grid-template-columns: minmax(0, 1fr); max-width: 560px; }
   .home-page .quick-grid.guest-action-grid a { min-height: 92px; padding: 20px 24px; border: 0; border-radius: 0; background: transparent; }
   .home-page .quick-grid.guest-action-grid a + a { border-left: 1px solid var(--theme-line-soft); }
   .home-page .quick-grid.guest-action-grid a:last-child { grid-column: auto; }
