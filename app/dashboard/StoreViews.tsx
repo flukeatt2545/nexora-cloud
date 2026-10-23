@@ -380,7 +380,6 @@ export function StoreCategoriesView({ notify, ask }: { notify: Notify; ask: Ask 
     <div className="aov store-cats">
       <header className="aov-head">
         <div>
-          <p className="aov-eyebrow">ร้านค้า</p>
           <h1>หมวดหมู่สินค้า</h1>
           <p className="aov-sub">จัดกลุ่มสินค้าและเรียงลำดับที่ลูกค้าเห็นบนหน้าร้าน</p>
         </div>
@@ -880,7 +879,6 @@ export function StoreProductsView({ notify, ask }: { notify: Notify; ask: Ask })
     <div className="aov store-prods">
       <header className="aov-head">
         <div>
-          <p className="aov-eyebrow">ร้านค้า</p>
           <h1>คลังสินค้า</h1>
           <p className="aov-sub">จัดการสินค้าดิจิทัล ราคา และไฟล์ที่ส่งให้ลูกค้า</p>
         </div>

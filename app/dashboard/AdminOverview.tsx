@@ -211,7 +211,6 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
     <div className="aov" aria-busy={loading}>
       <header className="aov-head">
         <div>
-          <p className="aov-eyebrow">ภาพรวม</p>
           <h1>สวัสดี {name}</h1>
           <p className="aov-sub">{today}{updatedAt && <> · อัปเดต {new Intl.DateTimeFormat("th-TH", { timeStyle: "short" }).format(updatedAt)}</>}</p>
         </div>

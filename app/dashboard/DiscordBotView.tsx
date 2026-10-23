@@ -85,7 +85,6 @@ export default function DiscordBotView({ notify, isSuperadmin }: { notify: Notic
     <div className="aov hv dbx">
       <header className="aov-head dbx-page-head">
         <div>
-          <p className="aov-eyebrow">Discord</p>
           <h1>บอท Discord</h1>
           <p className="aov-sub">
             ตั้งสถานะใต้ชื่อบอท{isSuperadmin ? " ดูการเชื่อมต่อ token" : ""} และการตั้งค่าของบอททั้ง {BOTS.length} ตัว

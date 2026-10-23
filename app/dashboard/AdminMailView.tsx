@@ -409,7 +409,6 @@ export default function AdminMailView({ notify, ask, isSuperadmin = false }: { n
     <div className="aov hv mx">
       <header className="aov-head">
         <div>
-          <p className="aov-eyebrow">อีเมล</p>
           <h1>อีเมลโดเมน</h1>
           <p className="aov-sub">เลือกโดเมนเพื่อดูกล่องอีเมลในโดเมนนั้น ตั้งค่า DNS และสร้างกล่องให้ผู้ใช้</p>
         </div>

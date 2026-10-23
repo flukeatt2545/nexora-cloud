@@ -16,7 +16,6 @@
 /* Heading */
 .aov-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
 .aov-head > div:first-child { min-width: 0; }
-.aov-eyebrow { margin: 0 0 6px; color: var(--primary-ink); font-size: 13px; font-weight: 700; letter-spacing: .08em; }
 .aov-head h1 { margin: 0; font-size: clamp(24px, 2.6vw, 32px); line-height: 1.2; letter-spacing: -.01em; color: var(--theme-text-strong); overflow-wrap: anywhere; }
 .aov-sub { margin: 6px 0 0; color: var(--theme-text-soft); font-size: 15px; }
 .aov-head-actions { display: flex; gap: 8px; flex: 0 0 auto; }

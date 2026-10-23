@@ -800,7 +800,6 @@ export default function DatabaseAdminView({ me, notify, ask }: DatabaseAdminView
     <div className="aov hv dbv" aria-busy={isMappings ? mappingsLoading : loading}>
       <header className="aov-head">
         <div>
-          <p className="aov-eyebrow">เว็บไซต์</p>
           <h1>ฐานข้อมูล</h1>
           <p className="aov-sub">ฐานข้อมูล MySQL ทั้งหมด และการจับคู่รหัสนักศึกษากับบอท Discord</p>
         </div>

@@ -1154,7 +1154,6 @@ function ProfileView({ me, setMe, notify, ask }: { me: AuthUser; setMe: (user: A
   return <div className="aov hv pfv">
     <header className="aov-head">
       <div>
-        <p className="aov-eyebrow">บัญชีของฉัน</p>
         <h1>โปรไฟล์ของฉัน</h1>
         <p className="aov-sub">ข้อมูลบัญชี การเข้าสู่ระบบ และอุปกรณ์ที่ใช้อยู่</p>
       </div>
@@ -1754,8 +1753,7 @@ function UsersView({ me, notify, ask }: { me: AuthUser; notify: (notice: { kind:
     <div className="aov hv usv" aria-busy={loading}>
       <header className="aov-head">
         <div>
-          <p className="aov-eyebrow">ผู้ใช้และสิทธิ์</p>
-          <h1>ผู้ใช้</h1>
+          <h1>จัดการผู้ใช้</h1>
         </div>
         <div className="aov-head-actions">
           <button type="button" className="aov-btn" onClick={() => void load()} disabled={loading} aria-label="รีเฟรช" title="รีเฟรช">
@@ -2393,7 +2391,6 @@ function LogsView() {
     <div className="aov hv lgv" aria-busy={loading}>
       <header className="aov-head">
         <div>
-          <p className="aov-eyebrow">บันทึกระบบ</p>
           <h1>บันทึกกิจกรรม</h1>
         </div>
         <div className="aov-head-actions">
@@ -2699,7 +2696,6 @@ function AccessView({ me, notify, ask }: { me: AuthUser; notify: (notice: { kind
     <div className="aov hv acv" aria-busy={loading}>
       <header className="aov-head">
         <div>
-          <p className="aov-eyebrow">ผู้ใช้และสิทธิ์</p>
           <h1>สิทธิ์การเข้าถึง</h1>
         </div>
         <div className="aov-head-actions">
@@ -4228,12 +4224,12 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
 
   // One heading for the page: the tab's name, with the settings area as the small label above.
   const tabHeading: Record<string, [string, string]> = {
-    general: ["ทั่วไป", "ชื่อเว็บไซต์ หน้าตา ร้านค้า และรูปแบรนด์"],
-    auth: ["การเข้าสู่ระบบ", "ข้อความและนโยบายการเข้าสู่ระบบและสมัครสมาชิก"],
-    social: ["Social Login", "เข้าสู่ระบบด้วย Discord, Google หรือ GitHub"],
-    notifications: ["การแจ้งเตือน", "ส่งเหตุการณ์สำคัญเข้า Discord"],
-    danger: ["ขั้นสูง", "สิ่งที่กระทบผู้ใช้ทั้งระบบ"],
-    mail: ["ระบบอีเมล", "การเชื่อมต่อสำหรับส่งและรับอีเมลของทุกโดเมน"],
+    general: ["ตั้งค่าทั่วไป", "ชื่อเว็บไซต์ หน้าตา ร้านค้า และรูปแบรนด์"],
+    auth: ["ตั้งค่าการเข้าสู่ระบบ", "ข้อความและนโยบายการเข้าสู่ระบบและสมัครสมาชิก"],
+    social: ["ตั้งค่า Social Login", "เข้าสู่ระบบด้วย Discord, Google หรือ GitHub"],
+    notifications: ["ตั้งค่าการแจ้งเตือน", "ส่งเหตุการณ์สำคัญเข้า Discord"],
+    danger: ["ตั้งค่าขั้นสูง", "สิ่งที่กระทบผู้ใช้ทั้งระบบ"],
+    mail: ["ตั้งค่าระบบอีเมล", "การเชื่อมต่อสำหรับส่งและรับอีเมลของทุกโดเมน"],
   };
   const [tabTitle, tabDescription] = tabHeading[activeTab] || tabHeading.general;
 
@@ -4241,7 +4237,6 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
     <>
       <header className="aov-head gst-head">
         <div>
-          <p className="aov-eyebrow">ตั้งค่าระบบ</p>
           <h1>{tabTitle}</h1>
           <p className="aov-sub">{tabDescription}</p>
         </div>
@@ -5135,8 +5130,7 @@ function HomepageSettingsView({ notify }: { notify: (notice: { kind: "success" |
     <div className="hpv">
       <header className="aov-head gst-head">
         <div>
-          <p className="aov-eyebrow">ตั้งค่าระบบ</p>
-          <h1>หน้าแรก</h1>
+          <h1>ตั้งค่าหน้าแรก</h1>
           <p className="aov-sub">เลือกว่าหน้าแรกจะมีส่วนไหนบ้าง</p>
         </div>
         <div className="aov-head-actions">

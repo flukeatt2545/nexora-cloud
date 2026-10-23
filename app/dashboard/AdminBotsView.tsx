@@ -199,7 +199,6 @@ export default function AdminBotsView({ notify, ask }: { notify: Notify; ask: As
     <div className="bt bt-admin aov hv bf" aria-busy={loading}>
       <header className="aov-head">
         <div>
-          <p className="aov-eyebrow">เว็บไซต์</p>
           <h1>บอทของผู้ใช้</h1>
           <p className="aov-sub">บอท Discord ที่ผู้ใช้รันบนเซิร์ฟเวอร์ เพิ่มบอทให้ใครก็ได้ ปิดตัวที่มีปัญหา ปรับทรัพยากร และกำหนดโควตา</p>
         </div>

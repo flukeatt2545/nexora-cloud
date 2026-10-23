@@ -1053,7 +1053,6 @@ export default function HostingView({
     <div className="aov hv" aria-busy={loading}>
       <header className="aov-head">
         <div>
-          <p className="aov-eyebrow">เว็บไซต์</p>
           <h1>{me.role === "user" ? "เว็บไซต์ของฉัน" : "จัดการโฮสติ้ง"}</h1>
           <p className="aov-sub">{me.role === "user" ? "เว็บไซต์ของคุณและเว็บที่ได้รับเชิญให้ร่วมงาน" : "เว็บไซต์ทั้งหมดบน *.nkn02.com สถานะ ผู้ร่วมงาน และการตั้งค่า"}</p>
         </div>

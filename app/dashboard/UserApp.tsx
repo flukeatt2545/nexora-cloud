@@ -966,7 +966,6 @@ function UserTopupHistoryView({ onTopup, refreshKey }: { onTopup?: () => void; r
   return <div className="user-topup-history">
     <header className="uth-heading">
       <div className="uth-heading-copy">
-        <p className="uth-eyebrow">กระเป๋าของฉัน</p>
         <h1>ประวัติพอยท์</h1>
       </div>
       <div className="uth-heading-actions">

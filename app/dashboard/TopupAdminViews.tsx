@@ -176,7 +176,6 @@ export function TopupOverviewView({ notify, canConfigure = false }: { notify: No
   return <div className="aov topup-overview" aria-busy={loading}>
     <header className="aov-head">
       <div>
-        <p className="aov-eyebrow">การเงิน</p>
         <h1>ระบบเติมเงิน</h1>
         <p className="aov-sub">ยอดเติมเงินจากสลิปที่ตรวจผ่าน CheckSlips</p>
       </div>
@@ -320,7 +319,6 @@ export function TopupTransactionsView({ notify }: { notify: Notify }) {
   return <div className="aov topup-history" aria-busy={loading}>
     <header className="aov-head">
       <div>
-        <p className="aov-eyebrow">การเงิน</p>
         <h1>ประวัติการเติมเงิน</h1>
         <p className="aov-sub">ค้นหาและตรวจผลการยืนยันสลิปย้อนหลัง</p>
       </div>
@@ -565,7 +563,6 @@ export function StoreOrdersView({ notify }: { notify: Notify }) {
   return <div className="aov store-orders" aria-busy={loading}>
     <header className="aov-head">
       <div>
-        <p className="aov-eyebrow">ร้านค้า</p>
         <h1>คำสั่งซื้อ</h1>
         <p className="aov-sub">ดูว่าใครซื้ออะไร และคืนพอยท์เมื่อมีปัญหา</p>
       </div>
@@ -756,7 +753,6 @@ export function StoreSalesView({ notify }: { notify: Notify }) {
   return <div className="aov store-sales" aria-busy={loading}>
     <header className="aov-head">
       <div>
-        <p className="aov-eyebrow">ร้านค้า</p>
         <h1>ยอดขาย</h1>
         <p className="aov-sub">รายได้และสินค้าขายดี ไม่รวมคำสั่งซื้อที่คืนพอยท์แล้ว</p>
       </div>

@@ -929,15 +929,6 @@ body.user-nav-locked .user-app-main {
   min-width: 0;
 }
 
-.uth-eyebrow {
-  display: block;
-  margin: 0 0 4px;
-  color: var(--theme-text-soft);
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
 
 .uth-heading h1 {
   margin: 0;

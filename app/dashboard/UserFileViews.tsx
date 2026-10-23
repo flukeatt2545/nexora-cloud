@@ -242,7 +242,6 @@ export function UserFileCategoriesView({ notify, ask }: { notify: Notify; ask: A
     <div className="aov hv fcv" aria-busy={loading}>
       <header className="aov-head">
         <div>
-          <p className="aov-eyebrow">ระบบไฟล์</p>
           <h1>หมวดหมู่ไฟล์</h1>
           <p className="aov-sub">หมวดที่ผู้ใช้เลือกกรองไฟล์ได้ในคลังไฟล์ เรียงตามลำดับที่ตั้งไว้</p>
         </div>
