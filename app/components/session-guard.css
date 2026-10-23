@@ -6,6 +6,11 @@
   backdrop-filter: blur(3px);
   animation: sg-fade .2s ease-out;
 }
+/* The page behind does not scroll; the gutter stays so nothing shifts sideways. */
+html.sg-locked, html.sg-locked body { overflow: hidden !important; scrollbar-gutter: stable; overscroll-behavior: none; }
+.sg-backdrop { overscroll-behavior: contain; touch-action: none; }
+/* Once the session has ended, failure toasts from the page behind it would only repeat the notice. */
+html.sg-expired :is(.toast-region, .fl-toast, .gal-toasts, .dashboard-toast) { display: none !important; }
 .sg-dialog {
   width: min(400px, 100%);
   display: grid; justify-items: center; gap: 10px;

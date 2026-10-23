@@ -692,22 +692,6 @@ body,
   color: #72767c;
 }
 
-[data-theme="light"] .toast {
-  border-color: var(--theme-line-soft);
-  background: rgba(255, 255, 255, .97);
-  box-shadow: 0 18px 55px var(--theme-shadow);
-  color: #25272b;
-}
-
-[data-theme="light"] .toast-close {
-  color: #72767d;
-}
-
-[data-theme="light"] .toast-close:hover {
-  background: rgba(0, 0, 0, .055);
-  color: #17181b;
-}
-
 /* Complete light-theme coverage: Dashboard และ Control Center */
 [data-theme="light"] .dashboard-root {
   --control-red: #d70b13;

@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  ArchiveRestore, ChevronLeft, Download, File, Forward, Inbox, Mail, MailOpen, MailPlus,
+  ArchiveRestore, ChevronLeft, CircleAlert, Download, File, Forward, Inbox, Mail, MailOpen, MailPlus,
   Paperclip, RefreshCw, Reply, ReplyAll, Search, Send, Settings2, SquarePen, Trash2, X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -108,6 +108,9 @@ const personLabel = (item: Recipient) => item.name ? `${item.name} <${item.addre
 
 export default function MailView({ notify }: { notify: Notice }) {
   const [mailboxes, setMailboxes] = useState<Mailbox[] | null>(null);
+  // A failed load is shown in the page, not as a toast, and never as "no mailboxes".
+  const [loadError, setLoadError] = useState("");
+  const [listError, setListError] = useState("");
   const [mailboxId, setMailboxId] = useState("");
   const [folder, setFolder] = useState<Folder>("inbox");
   const [items, setItems] = useState<MailItem[]>([]);
@@ -130,6 +133,7 @@ export default function MailView({ notify }: { notify: Notice }) {
 
   const refreshBootstrap = useCallback(async () => {
     const data = await api<{ mailboxes: Mailbox[] }>("/api/mail/bootstrap");
+    setLoadError("");
     const list = data.mailboxes || [];
     // /mail?mailbox=<id> (the admin mail page links here) opens that mailbox first.
     const wanted = linkedMailbox.current;
@@ -160,12 +164,13 @@ export default function MailView({ notify }: { notify: Notice }) {
       setItems(data.items || []);
       setNextCursor(data.nextCursor || 0);
       setNow(Date.now());
+      setListError("");
     } catch (error) {
-      notify({ kind: "error", text: (error as Error).message });
+      setListError((error as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [mailboxId, messagesUrl, notify]);
+  }, [mailboxId, messagesUrl]);
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
@@ -182,10 +187,7 @@ export default function MailView({ notify }: { notify: Notice }) {
   }
 
   useEffect(() => {
-    const timer = window.setTimeout(() => refreshBootstrap().catch((error) => {
-      setMailboxes([]);
-      notify({ kind: "error", text: (error as Error).message });
-    }), 0);
+    const timer = window.setTimeout(() => refreshBootstrap().catch((error) => setLoadError((error as Error).message)), 0);
     return () => window.clearTimeout(timer);
   }, [notify, refreshBootstrap]);
   useEffect(() => {
@@ -365,6 +367,22 @@ export default function MailView({ notify }: { notify: Notice }) {
     </>
   );
 
+  if (loadError && !mailboxes) {
+    return (
+      <section className="wm">
+        {header}
+        <div className="wm-start is-error" role="alert">
+          <span className="wm-start-icon" aria-hidden="true"><CircleAlert size={24} /></span>
+          <h2>โหลดอีเมลไม่สำเร็จ</h2>
+          <p>{loadError}</p>
+          <button type="button" className="wm-btn" onClick={() => { setLoadError(""); refreshBootstrap().catch((error) => setLoadError((error as Error).message)); }}>
+            <RefreshCw size={16} aria-hidden="true" /> ลองใหม่
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   if (mailboxes && !mailboxes.length) {
     return (
       <section className="wm">
@@ -437,6 +455,12 @@ export default function MailView({ notify }: { notify: Notice }) {
               <ul className="wm-skeleton" aria-hidden="true">
                 {[0, 1, 2, 3, 4].map((index) => <li key={index}><span /><span /><span /></li>)}
               </ul>
+            ) : listError && !items.length ? (
+              <div className="wm-list-empty is-error" role="alert">
+                <CircleAlert size={28} aria-hidden="true" />
+                <p>โหลดอีเมลไม่สำเร็จ · {listError}</p>
+                <button type="button" className="wm-link" onClick={() => void loadMessages()}>ลองใหม่</button>
+              </div>
             ) : !items.length ? (
               <div className="wm-list-empty">
                 <currentFolder.icon size={28} aria-hidden="true" />

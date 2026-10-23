@@ -157,6 +157,7 @@
 @keyframes wm-pulse { 50% { opacity: .45; } }
 .wm-list-empty { display: grid; justify-items: center; gap: 10px; padding: 48px 20px; color: var(--theme-text-soft); font-size: 14.5px; line-height: 1.6; text-align: center; }
 .wm-list-empty svg { opacity: .6; }
+.wm-list-empty.is-error svg { color: var(--danger); opacity: 1; }
 .wm-list-empty-hint { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 8px; font-size: 13.5px; }
 .wm-list-empty-hint b { color: var(--theme-text-strong); font-weight: 600; overflow-wrap: anywhere; }
 
@@ -237,6 +238,7 @@
 .wm .wm-start h2 { font-size: 19px; font-weight: 700; }
 .wm-start p { max-width: 460px; color: var(--theme-text-soft); font-size: 14.5px; line-height: 1.65; }
 .wm-start .wm-btn { margin-top: 6px; }
+.wm-start.is-error .wm-start-icon { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
 
 /* Dialogs: compose and manage. They render outside .wm's container, so they carry their own
    tokens and use viewport media queries. */

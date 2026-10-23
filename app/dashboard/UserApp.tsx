@@ -2,7 +2,7 @@
 
 import {
   Cloud, Eye, EyeOff, FolderOpen, Info, LayoutDashboard, LogOut, Menu, ShieldCheck, User, X, Globe, Smartphone, Monitor, KeyRound, Check, Clock3, Zap, ChevronDown, Coins, Lock, Store, ReceiptText, RefreshCw, ChevronLeft, ChevronRight, Plus, ArrowUpRight, ExternalLink, Database, Mail, ShoppingCart, Undo2,
-  FileImage, FileVideo, FileAudio, FileText, FileArchive, File as FileIcon, CircleCheck, Circle, Upload, Bot,
+  FileImage, FileVideo, FileAudio, FileText, FileArchive, File as FileIcon, CircleCheck, CircleAlert, Circle, Upload, Bot,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -125,7 +125,7 @@ function UserFeedbackToast({ notice, onClose }: { notice: FeedbackNotice; onClos
   return (
     <div className="toast-region" role="status" aria-live="polite">
       <div className={`toast ${notice.kind}`}>
-        {notice.kind === "success" ? <Check size={20} aria-hidden="true" /> : <Info size={20} aria-hidden="true" />}
+        {notice.kind === "success" ? <CircleCheck size={20} aria-hidden="true" /> : <CircleAlert size={20} aria-hidden="true" />}
         <span>
           {notice.title ? <strong>{notice.title}</strong> : null}
           {notice.text}

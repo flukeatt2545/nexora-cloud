@@ -23,6 +23,9 @@ let activeWindow = 60_000;
 
 let lastActivity = Date.now();
 let fetchPatched = false;
+/** Set while the "ran out" notice is up: the page's own requests are answered 401 here, without
+ *  going to the network, so they stop filling the console and the toasts with the same failure. */
+let sessionEnded = false;
 
 function isApiRequest(url: string) {
   try {
@@ -44,6 +47,9 @@ function patchFetch() {
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (!isApiRequest(url)) return original(input, init);
+    if (sessionEnded && !AUTH_PATHS.some((prefix) => new URL(url, window.location.href).pathname.startsWith(prefix))) {
+      return new Response(JSON.stringify({ error: "เซสชันหมดอายุแล้ว", code: "unauthenticated" }), { status: 401, headers: { "Content-Type": "application/json" } });
+    }
     let nextInit = init;
     if (Date.now() - lastActivity > activeWindow) {
       const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
@@ -170,6 +176,30 @@ export default function SessionGuard() {
     const timer = window.setTimeout(() => void check(), phase === "zero" ? 500 : 0);
     return () => window.clearTimeout(timer);
   }, [check, phase]);
+
+  // While the notice is up the page behind it is frozen: no scrolling (wheel, touch, keys) and no
+  // tabbing into it.
+  const open = expired || warning;
+  useEffect(() => {
+    sessionEnded = expired;
+    document.documentElement.classList.toggle("sg-expired", expired);
+    return () => { sessionEnded = false; document.documentElement.classList.remove("sg-expired"); };
+  }, [expired]);
+  useEffect(() => {
+    if (!open) return;
+    const root = document.documentElement;
+    root.classList.add("sg-locked");
+    const frozen: Element[] = [];
+    Array.from(document.body.children).forEach((element) => {
+      if (element.classList.contains("sg-backdrop") || element.hasAttribute("inert") || ["SCRIPT", "STYLE", "LINK"].includes(element.tagName)) return;
+      element.setAttribute("inert", "");
+      frozen.push(element);
+    });
+    return () => {
+      root.classList.remove("sg-locked");
+      frozen.forEach((element) => element.removeAttribute("inert"));
+    };
+  }, [open]);
 
   async function stay() {
     setBusy(true);
