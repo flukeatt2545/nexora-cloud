@@ -2253,6 +2253,7 @@ function logDevice(log: LogItem, meta: Record<string, unknown> | null) {
   return parsed.browser === "Unknown Browser" ? "" : `${parsed.browser} บน ${parsed.os}`;
 }
 
+const localDateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const logTime = (value: string) => new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 
 // A date field that looks like the other filter controls: the native date input sits on top,
@@ -2313,6 +2314,7 @@ function LogsView() {
   const [perPage, setPerPage] = useState(initial.perPage);
   const [page, setPage] = useState(initial.page);
   const [selectedLog, setSelectedLog] = useState<LogItem | null>(null);
+  const [today, setToday] = useState<{ total: number; failed: number } | null>(null);
   const requestRef = useRef(0);
   const listRef = useRef<HTMLElement>(null);
   const search = q.trim();
@@ -2336,6 +2338,22 @@ function LogsView() {
       if (request === requestRef.current) setLoading(false);
     }
   }, [search, category, outcome, action, dateFrom, dateTo, perPage, page]);
+
+  // Today at a glance: two counts, read from the totals of one-row pages.
+  const todayKey = localDateKey(new Date());
+  const loadToday = useCallback(async () => {
+    const count = async (extra: string) => Number((await api<{ total: number }>(`/api/admin/logs?dateFrom=${todayKey}&limit=1&page=1${extra}`)).total) || 0;
+    try {
+      const [all, failures] = await Promise.all([count(""), count("&outcome=failure")]);
+      setToday({ total: all, failed: failures });
+    } catch {
+      setToday(null);
+    }
+  }, [todayKey]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadToday(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadToday]);
 
   // Typing waits a moment before searching; everything else loads at once.
   const typedRef = useRef(search);
@@ -2373,12 +2391,13 @@ function LogsView() {
     if (top && top.getBoundingClientRect().top < 0) top.scrollIntoView({ block: "start", behavior: "smooth" });
   }
   function searchFor(value: string) { setSelectedLog(null); setQ(value); setPage(1); }
+  function showTodayFailures() { setQ(""); setCategory(""); setAction(""); setOutcome("failure"); setDateFrom(todayKey); setDateTo(""); setPage(1); }
+  function refresh() { void load(); void loadToday(); }
 
   // Day headings between rows: the list is newest first, so a heading starts each new day.
-  const dayHeadings = logs.map((log, index) => {
-    const day = logDayLabel(log.createdAt);
-    return index === 0 || day !== logDayLabel(logs[index - 1].createdAt) ? day : "";
-  });
+  const dayLabels = logs.map((log) => logDayLabel(log.createdAt));
+  const dayHeadings = dayLabels.map((day, index) => (index === 0 || day !== dayLabels[index - 1] ? day : ""));
+  const dayCount = (day: string) => dayLabels.filter((label) => label === day).length;
 
   const meta = selectedLog ? logMeta(selectedLog) : null;
   const geo = meta?.geo as { city?: string; country?: string; isp?: string } | undefined;
@@ -2394,11 +2413,27 @@ function LogsView() {
           <h1>บันทึกกิจกรรม</h1>
         </div>
         <div className="aov-head-actions">
-          <button type="button" className="aov-btn" onClick={() => void load()} disabled={loading} aria-label="รีเฟรช" title="รีเฟรช">
+          <button type="button" className="aov-btn" onClick={refresh} disabled={loading} aria-label="รีเฟรช" title="รีเฟรช">
             <RefreshCw size={16} aria-hidden="true" className={loading ? "spin" : ""} />
           </button>
         </div>
       </header>
+
+      {today && (
+        today.failed > 0 ? (
+          <div className="aov-status">
+            <div className="aov-alert is-bad lgv-today">
+              <CircleAlert size={18} aria-hidden="true" />
+              <span>วันนี้มี <b>{today.failed.toLocaleString("th-TH")}</b> รายการที่ไม่สำเร็จ จากทั้งหมด {today.total.toLocaleString("th-TH")} รายการ</span>
+              <button type="button" onClick={showTodayFailures}>ดูรายการ</button>
+            </div>
+          </div>
+        ) : (
+          <div className="aov-status is-calm">
+            <p className="aov-status-calm"><CheckCircle2 size={18} aria-hidden="true" />{today.total ? `วันนี้ ${today.total.toLocaleString("th-TH")} รายการ สำเร็จทั้งหมด` : "วันนี้ยังไม่มีกิจกรรม"}</p>
+          </div>
+        )
+      )}
 
       <section className="aov-panel" ref={listRef}>
         <div className="th-filters">
@@ -2441,38 +2476,41 @@ function LogsView() {
         {failed && !logs.length ? (
           <div className="aov-empty hv-empty">
             <span>โหลดบันทึกไม่ได้</span>
-            <button type="button" onClick={() => void load()}>ลองอีกครั้ง</button>
+            <button type="button" onClick={refresh}>ลองอีกครั้ง</button>
           </div>
         ) : loading && !logs.length ? (
           <ul className="hv-list" aria-hidden="true">{[0, 1, 2, 3, 4].map((i) => <li className="hv-row is-skeleton" key={i}><span /><span /><span /></li>)}</ul>
         ) : logs.length ? (
           <ul className={`hv-list${loading ? " usv-refreshing" : ""}`}>
             <li className="hv-row lgv-row hv-row-head" aria-hidden="true">
-              <span>กิจกรรม</span><span>ผู้ทำ</span><span>ผล</span><span>IP</span><span>เวลา</span>
+              <span>เวลา</span><span>กิจกรรม</span><span>ผู้ทำ</span><span>IP</span>
             </li>
             {logs.map((log, index) => {
               const heading = dayHeadings[index];
               const target = log.targetType ? formatLogTarget(log) : "";
+              const failedRow = log.outcome !== "success";
               return (
                 <Fragment key={log.id}>
-                  {heading && <li className="lgv-day" aria-hidden="true">{heading}</li>}
+                  {heading && <li className="lgv-day" aria-hidden="true"><span>{heading}</span><small>{dayCount(heading).toLocaleString("th-TH")} รายการ</small></li>}
                   <li>
-                    <button type="button" className={`hv-row lgv-row${log.outcome === "success" ? "" : " is-failed"}`} onClick={() => setSelectedLog(log)}>
+                    <button type="button" className={`hv-row lgv-row${failedRow ? " is-failed" : ""}`} onClick={() => setSelectedLog(log)}>
+                      <time className="lgv-time" dateTime={log.createdAt}>{logTime(log.createdAt)}</time>
                       <span className="hv-site">
                         <span className={`lgv-icon is-${log.category || "system"}`} aria-hidden="true">{logIcon(log)}</span>
                         <span className="hv-site-copy">
-                          <strong className="lgv-title">{actionText(log.action)}</strong>
+                          <span className="lgv-title-line">
+                            <strong className="lgv-title">{actionText(log.action)}</strong>
+                            {failedRow && <span className="hv-status is-error lgv-fail">ไม่สำเร็จ</span>}
+                          </span>
                           <small className="hv-site-domain">{categoryLabel[log.category] || log.category}{target ? ` · ${target}` : ""}</small>
-                          <small className="hv-site-meta">{logActor(log)} · {logTime(log.createdAt)}{log.ipAddress ? ` · ${log.ipAddress}` : ""}</small>
+                          <small className="hv-site-meta">{logActor(log)}{log.ipAddress ? ` · ${log.ipAddress}` : ""}</small>
                         </span>
                       </span>
                       <span className="hv-cell lgv-actor">
                         <strong>{log.actorUsername || logActor(log)}</strong>
                         {log.actorRole && <small>{roleLabel[log.actorRole as Role] || log.actorRole}</small>}
                       </span>
-                      <span className={`hv-status ${log.outcome === "success" ? "is-running" : "is-error"}`}>{log.outcome === "success" ? "สำเร็จ" : "ไม่สำเร็จ"}</span>
                       <span className="hv-cell lgv-ip">{log.ipAddress || <span className="usv-none">—</span>}</span>
-                      <span className="hv-cell lgv-time">{logTime(log.createdAt)}</span>
                     </button>
                   </li>
                 </Fragment>
