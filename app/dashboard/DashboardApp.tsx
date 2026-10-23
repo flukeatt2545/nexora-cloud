@@ -112,6 +112,10 @@ const targetTypeLabel: Record<string, string> = {
   "discord_channel": "ห้องใน Discord",
   "discord_protect_settings": "ระบบป้องกันเซิร์ฟเวอร์",
   "voice_room_settings": "กติกาห้องเสียง",
+  "community_ticket": "Ticket ใน Discord",
+  "community_settings": "การตั้งค่าบอทดูแลเซิร์ฟ",
+  "community_status": "สถานะเว็บ",
+  "discord_role": "ยศใน Discord",
   "mail_log_settings": "ตั้งค่า Log อีเมล",
   "mail_bot_settings": "การสร้างเมลผ่านบอท",
 };
@@ -291,6 +295,13 @@ const actionLabel: Record<string, string> = {
   "discord.protect.word_blocked": "บล็อกคำต้องห้าม", "discord.protect.spam_blocked": "บล็อกข้อความสแปม",
   "discord.protect.mention_blocked": "บล็อกการแท็กหลายคน", "discord.protect.flood_timeout": "พักการพิมพ์คนที่ส่งข้อความรัว",
   "discord.protect.channel_restored": "สร้างห้องที่ถูกลบคืน", "discord.protect.settings_updated": "แก้ระบบป้องกันเซิร์ฟเวอร์",
+
+  // ===== บอทดูแลเซิร์ฟ =====
+  "discord.community.settings_updated": "แก้การตั้งค่าบอทดูแลเซิร์ฟ", "discord.community.setup_ran": "บอทดูแลเซิร์ฟสร้างห้องและยศที่ขาด",
+  "discord.community.channel_created": "สร้างห้องผ่านบอท", "discord.community.category_created": "สร้างหมวดผ่านบอท",
+  "discord.community.role_created": "สร้างยศผ่านบอท", "discord.community.ticket_opened": "เปิด Ticket",
+  "discord.community.ticket_claimed": "ทีมงานรับเรื่อง Ticket", "discord.community.ticket_closed": "ปิด Ticket",
+  "discord.community.site_down": "เว็บหรือ API ล่ม (บอทแจ้งใน Discord)",
 
   // ===== ไฟล์ แฟ้ม และหมวดหมู่ =====
   "user_file.updated": "แก้ไขไฟล์", "user_file.shared": "แชร์ไฟล์", "user_file.share_revoked": "ยกเลิกการแชร์ไฟล์",
@@ -2189,7 +2200,7 @@ const logReasonLabel: Record<string, string> = {
   admin: "แอดมินสั่งลบจากเว็บ",
 };
 
-const discordBotNames: Record<string, string> = { nexora: "บอท NEXORA", mail: "บอทเมล", voice: "บอทห้องเสียง" };
+const discordBotNames: Record<string, string> = { nexora: "บอท NEXORA", mail: "บอทเมล", voice: "บอทห้องเสียง", community: "บอทดูแลเซิร์ฟ" };
 
 // Readable details for Discord bot events: names instead of ids where the bot sent them.
 function discordLogFacts(log: LogItem, meta: Record<string, unknown> | null): [string, string][] {
@@ -2208,6 +2219,17 @@ function discordLogFacts(log: LogItem, meta: Record<string, unknown> | null): [s
     if (text("detail")) facts.push(["รายละเอียด", text("detail")]);
     if (meta.times !== undefined) facts.push(["จำนวนครั้ง", `${meta.times} ครั้งในช่วงสั้นๆ`]);
     if (log.action === "discord.protect.channel_restored") facts.push(["สร้างคืน", meta.restored ? "สร้างคืนแล้ว" : "สร้างคืนไม่ได้"]);
+  }
+  if (log.action.startsWith("discord.community.")) {
+    if (text("name")) facts.push([log.targetType === "community_ticket" ? "Ticket" : "ชื่อ", text("name")]);
+    if (text("openerName")) facts.push(["คนเปิด", `@${text("openerName")}`]);
+    if (text("reason")) facts.push(["เหตุผล", text("reason")]);
+    if (meta.messages !== undefined) facts.push(["ข้อความในห้อง", `${meta.messages} ข้อความ`]);
+    if (text("created")) facts.push(["สร้าง", text("created")]);
+    if (text("source")) facts.push(["แก้จาก", text("source") === "discord" ? "คำสั่ง /setup ใน Discord" : "หน้าเว็บ"]);
+    if (text("fields")) facts.push(["ค่าที่แก้", text("fields")]);
+    if (meta.minutes !== undefined) facts.push(["ล่มนาน", `${Math.max(1, Number(meta.minutes))} นาที`]);
+    if (text("detail")) facts.push(["สาเหตุ", text("detail")]);
   }
   if (log.action === "discord.voice.place_deleted") {
     facts.push(["คนที่ลบ", who(text("deleterName"), text("deleterId")) || "ไม่ทราบ (บอทไม่มีสิทธิ์ดูบันทึกการตรวจสอบ)"]);

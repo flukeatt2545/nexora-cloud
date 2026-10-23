@@ -29,6 +29,10 @@ var webTokenBots = map[string]string{
 	// links, attach files (pictures set on the web page), read history (panels posted earlier),
 	// connect, move members.
 	"voice": "1099798015152",
+	// Manage channels and roles (/setup and /create, ticket rooms, roles picked from the panel,
+	// stats channel names), view, send, embed links, attach files (ticket transcripts), read
+	// history (panels posted earlier), connect and move members (temporary voice rooms).
+	"community": "286379024",
 }
 
 type discordBotStatus struct {

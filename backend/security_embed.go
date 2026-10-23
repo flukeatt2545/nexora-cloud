@@ -167,7 +167,7 @@ func (s *server) securityTargetName(ctx context.Context, event auditEvent) strin
 		return name
 	}
 	if event.Target == "discord_bot" {
-		return map[string]string{"nexora": "บอท NEXORA", "mail": "บอทเมล", "voice": "บอทห้องเสียง"}[event.TargetID]
+		return map[string]string{"nexora": "บอท NEXORA", "mail": "บอทเมล", "voice": "บอทห้องเสียง", "community": "บอทดูแลเซิร์ฟ"}[event.TargetID]
 	}
 	id := strings.TrimSpace(event.TargetID)
 	if id == "" || s.db == nil {

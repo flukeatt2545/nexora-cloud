@@ -18,6 +18,8 @@ func parseDiscordBotKey(raw string) (string, string, bool) {
 		return "nexora", "NEXORA", true
 	case "voice":
 		return "voice", "ห้องเสียง", true
+	case "community":
+		return "community", "เซิร์ฟเวอร์", true
 	default:
 		return "", "", false
 	}

@@ -7,7 +7,7 @@ import "./discord-mail-bot-settings.css";
 
 type Notice = (notice: { kind: "success" | "error"; text: string }) => void;
 
-export type BotKey = "nexora" | "mail" | "voice";
+export type BotKey = "nexora" | "mail" | "voice" | "community";
 export type ActivityType = "playing" | "watching" | "listening" | "competing" | "custom";
 type DiscordBotPresence = {
   activityType: ActivityType;

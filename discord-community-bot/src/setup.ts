@@ -1,0 +1,364 @@
+import {
+  ButtonBuilder,
+  ButtonStyle,
+  ChannelSelectMenuBuilder,
+  ChannelType,
+  EmbedBuilder,
+  MessageFlags,
+  ModalBuilder,
+  OverwriteType,
+  PermissionFlagsBits,
+  RoleSelectMenuBuilder,
+  StringSelectMenuBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ActionRowBuilder,
+  type ButtonInteraction,
+  type ChannelSelectMenuInteraction,
+  type ChatInputCommandInteraction,
+  type GuildMember,
+  type ModalSubmitInteraction,
+  type OverwriteResolvable,
+  type RoleSelectMenuInteraction,
+  type StringSelectMenuInteraction,
+} from "discord.js";
+import { isManager } from "./access";
+import { api, apiMessage, logBotError } from "./api";
+import { applySettings } from "./apply";
+import { buildMissing, hideFromUnverified } from "./build";
+import { SETTINGS_URL } from "./config";
+import { reportSoon } from "./guild";
+import { settings, updateSettings, type Settings } from "./settings";
+import { COLOR, errorEmbed, linkButton, okEmbed, row } from "./ui";
+
+const ephemeral = MessageFlags.Ephemeral as const;
+
+// /setup: the same settings as the admin web page, inside Discord (only the person who ran it
+// sees the panel). /create: make a channel, category or role.
+
+type Slot = {
+  key: keyof Settings;
+  label: string;
+  kind: "text" | "voice" | "category" | "role" | "roles";
+  max?: number;
+};
+
+const SLOTS: Slot[] = [
+  { key: "welcomeChannelId", label: "ห้องต้อนรับ", kind: "text" },
+  { key: "verifyChannelId", label: "ห้องยืนยันตัวตน", kind: "text" },
+  { key: "memberRoleId", label: "ยศสมาชิก (ได้ตอนยืนยัน)", kind: "role" },
+  { key: "rolesChannelId", label: "ห้องเลือกยศ", kind: "text" },
+  { key: "selfRoleIds", label: "ยศที่ให้เลือกเอง", kind: "roles", max: 25 },
+  { key: "ticketChannelId", label: "ห้องปุ่มเปิด Ticket", kind: "text" },
+  { key: "ticketCategoryId", label: "หมวดที่สร้างห้อง Ticket", kind: "category" },
+  { key: "ticketLogChannelId", label: "ห้อง log Ticket", kind: "text" },
+  { key: "staffRoleIds", label: "ยศทีมงาน (ตอบ Ticket)", kind: "roles", max: 10 },
+  { key: "managerRoleIds", label: "ยศผู้ดูแลบอท (/setup, /create)", kind: "roles", max: 10 },
+  { key: "usageRoleIds", label: "ยศที่ใช้ Ticket/ห้องเสียงได้", kind: "roles", max: 10 },
+  { key: "tempHubChannelId", label: "ห้อง ➕ สร้างห้องเสียง", kind: "voice" },
+  { key: "statusChannelId", label: "ห้องแจ้งเว็บล่ม", kind: "text" },
+  { key: "statusMentionRoleId", label: "ยศที่แท็กตอนเว็บล่ม", kind: "role" },
+  { key: "statsCategoryId", label: "หมวดสถิติ", kind: "category" },
+  { key: "statsMembersChannelId", label: "ห้องสถิติ: สมาชิก", kind: "voice" },
+  { key: "statsOnlineChannelId", label: "ห้องสถิติ: ออนไลน์", kind: "voice" },
+  { key: "statsSiteChannelId", label: "ห้องสถิติ: สถานะเว็บ", kind: "voice" },
+];
+
+const FEATURES: { key: keyof Settings; label: string; description: string }[] = [
+  { key: "welcomeEnabled", label: "ต้อนรับสมาชิกใหม่", description: "ส่งข้อความต้อนรับในห้องต้อนรับ" },
+  { key: "verifyEnabled", label: "ยืนยันตัวตน", description: "กดปุ่มแล้วได้ยศสมาชิก" },
+  { key: "ticketsEnabled", label: "Ticket", description: "ปุ่มเปิดห้องคุยส่วนตัวกับทีมงาน" },
+  { key: "tempVoiceEnabled", label: "ห้องเสียงชั่วคราว", description: "เข้าห้อง ➕ แล้วได้ห้องเสียงของตัวเอง" },
+  { key: "statsEnabled", label: "ห้องสถิติ", description: "ชื่อห้องบอกจำนวนสมาชิก คนออนไลน์ สถานะเว็บ" },
+  { key: "statusEnabled", label: "แจ้งเว็บล่ม", description: "แจ้งเมื่อเว็บหรือ API ล่มและกลับมา" },
+];
+
+const TEXTS: { key: keyof Settings; label: string; hint: string; max: number; long: boolean }[] = [
+  { key: "welcomeMessage", label: "ข้อความต้อนรับ", hint: "{user} = แท็กคนเข้า, {name} = ชื่อ, {server} = ชื่อเซิร์ฟ, {count} = ลำดับสมาชิก", max: 1500, long: true },
+  { key: "verifyMessage", label: "ข้อความแผงยืนยันตัวตน", hint: "", max: 1500, long: true },
+  { key: "rolesMessage", label: "ข้อความแผงเลือกยศ", hint: "", max: 1500, long: true },
+  { key: "ticketMessage", label: "ข้อความแผง Ticket", hint: "", max: 1500, long: true },
+  { key: "tempNameTemplate", label: "ชื่อห้องเสียงชั่วคราว", hint: "{user} = ชื่อเจ้าของห้อง", max: 60, long: false },
+  { key: "ticketMaxOpen", label: "Ticket ที่เปิดค้างได้ต่อคน (1–5)", hint: "", max: 1, long: false },
+];
+
+function on(value: boolean) {
+  return value ? "🟢 เปิด" : "⚪ ปิด";
+}
+
+function mention(kind: Slot["kind"], value: string | string[]) {
+  const ids = Array.isArray(value) ? value : value ? [value] : [];
+  if (!ids.length) return "—";
+  return ids.map((id) => (kind === "role" || kind === "roles" ? `<@&${id}>` : `<#${id}>`)).join(" ");
+}
+
+function slotText(current: Settings, key: keyof Settings) {
+  const slot = SLOTS.find((item) => item.key === key)!;
+  return mention(slot.kind, current[key] as string | string[]);
+}
+
+function homePage(current: Settings) {
+  const embed = new EmbedBuilder()
+    .setColor(COLOR.brand)
+    .setTitle("ตั้งค่าบอทดูแลเซิร์ฟ")
+    .setDescription("ตั้งที่นี่หรือที่หน้าเว็บแอดมินก็ได้ ค่าเดียวกัน\nกด **สร้างที่ขาดให้** แล้วบอทจะสร้างห้อง หมวด และยศที่ฟีเจอร์ที่เปิดอยู่ต้องใช้")
+    .addFields(
+      { name: `ต้อนรับ ${on(current.welcomeEnabled)} · ยืนยันตัวตน ${on(current.verifyEnabled)}`,
+        value: `ห้องต้อนรับ ${slotText(current, "welcomeChannelId")}\nห้องยืนยัน ${slotText(current, "verifyChannelId")} · ยศสมาชิก ${slotText(current, "memberRoleId")}` },
+      { name: "เลือกยศ", value: `ห้อง ${slotText(current, "rolesChannelId")} · ${current.selfRoleIds.length} ยศ` },
+      { name: `Ticket ${on(current.ticketsEnabled)}`,
+        value: `ปุ่ม ${slotText(current, "ticketChannelId")} · หมวด ${slotText(current, "ticketCategoryId")} · log ${slotText(current, "ticketLogChannelId")}\nทีมงาน ${slotText(current, "staffRoleIds")}` },
+      { name: `ห้องเสียงชั่วคราว ${on(current.tempVoiceEnabled)}`, value: `ห้อง ${slotText(current, "tempHubChannelId")}`, inline: true },
+      { name: `ห้องสถิติ ${on(current.statsEnabled)}`, value: `หมวด ${slotText(current, "statsCategoryId")}`, inline: true },
+      { name: `แจ้งเว็บล่ม ${on(current.statusEnabled)}`, value: `ห้อง ${slotText(current, "statusChannelId")}`, inline: true },
+      { name: "สิทธิ์", value: `ผู้ดูแลบอท ${slotText(current, "managerRoleIds")}\nใช้ Ticket/ห้องเสียงได้ ${current.usageRoleIds.length ? slotText(current, "usageRoleIds") : "ทุกคน"}` },
+    );
+  const features = new StringSelectMenuBuilder()
+    .setCustomId("cm:setup:features")
+    .setPlaceholder("เปิด/ปิดฟีเจอร์")
+    .setMinValues(0)
+    .setMaxValues(FEATURES.length)
+    .addOptions(FEATURES.map((feature) => ({ label: feature.label, description: feature.description, value: feature.key, default: Boolean(current[feature.key]) })));
+  const pick = new StringSelectMenuBuilder()
+    .setCustomId("cm:setup:pick")
+    .setPlaceholder("เลือกห้องหรือยศที่จะตั้ง")
+    .addOptions(SLOTS.map((slot) => ({ label: slot.label, value: slot.key })));
+  const text = new StringSelectMenuBuilder()
+    .setCustomId("cm:setup:text")
+    .setPlaceholder("แก้ข้อความ")
+    .addOptions(TEXTS.map((item) => ({ label: item.label, value: item.key })));
+  const buttons = row(
+    new ButtonBuilder().setCustomId("cm:setup:build").setStyle(ButtonStyle.Primary).setLabel("สร้างที่ขาดให้").setEmoji("🛠️"),
+    new ButtonBuilder().setCustomId("cm:setup:hide").setStyle(ButtonStyle.Secondary).setLabel("ซ่อนห้องจากคนยังไม่ยืนยัน").setEmoji("🔒"),
+    new ButtonBuilder().setCustomId("cm:setup:repost").setStyle(ButtonStyle.Secondary).setLabel("ลงแผงใหม่").setEmoji("🔁"),
+    linkButton(SETTINGS_URL, "ตั้งค่าบนเว็บ"),
+  );
+  return { embeds: [embed], components: [row(features), row(pick), row(text), buttons] };
+}
+
+function pickerPage(current: Settings, slot: Slot) {
+  const value = current[slot.key] as string | string[];
+  const ids = Array.isArray(value) ? value : value ? [value] : [];
+  let menu: ChannelSelectMenuBuilder | RoleSelectMenuBuilder;
+  if (slot.kind === "role" || slot.kind === "roles") {
+    menu = new RoleSelectMenuBuilder().setCustomId(`cm:set:${slot.key}`).setMinValues(slot.kind === "roles" ? 0 : 1).setMaxValues(slot.max ?? 1);
+    if (ids.length) menu.setDefaultRoles(...ids);
+  } else {
+    const types = { text: [ChannelType.GuildText, ChannelType.GuildAnnouncement], voice: [ChannelType.GuildVoice], category: [ChannelType.GuildCategory] }[slot.kind];
+    menu = new ChannelSelectMenuBuilder().setCustomId(`cm:set:${slot.key}`).setChannelTypes(...types).setMinValues(1).setMaxValues(1);
+    if (ids.length) menu.setDefaultChannels(...ids);
+  }
+  menu.setPlaceholder(slot.label);
+  const embed = new EmbedBuilder().setColor(COLOR.brand).setTitle(slot.label).setDescription(`ตอนนี้: ${mention(slot.kind, value)}\nเลือกใหม่จากเมนูด้านล่าง`);
+  return {
+    embeds: [embed],
+    components: [
+      row(menu),
+      row(
+        new ButtonBuilder().setCustomId("cm:setup:home").setStyle(ButtonStyle.Secondary).setLabel("กลับ"),
+        new ButtonBuilder().setCustomId(`cm:clear:${slot.key}`).setStyle(ButtonStyle.Danger).setLabel("ล้างค่า").setDisabled(ids.length === 0),
+      ),
+    ],
+  };
+}
+
+async function denyUnlessManager(interaction: ChatInputCommandInteraction | ButtonInteraction | StringSelectMenuInteraction | ChannelSelectMenuInteraction | RoleSelectMenuInteraction | ModalSubmitInteraction) {
+  if (isManager(interaction.member as GuildMember)) return false;
+  const payload = { embeds: [errorEmbed("ใช้ไม่ได้", "คำสั่งนี้สำหรับแอดมินและยศผู้ดูแลบอท")], components: [] };
+  if (interaction.isMessageComponent()) await interaction.update(payload);
+  else await interaction.reply({ ...payload, flags: ephemeral });
+  return true;
+}
+
+export async function onSetupCommand(interaction: ChatInputCommandInteraction) {
+  if (await denyUnlessManager(interaction)) return;
+  const current = settings();
+  if (!current) {
+    await interaction.reply({ embeds: [errorEmbed("ยังโหลดการตั้งค่าไม่ได้", "ติดต่อเว็บไม่ได้ ลองใหม่อีกครั้งในอีกสักครู่")], flags: ephemeral });
+    return;
+  }
+  await interaction.reply({ ...homePage(current), flags: ephemeral });
+}
+
+/** Saves a change and shows the panel again (or the error the site gave). */
+async function save(interaction: StringSelectMenuInteraction | ChannelSelectMenuInteraction | RoleSelectMenuInteraction | ButtonInteraction | ModalSubmitInteraction,
+  change: Partial<Settings>) {
+  if (!interaction.deferred && !interaction.replied) {
+    if (interaction.isMessageComponent() || (interaction.isModalSubmit() && interaction.isFromMessage())) await interaction.deferUpdate();
+    else await interaction.deferReply({ flags: ephemeral });
+  }
+  try {
+    const next = await updateSettings(interaction.user, change);
+    await interaction.editReply(homePage(next));
+    void applySettings(interaction.client);
+  } catch (error) {
+    logBotError("save settings", error);
+    await interaction.editReply({ embeds: [errorEmbed("บันทึกไม่ได้", apiMessage(error, "ติดต่อเว็บไม่ได้ ลองใหม่อีกครั้ง"))], components: [row(
+      new ButtonBuilder().setCustomId("cm:setup:home").setStyle(ButtonStyle.Secondary).setLabel("กลับ"),
+    )] });
+  }
+}
+
+export async function onSetupComponent(interaction: ButtonInteraction | StringSelectMenuInteraction | ChannelSelectMenuInteraction | RoleSelectMenuInteraction) {
+  if (await denyUnlessManager(interaction)) return;
+  const current = settings();
+  if (!current) {
+    await interaction.update({ embeds: [errorEmbed("ยังโหลดการตั้งค่าไม่ได้", "ลองใหม่อีกครั้งในอีกสักครู่")], components: [] });
+    return;
+  }
+  const id = interaction.customId;
+
+  if (id === "cm:setup:home") {
+    await interaction.update(homePage(current));
+  } else if (id === "cm:setup:features" && interaction.isStringSelectMenu()) {
+    const change: Partial<Settings> = {};
+    for (const feature of FEATURES) (change as Record<string, boolean>)[feature.key] = interaction.values.includes(feature.key);
+    await save(interaction, change);
+  } else if (id === "cm:setup:pick" && interaction.isStringSelectMenu()) {
+    const slot = SLOTS.find((item) => item.key === interaction.values[0]);
+    if (slot) await interaction.update(pickerPage(current, slot));
+  } else if (id === "cm:setup:text" && interaction.isStringSelectMenu()) {
+    const item = TEXTS.find((text) => text.key === interaction.values[0]);
+    if (!item) return;
+    const field = new TextInputBuilder().setCustomId("value").setLabel(item.label.slice(0, 45))
+      .setStyle(item.long ? TextInputStyle.Paragraph : TextInputStyle.Short).setMaxLength(item.max).setRequired(true)
+      .setValue(String(current[item.key]));
+    if (item.hint) field.setPlaceholder(item.hint.slice(0, 100));
+    await interaction.showModal(new ModalBuilder().setCustomId(`cm:text:${item.key}`).setTitle(item.label.slice(0, 45))
+      .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(field)));
+  } else if (id.startsWith("cm:set:")) {
+    const slot = SLOTS.find((item) => item.key === id.slice("cm:set:".length));
+    if (!slot || !(interaction.isChannelSelectMenu() || interaction.isRoleSelectMenu())) return;
+    const values = interaction.values;
+    await save(interaction, { [slot.key]: slot.kind === "roles" ? values : values[0] ?? "" });
+  } else if (id.startsWith("cm:clear:")) {
+    const slot = SLOTS.find((item) => item.key === id.slice("cm:clear:".length));
+    if (slot) await save(interaction, { [slot.key]: slot.kind === "roles" ? [] : "" });
+  } else if (id === "cm:setup:build") {
+    await interaction.deferUpdate();
+    const guild = interaction.guild!;
+    const result = await buildMissing(guild);
+    if (Object.keys(result.change).length) {
+      try {
+        await updateSettings(interaction.user, result.change);
+      } catch (error) {
+        logBotError("save built settings", error);
+        result.problems.push("สร้างแล้ว แต่บันทึกการตั้งค่าไม่ได้ (เว็บไม่ตอบ) กดสร้างที่ขาดให้อีกครั้งภายหลัง");
+      }
+    }
+    await api(interaction.user).post("/api/internal/bot/community/event", { kind: "setup", guildId: guild.id, name: guild.name, created: result.created })
+      .catch((error) => logBotError("log setup", error));
+    await applySettings(interaction.client);
+    const lines = [
+      result.created.length ? `**สร้างใหม่ ${result.created.length} อย่าง**\n${result.created.map((name) => `• ${name}`).join("\n")}` : "ไม่มีอะไรขาด ทุกอย่างมีครบแล้ว",
+      ...(result.problems.length ? [`**ทำไม่ได้**\n${result.problems.map((p) => `• ${p}`).join("\n")}`] : []),
+    ];
+    await interaction.editReply({
+      embeds: [new EmbedBuilder().setColor(result.problems.length ? COLOR.warn : COLOR.ok).setTitle("สร้างที่ขาดให้แล้ว").setDescription(lines.join("\n\n").slice(0, 4000))],
+      components: [row(new ButtonBuilder().setCustomId("cm:setup:home").setStyle(ButtonStyle.Secondary).setLabel("กลับไปหน้าตั้งค่า"))],
+    });
+  } else if (id === "cm:setup:hide") {
+    await interaction.update({
+      embeds: [new EmbedBuilder().setColor(COLOR.warn).setTitle("ซ่อนห้องจากคนที่ยังไม่ยืนยัน?").setDescription(
+        `ห้องและหมวดที่ทุกคนเห็นอยู่ตอนนี้ จะเห็นได้เฉพาะคนที่มียศ ${slotText(current, "memberRoleId")}\n` +
+        "เว้นห้องต้อนรับ ห้องยืนยันตัวตน และหมวดของสองห้องนี้ ส่วนห้องที่เป็นส่วนตัวอยู่แล้วไม่ถูกแตะ")],
+      components: [row(
+        new ButtonBuilder().setCustomId("cm:setup:hide:yes").setStyle(ButtonStyle.Danger).setLabel("ซ่อนเลย").setDisabled(!current.memberRoleId),
+        new ButtonBuilder().setCustomId("cm:setup:home").setStyle(ButtonStyle.Secondary).setLabel("ยกเลิก"),
+      )],
+    });
+  } else if (id === "cm:setup:hide:yes") {
+    await interaction.deferUpdate();
+    const result = await hideFromUnverified(interaction.guild!);
+    const text = result.missingRole ? "ยังไม่ได้ตั้งยศสมาชิก" :
+      `ซ่อนแล้ว ${result.changed} ห้อง/หมวด${result.failed ? ` · ทำไม่ได้ ${result.failed} ห้อง (บอทไม่มีสิทธิ์จัดการห้องนั้น)` : ""}`;
+    reportSoon(interaction.client);
+    await interaction.editReply({
+      embeds: [new EmbedBuilder().setColor(result.failed || result.missingRole ? COLOR.warn : COLOR.ok).setTitle("ซ่อนห้อง").setDescription(text)],
+      components: [row(new ButtonBuilder().setCustomId("cm:setup:home").setStyle(ButtonStyle.Secondary).setLabel("กลับไปหน้าตั้งค่า"))],
+    });
+  } else if (id === "cm:setup:repost") {
+    await interaction.deferUpdate();
+    await applySettings(interaction.client, true);
+    await interaction.editReply(homePage(settings() ?? current));
+    await interaction.followUp({ embeds: [okEmbed("ลงแผงใหม่แล้ว", "แผงยืนยันตัวตน เลือกยศ และ Ticket ถูกลงใหม่ที่ท้ายห้องของมัน")], flags: ephemeral });
+  }
+}
+
+export async function onSetupText(interaction: ModalSubmitInteraction) {
+  if (await denyUnlessManager(interaction)) return;
+  const key = interaction.customId.slice("cm:text:".length) as keyof Settings;
+  const item = TEXTS.find((text) => text.key === key);
+  if (!item) return;
+  const raw = interaction.fields.getTextInputValue("value").trim();
+  if (key === "ticketMaxOpen") {
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 1 || value > 5) {
+      await interaction.reply({ embeds: [errorEmbed("ตัวเลขไม่ถูก", "ใส่เลข 1–5")], flags: ephemeral });
+      return;
+    }
+    await save(interaction, { ticketMaxOpen: value });
+    return;
+  }
+  await save(interaction, { [key]: raw });
+}
+
+// /create
+
+function onlyRole(guild: GuildMember["guild"], roleId: string, readOnly: boolean): OverwriteResolvable[] {
+  const bot = { id: guild.client.user.id, type: OverwriteType.Member, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.Connect] };
+  if (!roleId) return readOnly ? [{ id: guild.id, type: OverwriteType.Role, deny: [PermissionFlagsBits.SendMessages] }, bot] : [];
+  return [
+    { id: guild.id, type: OverwriteType.Role, deny: [PermissionFlagsBits.ViewChannel] },
+    { id: roleId, type: OverwriteType.Role, allow: [PermissionFlagsBits.ViewChannel], deny: readOnly ? [PermissionFlagsBits.SendMessages] : [] },
+    bot,
+  ];
+}
+
+export async function onCreateCommand(interaction: ChatInputCommandInteraction) {
+  if (await denyUnlessManager(interaction)) return;
+  const guild = interaction.guild!;
+  const sub = interaction.options.getSubcommand();
+  const name = interaction.options.getString("name", true).trim();
+  await interaction.deferReply({ flags: ephemeral });
+  try {
+    if (sub === "role") {
+      const colorText = interaction.options.getString("color")?.trim() ?? "";
+      if (colorText && !/^#?[0-9a-f]{6}$/i.test(colorText)) {
+        await interaction.editReply({ embeds: [errorEmbed("สีไม่ถูก", "ใส่สีแบบ #2e7eff หรือเว้นไว้")] });
+        return;
+      }
+      const role = await guild.roles.create({
+        name, color: colorText ? parseInt(colorText.replace("#", ""), 16) : undefined,
+        hoist: interaction.options.getBoolean("separate") ?? false, mentionable: interaction.options.getBoolean("mentionable") ?? false,
+        reason: `/create โดย ${interaction.user.username}`,
+      });
+      await api(interaction.user).post("/api/internal/bot/community/event", { kind: "role", guildId: guild.id, name: role.name, id: role.id }).catch(() => undefined);
+      await interaction.editReply({ embeds: [okEmbed("สร้างยศแล้ว", `${role} (ลากตำแหน่งยศได้ในตั้งค่าเซิร์ฟ)`)] });
+      return;
+    }
+    const roleId = interaction.options.getRole("only")?.id ?? "";
+    if (sub === "category") {
+      const category = await guild.channels.create({ name, type: ChannelType.GuildCategory, permissionOverwrites: onlyRole(guild, roleId, false), reason: `/create โดย ${interaction.user.username}` });
+      await api(interaction.user).post("/api/internal/bot/community/event", { kind: "category", guildId: guild.id, name: category.name, id: category.id }).catch(() => undefined);
+      await interaction.editReply({ embeds: [okEmbed("สร้างหมวดแล้ว", `**${category.name}**${roleId ? ` เห็นเฉพาะ <@&${roleId}>` : ""}`)] });
+      return;
+    }
+    const type = { voice: ChannelType.GuildVoice, announcement: ChannelType.GuildAnnouncement }[interaction.options.getString("type") ?? ""] ?? ChannelType.GuildText;
+    const parent = interaction.options.getChannel("category");
+    const readOnly = interaction.options.getBoolean("read_only") ?? false;
+    const custom = Boolean(roleId) || readOnly;
+    const channel = await guild.channels.create({
+      name, type: type as ChannelType.GuildText,
+      parent: parent?.id,
+      // Without a role or read-only it simply follows its category's permissions.
+      permissionOverwrites: custom ? onlyRole(guild, roleId, readOnly && type !== ChannelType.GuildVoice) : undefined,
+      reason: `/create โดย ${interaction.user.username}`,
+    });
+    await api(interaction.user).post("/api/internal/bot/community/event", { kind: "channel", guildId: guild.id, name: channel.name, id: channel.id }).catch(() => undefined);
+    await interaction.editReply({ embeds: [okEmbed("สร้างห้องแล้ว", `${channel}${roleId ? ` เห็นเฉพาะ <@&${roleId}>` : ""}${readOnly ? " · อ่านอย่างเดียว" : ""}`)] });
+  } catch (error) {
+    logBotError(`create ${sub}`, error);
+    await interaction.editReply({ embeds: [errorEmbed("สร้างไม่ได้", "บอทอาจไม่มีสิทธิ์ Manage Channels / Manage Roles หรือชื่อไม่ถูกต้อง")] });
+  }
+}

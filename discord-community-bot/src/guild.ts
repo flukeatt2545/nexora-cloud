@@ -1,0 +1,119 @@
+import { ChannelType, PermissionFlagsBits, type Client, type Guild } from "discord.js";
+import { assignable } from "./access";
+import { api, logBotError } from "./api";
+import { ENV_GUILD_ID } from "./config";
+import { settings, settingsVersion } from "./settings";
+
+// The bot looks after one server. Which one: the page's setting, else .env, else the only
+// server it is in. In any other server it answers only with a note that it is not set up there.
+
+export function homeGuildId(client: Client) {
+  const configured = settings()?.guildId || ENV_GUILD_ID;
+  if (configured) return configured;
+  return client.guilds.cache.size === 1 ? client.guilds.cache.first()!.id : "";
+}
+
+export function homeGuild(client: Client): Guild | undefined {
+  const id = homeGuildId(client);
+  return id ? client.guilds.cache.get(id) : undefined;
+}
+
+export function isHome(guild: Guild | null | undefined) {
+  return Boolean(guild && guild.id === homeGuildId(guild.client));
+}
+
+const typeNames: Partial<Record<ChannelType, string>> = {
+  [ChannelType.GuildText]: "text",
+  [ChannelType.GuildVoice]: "voice",
+  [ChannelType.GuildCategory]: "category",
+  [ChannelType.GuildAnnouncement]: "announcement",
+  [ChannelType.GuildStageVoice]: "stage",
+  [ChannelType.GuildForum]: "forum",
+};
+
+/** What stops a setting from working: missing permissions, missing channels, roles out of reach. */
+function problems(guild: Guild): string[] {
+  const current = settings();
+  const me = guild.members.me;
+  const out: string[] = [];
+  if (!me || !current) return out;
+  const needs: [bigint, string][] = [
+    [PermissionFlagsBits.ManageChannels, "Manage Channels (สร้างห้อง, Ticket, ห้องเสียง, สถิติ)"],
+    [PermissionFlagsBits.ManageRoles, "Manage Roles (ให้ยศ, ตั้งสิทธิ์ห้อง)"],
+    [PermissionFlagsBits.MoveMembers, "Move Members (ย้ายคนเข้าห้องเสียงที่สร้าง)"],
+    [PermissionFlagsBits.AttachFiles, "Attach Files (ส่งประวัติ Ticket)"],
+  ];
+  for (const [flag, label] of needs) {
+    if (!me.permissions.has(flag)) out.push(`บอทยังไม่มีสิทธิ์ ${label}`);
+  }
+  const channel = (id: string, label: string, on: boolean) => {
+    if (on && id && !guild.channels.cache.has(id)) out.push(`ไม่พบ${label}ที่ตั้งไว้ (อาจถูกลบ)`);
+  };
+  channel(current.welcomeChannelId, "ห้องต้อนรับ", current.welcomeEnabled);
+  channel(current.verifyChannelId, "ห้องยืนยันตัวตน", current.verifyEnabled);
+  channel(current.rolesChannelId, "ห้องเลือกยศ", true);
+  channel(current.ticketChannelId, "ห้อง Ticket", current.ticketsEnabled);
+  channel(current.ticketCategoryId, "หมวด Ticket", current.ticketsEnabled);
+  channel(current.ticketLogChannelId, "ห้อง log Ticket", current.ticketsEnabled);
+  channel(current.tempHubChannelId, "ห้องสร้างห้องเสียง", current.tempVoiceEnabled);
+  channel(current.statusChannelId, "ห้องแจ้งสถานะ", current.statusEnabled);
+  if (current.memberRoleId && !assignable(guild, current.memberRoleId)) {
+    out.push("ยศสมาชิกอยู่สูงกว่ายศของบอท (หรือหายไป) ลากยศของบอทให้อยู่เหนือยศสมาชิกในตั้งค่าเซิร์ฟ");
+  }
+  const blocked = current.selfRoleIds.filter((id) => !assignable(guild, id));
+  if (blocked.length) out.push(`ยศให้เลือก ${blocked.length} ยศอยู่สูงกว่ายศของบอท (หรือหายไป) บอทให้ยศนั้นไม่ได้`);
+  if (current.verifyEnabled && !current.memberRoleId) out.push("เปิดยืนยันตัวตนแล้ว แต่ยังไม่ได้เลือกยศสมาชิก");
+  if (current.ticketsEnabled && !current.ticketCategoryId) out.push("เปิด Ticket แล้ว แต่ยังไม่ได้เลือกหมวดที่จะสร้างห้อง Ticket");
+  return out;
+}
+
+let reportTimer: NodeJS.Timeout | null = null;
+let appliedVersion = 0;
+
+export function markApplied(version = settingsVersion()) {
+  appliedVersion = version;
+}
+
+/** Tells the site what the server looks like (for the pickers on the web page) and what is wrong. */
+export async function reportGuild(client: Client) {
+  const guild = homeGuild(client);
+  if (!guild) return;
+  const me = guild.members.me;
+  const channels = [...guild.channels.cache.values()]
+    .filter((channel) => typeNames[channel.type])
+    .map((channel) => ({
+      id: channel.id,
+      name: channel.name,
+      type: typeNames[channel.type],
+      parentId: "parentId" in channel ? channel.parentId ?? "" : "",
+      position: "rawPosition" in channel ? channel.rawPosition : 0,
+    }));
+  const roles = [...guild.roles.cache.values()]
+    .filter((role) => role.id !== guild.id)
+    .sort((a, b) => b.position - a.position)
+    .map((role) => ({
+      id: role.id,
+      name: role.name,
+      color: role.color,
+      position: role.position,
+      assignable: Boolean(me && !role.managed && role.position < me.roles.highest.position),
+    }));
+  await api().post("/api/internal/bot/community/guild", {
+    guildId: guild.id,
+    guildName: guild.name,
+    memberCount: guild.memberCount,
+    channels: channels.slice(0, 600),
+    roles: roles.slice(0, 300),
+    appliedVersion,
+    problems: problems(guild),
+  }).catch((error) => logBotError("report guild", error));
+}
+
+/** Channels and roles change in bursts (a setup run makes ten at once); report once after. */
+export function reportSoon(client: Client) {
+  if (reportTimer) clearTimeout(reportTimer);
+  reportTimer = setTimeout(() => {
+    reportTimer = null;
+    void reportGuild(client);
+  }, 3000);
+}

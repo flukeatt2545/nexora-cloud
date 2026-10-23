@@ -1,9 +1,10 @@
 "use client";
 
 import { Fragment, type KeyboardEvent, type ReactNode, useRef } from "react";
-import { AudioLines, Bot, Check, CircleAlert, Eye, Gamepad2, Headphones, Mail, PenLine, RotateCcw, Save, Trophy, type LucideIcon } from "lucide-react";
+import { AudioLines, Bot, Check, CircleAlert, Eye, Gamepad2, Headphones, Mail, PenLine, RotateCcw, Save, Trophy, Users, type LucideIcon } from "lucide-react";
 import { BotConnectionStrip, type BotConnectionState, useBotConnection } from "./DiscordBotConnection";
 import { ACTIVITY_TEXT_MAX, type ActivityType, type BotKey, MailBotSelfServiceSettings, useBotPresence } from "./DiscordMailBotSettings";
+import { DiscordCommunity } from "./DiscordCommunity";
 import { DiscordProtect } from "./DiscordProtect";
 import { DiscordVoiceMessages } from "./DiscordVoiceMessages";
 import { DiscordVoiceRooms } from "./DiscordVoiceRooms";
@@ -61,6 +62,15 @@ const BOTS: BotConfig[] = [
       { key: "sessions", superadminOnly: true, render: () => <DiscordVoiceSessions /> },
       { key: "messages", superadminOnly: true, render: (notify) => <DiscordVoiceMessages notify={notify} /> },
     ],
+  },
+  {
+    key: "community",
+    name: "บอทดูแลเซิร์ฟ",
+    description: "ต้อนรับ ยืนยันตัวตน เลือกยศ Ticket ห้องเสียงชั่วคราว ห้องสถิติ และแจ้งเว็บล่ม ในเซิร์ฟเดียวที่ตั้งไว้",
+    icon: Users,
+    previewName: "บอทดูแลเซิร์ฟ",
+    defaultText: "เซิร์ฟเวอร์",
+    extras: [{ key: "settings", superadminOnly: true, render: (notify) => <DiscordCommunity notify={notify} /> }],
   },
 ];
 
