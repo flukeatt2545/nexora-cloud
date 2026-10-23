@@ -294,7 +294,18 @@ export default function SessionGuard() {
   if ((!expired && !warning) || !host) return null;
 
   return createPortal(
-    <div className="sg-backdrop" role="presentation" ref={backdropRef}>
+    <div className={`sg-backdrop${expired ? " is-ended" : ""}`} role="presentation" ref={backdropRef}>
+      {expired && (
+        // The page itself is gone, so the notice sits on an empty outline of one: nothing real, just
+        // blocks where the menu, the heading and the cards were.
+        <div className="sg-ghost" aria-hidden="true">
+          <span className="sg-ghost-side" />
+          <span className="sg-ghost-top" />
+          <span className="sg-ghost-hero" />
+          <span className="sg-ghost-card" /><span className="sg-ghost-card" /><span className="sg-ghost-card" />
+          <span className="sg-ghost-panel" /><span className="sg-ghost-panel" />
+        </div>
+      )}
       <section ref={dialogRef} className={`sg-dialog${expired ? " is-expired" : ""}`} role="alertdialog" aria-modal="true" aria-labelledby="sg-title" aria-describedby="sg-text">
         <span className="sg-icon" aria-hidden="true">{expired ? <LockKeyhole size={26} /> : <Clock3 size={26} />}</span>
         {expired ? (

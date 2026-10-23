@@ -11,6 +11,31 @@ html.sg-locked, html.sg-locked body { overflow: hidden !important; scrollbar-gut
 .sg-backdrop { overscroll-behavior: contain; touch-action: none; }
 /* Once the session has ended, failure toasts from the page behind it would only repeat the notice. */
 html.sg-expired :is(.toast-region, .fl-toast, .gal-toasts, .dashboard-toast) { display: none !important; }
+/* Session over: an empty outline of the page, softly dimmed, instead of a black screen. */
+.sg-backdrop.is-ended { background: var(--background); backdrop-filter: none; }
+.sg-ghost { position: absolute; inset: 0; display: grid; grid-template-columns: 248px repeat(3, minmax(0, 1fr)); grid-template-rows: 64px 150px 96px minmax(0, 1fr); gap: 20px; padding: 0 28px 28px 0; overflow: hidden; pointer-events: none; }
+.sg-ghost > span { display: block; border: 1px solid var(--theme-line-soft); border-radius: 16px; background: color-mix(in srgb, var(--theme-elevated) 70%, transparent); }
+.sg-ghost-side { grid-column: 1; grid-row: 1 / -1; border-width: 0 1px 0 0 !important; border-radius: 0 !important; background: color-mix(in srgb, var(--theme-elevated) 85%, transparent) !important; }
+.sg-ghost-top { grid-column: 2 / -1; grid-row: 1; margin-right: -28px; border-width: 0 0 1px !important; border-radius: 0 !important; background: none !important; }
+.sg-ghost-hero { grid-column: 2 / -1; grid-row: 2; }
+.sg-ghost-card:nth-of-type(4) { grid-column: 2; grid-row: 3; }
+.sg-ghost-card:nth-of-type(5) { grid-column: 3; grid-row: 3; }
+.sg-ghost-card:nth-of-type(6) { grid-column: 4; grid-row: 3; }
+.sg-ghost-panel:nth-of-type(7) { grid-column: 2 / 4; grid-row: 4; }
+.sg-ghost-panel:nth-of-type(8) { grid-column: 4; grid-row: 4; }
+.sg-backdrop.is-ended::after { content: ""; position: absolute; inset: 0; background: var(--theme-overlay); opacity: .35; pointer-events: none; }
+.sg-backdrop.is-ended > .sg-dialog { position: relative; z-index: 1; }
+@media (max-width: 900px) {
+  .sg-ghost { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: 56px 120px 84px minmax(0, 1fr); gap: 14px; padding: 0 16px 16px; }
+  .sg-ghost > .sg-ghost-side { display: none; }
+  .sg-ghost-top { grid-column: 1 / -1; margin-inline: -16px; }
+  .sg-ghost-hero { grid-column: 1 / -1; }
+  .sg-ghost-card:nth-of-type(4) { grid-column: 1; }
+  .sg-ghost-card:nth-of-type(5) { grid-column: 2; }
+  .sg-ghost-card:nth-of-type(6) { grid-column: 3; }
+  .sg-ghost-panel:nth-of-type(7) { grid-column: 1 / -1; }
+  .sg-ghost > .sg-ghost-panel:nth-of-type(8) { display: none; }
+}
 .sg-dialog {
   width: min(400px, 100%);
   display: grid; justify-items: center; gap: 10px;
