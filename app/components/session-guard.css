@@ -6,8 +6,10 @@
   backdrop-filter: blur(3px);
   animation: sg-fade .2s ease-out;
 }
-/* The page behind does not scroll; the gutter stays so nothing shifts sideways. */
-html.sg-locked, html.sg-locked body { overflow: hidden !important; scrollbar-gutter: stable; overscroll-behavior: none; }
+/* The page behind does not scroll. */
+html.sg-locked, html.sg-locked body { overflow: hidden !important; overscroll-behavior: none; }
+/* The scrollbar goes away with the lock; its width is added back so the page does not jump, and the notice covers the whole window. */
+html.sg-locked body { padding-right: var(--sg-scrollbar, 0px); }
 .sg-backdrop { overscroll-behavior: contain; touch-action: none; }
 /* Once the session has ended, failure toasts from the page behind it would only repeat the notice. */
 html.sg-expired :is(.toast-region, .fl-toast, .gal-toasts, .dashboard-toast) { display: none !important; }
@@ -23,6 +25,14 @@ html.sg-expired :is(.toast-region, .fl-toast, .gal-toasts, .dashboard-toast) { d
 .sg-ghost-card:nth-of-type(6) { grid-column: 4; grid-row: 3; }
 .sg-ghost-panel:nth-of-type(7) { grid-column: 2 / 4; grid-row: 4; }
 .sg-ghost-panel:nth-of-type(8) { grid-column: 4; grid-row: 4; }
+/* The outline fades in block by block, then a slow light sweeps across each one. */
+.sg-ghost > span { position: relative; overflow: hidden; animation: sg-ghost-in .55s cubic-bezier(.2, .75, .25, 1) both; animation-delay: calc(var(--n, 0) * 70ms); }
+.sg-ghost > span::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--theme-text-strong) 7%, transparent) 50%, transparent 70%); transform: translateX(-100%); animation: sg-ghost-sweep 2.8s ease-in-out infinite; animation-delay: calc(.6s + var(--n, 0) * 140ms); }
+.sg-ghost > span:nth-of-type(1) { --n: 0; } .sg-ghost > span:nth-of-type(2) { --n: 1; } .sg-ghost > span:nth-of-type(3) { --n: 2; }
+.sg-ghost > span:nth-of-type(4) { --n: 3; } .sg-ghost > span:nth-of-type(5) { --n: 4; } .sg-ghost > span:nth-of-type(6) { --n: 5; }
+.sg-ghost > span:nth-of-type(7) { --n: 6; } .sg-ghost > span:nth-of-type(8) { --n: 7; }
+@keyframes sg-ghost-in { from { opacity: 0; transform: translateY(10px); } }
+@keyframes sg-ghost-sweep { 0% { transform: translateX(-100%); } 55%, 100% { transform: translateX(100%); } }
 .sg-backdrop.is-ended::after { content: ""; position: absolute; inset: 0; background: var(--theme-overlay); opacity: .35; pointer-events: none; }
 .sg-backdrop.is-ended > .sg-dialog { position: relative; z-index: 1; }
 @media (max-width: 900px) {
@@ -77,4 +87,6 @@ html.sg-expired :is(.toast-region, .fl-toast, .gal-toasts, .dashboard-toast) { d
 @keyframes sg-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .sg-backdrop, .sg-dialog, .sg-dialog.is-expired .sg-icon { animation: none; }
+  .sg-ghost > span, .sg-ghost > span::after { animation: none; }
+  .sg-ghost > span::after { display: none; }
 }

@@ -27,10 +27,17 @@ let fetchPatched = false;
  *  going to the network, so they stop filling the console and the toasts with the same failure. */
 let sessionEnded = false;
 let lastTtlSeconds = 0;
+/** Why the session ended, as far as the page can tell: "idle" when the end time it was told came and
+ *  went, "other" when the server refused it earlier than that (signed out on another device or tab,
+ *  the session cancelled or all sessions revoked, the account switched off), "unknown" when the page
+ *  never learned an end time. The notice words itself from this and does not claim more. */
+type EndReason = "idle" | "other" | "unknown";
+let endInfo: { reason: EndReason; ttlSeconds: number } = { reason: "unknown", ttlSeconds: 0 };
 const endedListeners = new Set<() => void>();
 
-function markEnded() {
+function markEnded(reason: EndReason, ttlSeconds: number) {
   if (sessionEnded) return;
+  endInfo = { reason, ttlSeconds };
   sessionEnded = true;
   endedListeners.forEach((listener) => listener());
 }
@@ -109,6 +116,7 @@ export default function SessionGuard() {
   const [busy, setBusy] = useState(false);
   // Last time activity was reported; 0 until the first status, which counts as one.
   const lastExtend = useRef(0);
+  const statusRef = useRef<Status | null>(null);
 
   const apply = useCallback((data: { expiresAt: string; now: string; ttlSeconds?: number; ttlMinutes: number }) => {
     // Kept in this device's clock, whatever the server's clock says.
@@ -118,10 +126,17 @@ export default function SessionGuard() {
     const ttlSeconds = data.ttlSeconds ?? data.ttlMinutes * 60;
     lastTtlSeconds = ttlSeconds;
     activeWindow = Math.max(5_000, Math.min(60_000, ttlSeconds * 500));
-    setStatus({ expiresAt: new Date(data.expiresAt).getTime() - skew, ttlSeconds });
+    const next = { expiresAt: new Date(data.expiresAt).getTime() - skew, ttlSeconds };
+    statusRef.current = next;
+    setStatus(next);
   }, []);
 
-  const end = useCallback(() => { setExpired(true); markEnded(); }, []);
+  const end = useCallback(() => {
+    const known = statusRef.current;
+    // A couple of seconds of slack for clock differences.
+    markEnded(known ? (Date.now() >= known.expiresAt - 2000 ? "idle" : "other") : "unknown", known?.ttlSeconds ?? lastTtlSeconds);
+    setExpired(true);
+  }, []);
 
   const check = useCallback(async () => {
     try {
@@ -258,6 +273,7 @@ export default function SessionGuard() {
   useEffect(() => {
     if (!open) return;
     const root = document.documentElement;
+    root.style.setProperty("--sg-scrollbar", `${Math.max(0, window.innerWidth - root.clientWidth)}px`);
     root.classList.add("sg-locked");
     const frozen: Element[] = [];
     Array.from(document.body.children).forEach((element) => {
@@ -267,6 +283,7 @@ export default function SessionGuard() {
     });
     return () => {
       root.classList.remove("sg-locked");
+      root.style.removeProperty("--sg-scrollbar");
       frozen.forEach((element) => element.removeAttribute("inert"));
     };
   }, [open]);
@@ -310,9 +327,14 @@ export default function SessionGuard() {
         <span className="sg-icon" aria-hidden="true">{expired ? <LockKeyhole size={26} /> : <Clock3 size={26} />}</span>
         {expired ? (
           <>
-            <h2 id="sg-title">หมดเวลาใช้งานแล้ว</h2>
+            <h2 id="sg-title">{endInfo.reason === "idle" ? "หมดเวลาใช้งานแล้ว" : "เซสชันสิ้นสุดแล้ว"}</h2>
             <p id="sg-text">
-              {status || lastTtlSeconds ? `ไม่ได้ใช้งานนานเกิน ${idleText(status?.ttlSeconds ?? lastTtlSeconds)} ` : ""}ระบบจึงออกจากระบบให้เพื่อความปลอดภัย เข้าสู่ระบบอีกครั้งแล้วจะกลับมาที่หน้านี้
+              {endInfo.reason === "idle" && endInfo.ttlSeconds > 0
+                ? `ไม่มีการใช้งานนานเกิน ${idleText(endInfo.ttlSeconds)} ระบบจึงออกจากระบบให้อัตโนมัติ`
+                : endInfo.reason === "other"
+                  ? "เซสชันนี้ถูกปิดก่อนครบเวลา อาจเพราะออกจากระบบในอุปกรณ์หรือแท็บอื่น ยกเลิกเซสชัน หรือบัญชีถูกปิดการใช้งาน"
+                  : "การเข้าสู่ระบบนี้สิ้นสุดแล้ว"}
+              {" "}เข้าสู่ระบบอีกครั้งเพื่อทำงานต่อ ถ้าเข้าภายใน 1 ชั่วโมงจะกลับมาที่หน้านี้
             </p>
             <div className="sg-actions">
               <button type="button" className="sg-btn sg-btn-primary" onClick={signInAgain} autoFocus><LogIn size={17} aria-hidden="true" />เข้าสู่ระบบอีกครั้ง</button>
