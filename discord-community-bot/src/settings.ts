@@ -16,6 +16,12 @@ export type Settings = {
   welcomeChannelId: string;
   welcomeMessage: string;
   welcomeImage: boolean;
+  roleCheckEnabled: boolean;
+  roleCheckChannelId: string;
+  leaveEnabled: boolean;
+  leaveChannelId: string;
+  leaveMessage: string;
+  leaveImage: boolean;
   verifyEnabled: boolean;
   verifyChannelId: string;
   verifyMessage: string;
@@ -57,7 +63,7 @@ export type Settings = {
 };
 
 export type Panel = { channelId: string; messageId: string };
-export type Panels = { verify: Panel; roles: Panel; ticket: Panel; status: Panel; boost: Panel };
+export type Panels = { verify: Panel; roles: Panel; ticket: Panel; status: Panel; boost: Panel; roleCheck: Panel };
 export type PanelKey = keyof Panels;
 
 type Snapshot = { settings: Settings; panels: Panels; version: number };
@@ -98,7 +104,7 @@ export function nameEmoji(): boolean {
 
 export function panels(): Panels {
   const none = { channelId: "", messageId: "" };
-  return { verify: none, roles: none, ticket: none, status: none, boost: none, ...snapshot?.panels };
+  return { verify: none, roles: none, ticket: none, status: none, boost: none, roleCheck: none, ...snapshot?.panels };
 }
 
 export function settingsVersion() {
@@ -125,10 +131,15 @@ export async function updateSettings(actor: Actor, change: Partial<Settings>) {
   return res.data.settings;
 }
 
+// Panels are posted at the same time now; the saves to the site go one after another, each
+// sending the latest of all of them, so a late one can never bring back an old state.
+let panelSaves: Promise<unknown> = Promise.resolve();
+
 export async function savePanel(key: PanelKey, panel: Panel) {
   const next = { ...panels(), [key]: panel };
   if (snapshot) remember({ ...snapshot, panels: next });
-  await api().post("/api/internal/bot/community/panels", next).catch((error) => logBotError("save panel", error));
+  panelSaves = panelSaves.then(() => api().post("/api/internal/bot/community/panels", panels()).catch((error) => logBotError("save panel", error)));
+  await panelSaves;
 }
 
 /** {user}, {name}, {server} and {count} in the texts set on the web page. */

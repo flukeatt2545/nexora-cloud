@@ -122,7 +122,7 @@ function pill(ctx: SKRSContext2D, x: number, y: number, text: string, color: str
 
 async function avatar(url: string): Promise<Image | null> {
   try {
-    const res = await axios.get<ArrayBuffer>(url, { responseType: "arraybuffer", timeout: 8000 });
+    const res = await axios.get<ArrayBuffer>(url, { responseType: "arraybuffer", timeout: 4000 });
     return await loadImage(Buffer.from(res.data));
   } catch (error) {
     logBotError("welcome avatar", error);
@@ -132,7 +132,11 @@ async function avatar(url: string): Promise<Image | null> {
 
 // Welcome
 
-export type WelcomeData = { name: string; username: string; avatarUrl: string; server: string; count: number };
+export type WelcomeData = {
+  name: string; username: string; avatarUrl: string; server: string; count: number;
+  /** The goodbye card: "ลาก่อน", a grey avatar, and how long they stayed (null = unknown). */
+  leaving?: { days: number | null };
+};
 
 export async function welcomeCard(data: WelcomeData) {
   const w = 1100;
@@ -212,7 +216,7 @@ export async function welcomeCard(data: WelcomeData) {
   // Greeting, the member's name as the hero, and an accent bar.
   const left = 70;
   const room = 600;
-  drawText(ctx, "ยินดีต้อนรับ", left, 148, { size: 36, weight: 600, color: "#ff4d5e" });
+  drawText(ctx, data.leaving ? "ลาก่อน" : "ยินดีต้อนรับ", left, 148, { size: 36, weight: 600, color: "#ff4d5e" });
   const name = drawable(data.name, drawable(data.username, "สมาชิกใหม่"));
   drawText(ctx, name, left, 246, { size: 98, weight: 800, maxWidth: room });
   const bar = ctx.createLinearGradient(left, 0, left + 120, 0);
@@ -224,8 +228,8 @@ export async function welcomeCard(data: WelcomeData) {
 
   // Two figures: which member, which server.
   const server = drawable(data.server, "เซิร์ฟเวอร์");
-  drawText(ctx, "สมาชิกคนที่", left, 322, { size: 18, color: "rgba(255,255,255,0.55)" });
-  const number = `#${data.count.toLocaleString("en-US")}`;
+  drawText(ctx, data.leaving ? "อยู่กับเรา" : "สมาชิกคนที่", left, 322, { size: 18, color: "rgba(255,255,255,0.55)" });
+  const number = data.leaving ? (data.leaving.days === null ? "—" : `${data.leaving.days.toLocaleString("en-US")} วัน`) : `#${data.count.toLocaleString("en-US")}`;
   const numberWidth = drawText(ctx, number, left, 368, { size: 46, weight: 800, color: "#ff5a68" });
   const second = left + Math.max(numberWidth, 110) + 44;
   ctx.fillStyle = "rgba(255,255,255,0.16)";
@@ -266,8 +270,11 @@ export async function welcomeCard(data: WelcomeData) {
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.clip();
-  if (picture) ctx.drawImage(picture, cx - radius, cy - radius, radius * 2, radius * 2);
-  else {
+  if (picture) {
+    if (data.leaving) ctx.filter = "grayscale(1) brightness(0.8)";
+    ctx.drawImage(picture, cx - radius, cy - radius, radius * 2, radius * 2);
+    ctx.filter = "none";
+  } else {
     ctx.fillStyle = "#2a0f14";
     ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
   }
@@ -346,7 +353,7 @@ export async function statusCard(rows: StatusRow[], title: string) {
   });
 
   drawText(ctx, `อัปเดตล่าสุด ${thaiTime.format(new Date())} น.`, 64, h - 50, { size: 20, color: "rgba(255,255,255,0.6)" });
-  drawText(ctx, "ตรวจทุก 1 นาที · อัปเดตอัตโนมัติ", w - 64, h - 50, { size: 20, align: "right", color: "rgba(255,255,255,0.6)" });
+  drawText(ctx, "ตรวจทุก 30 วินาที · อัปเดตอัตโนมัติ", w - 64, h - 50, { size: 20, align: "right", color: "rgba(255,255,255,0.6)" });
   return canvas.toBuffer("image/png");
 }
 
@@ -409,11 +416,12 @@ export async function boostCard(data: BoostData) {
 // Panel banners (verify, ticket): a badge with a drawn icon, the title and one line under it.
 // They never change, so each is drawn once.
 
-export type BannerKind = "verify" | "ticket";
+export type BannerKind = "verify" | "ticket" | "roles";
 
 const BANNERS: Record<BannerKind, { label: string; title: string; subtitle: string }> = {
   verify: { label: "VERIFY", title: "ยืนยันตัวตน", subtitle: "กดปุ่มด้านล่างเพื่อเข้าถึงทุกห้องในเซิร์ฟ" },
   ticket: { label: "SUPPORT", title: "ติดต่อทีมงาน", subtitle: "เปิด Ticket เพื่อคุยส่วนตัวกับทีมงาน" },
+  roles: { label: "ROLES", title: "เช็คยศ", subtitle: "กดปุ่มด้านล่างเพื่อดูยศของคุณ" },
 };
 
 function drawIcon(ctx: SKRSContext2D, kind: BannerKind, cx: number, cy: number, size: number) {
@@ -437,6 +445,22 @@ function drawIcon(ctx: SKRSContext2D, kind: BannerKind, cx: number, cy: number, 
     ctx.moveTo(cx - size * 0.35, cy);
     ctx.lineTo(cx - size * 0.08, cy + size * 0.28);
     ctx.lineTo(cx + size * 0.4, cy - size * 0.28);
+    ctx.stroke();
+  } else if (kind === "roles") {
+    // A crown.
+    ctx.beginPath();
+    ctx.moveTo(cx - size * 0.9, cy + size * 0.55);
+    ctx.lineTo(cx - size * 0.9, cy - size * 0.45);
+    ctx.lineTo(cx - size * 0.45, cy + size * 0.05);
+    ctx.lineTo(cx, cy - size * 0.7);
+    ctx.lineTo(cx + size * 0.45, cy + size * 0.05);
+    ctx.lineTo(cx + size * 0.9, cy - size * 0.45);
+    ctx.lineTo(cx + size * 0.9, cy + size * 0.55);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - size * 0.9, cy + size * 0.85);
+    ctx.lineTo(cx + size * 0.9, cy + size * 0.85);
     ctx.stroke();
   } else {
     // A ticket with a notch on each side and a dashed tear line.

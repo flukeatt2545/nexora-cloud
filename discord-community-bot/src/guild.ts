@@ -49,6 +49,8 @@ function problems(guild: Guild): string[] {
   };
   channel(current.welcomeChannelId, "ห้องต้อนรับ", current.welcomeEnabled);
   channel(current.verifyChannelId, "ห้องยืนยันตัวตน", current.verifyEnabled);
+  channel(current.leaveChannelId, "ห้องคนออก", current.leaveEnabled);
+  channel(current.roleCheckChannelId, "ห้องเช็คยศ", current.roleCheckEnabled);
   channel(current.boostChannelId, "ห้องบูสต์", current.boostEnabled);
   channel(current.boostLoungeChannelId, "ห้องบูสเตอร์", current.boostEnabled);
   channel(current.ticketChannelId, "ห้อง Ticket", current.ticketsEnabled);

@@ -16,8 +16,9 @@ import { API_URL, BOT_SECRET, ENV_TOKEN } from "./config";
 import { ensureSetupChannel } from "./build";
 import { isHome, reportGuild, reportSoon } from "./guild";
 import { checkRateLimit } from "./limits";
-import { onMemberJoin, onVerify } from "./members";
+import { onMemberJoin, onMemberLeave, onVerify } from "./members";
 import { onMessageDeleted } from "./panels";
+import { onRoleCheckButton } from "./rolecheck";
 import { onAuditLogEntry, onSecurityJoin, onSecurityMessage, startSiteSecurityFeed } from "./security";
 import { loadSettings } from "./settings";
 import { onCreateCommand, onSetupCommand, onSetupComponent, onSetupText, onWipeSubmit } from "./setup";
@@ -127,6 +128,11 @@ client.on(Events.GuildUpdate, (before, after) => {
   refreshBoost(client).catch((error) => logBotError("boost panel", error));
 });
 
+client.on(Events.GuildMemberRemove, (member) => {
+  if (!isHome(member.guild)) return;
+  onMemberLeave(member).catch((error) => logBotError("member leave", error));
+});
+
 client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => {
   onAuditLogEntry(entry, guild).catch((error) => logBotError("audit log entry", error));
 });
@@ -198,6 +204,7 @@ async function route(interaction: Interaction) {
   if (interaction.isButton()) {
     if (id === "cm:verify") return onVerify(interaction);
     if (id === "cm:ticket:open") return onTicketButton(interaction);
+    if (id === "cm:rolecheck:me") return onRoleCheckButton(interaction);
     if (id.startsWith("cm:ticket:claim:")) return onTicketClaim(interaction);
     if (id.startsWith("cm:ticket:close:")) return onTicketCloseButton(interaction);
   }

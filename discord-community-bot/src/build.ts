@@ -201,6 +201,8 @@ type ChannelSpec = {
   key?: keyof Settings;
   name: string;
   type: ChannelType.GuildText | ChannelType.GuildVoice;
+  /** English name shown in bold capitals (𝐖𝐄𝐋𝐂𝐎𝐌𝐄) like the rooms of the server layout. */
+  bold?: boolean;
   audience: Audience;
   /** Older names that count as this channel already. */
   aliases?: string[];
@@ -215,7 +217,8 @@ async function ensureChannel(guild: Guild, plan: Plan, parent: CategoryChannel, 
     if (spec.key && found.id !== id) (plan.change as Record<string, unknown>)[spec.key] = found.id;
     return found;
   }
-  const name = exactName ?? channelName(nameStyle(), spec.type === ChannelType.GuildText ? spec.name.replace(/\s+/g, "-") : spec.name, iconOf(spec.name));
+  const shown = spec.bold ? fancy(spec.name.toUpperCase().replace(/\s+/g, "-"), "bold") : spec.type === ChannelType.GuildText ? spec.name.replace(/\s+/g, "-") : spec.name;
+  const name = exactName ?? channelName(nameStyle(), shown, iconOf(spec.name));
   const channel = await guild.channels.create({
     name, type: spec.type, parent: parent.id, reason: "/setup: สร้างห้องที่ขาด",
     permissionOverwrites: overwrites(guild, spec.audience, plan.change.memberRoleId ?? current.memberRoleId,
@@ -263,21 +266,31 @@ export async function buildMissing(guild: Guild): Promise<Plan & { problems: str
     });
   }
 
+  if (current.boostEnabled) {
+    await step("ห้องบูสต์", async () => {
+      const hint = exists(guild, current.boostChannelId, [text]);
+      const category = await ensureCategory(guild, plan, "Boost", "บูสเตอร์", "members", hint && "parentId" in hint ? hint.parentId ?? "" : "");
+      await ensureChannel(guild, plan, category, { key: "boostChannelId", name: "boost", bold: true, type: text, audience: "members-read", aliases: ["บูสต์", "boosts"] });
+      await ensureChannel(guild, plan, category, { key: "boostLoungeChannelId", name: "ห้องบูสเตอร์", type: text, audience: "boosters", aliases: ["booster lounge", "boosters"] });
+    });
+  }
+
   await step("หมวดเริ่มต้น", async () => {
     const hint = exists(guild, current.welcomeChannelId, [text]);
     const category = await ensureCategory(guild, plan, "Start", "เริ่มต้นที่นี่", "everyone", hint && "parentId" in hint ? hint.parentId ?? "" : "");
-    if (current.welcomeEnabled) await ensureChannel(guild, plan, category, { key: "welcomeChannelId", name: "ยินดีต้อนรับ", type: text, audience: "everyone-read", aliases: ["welcome"] });
-    if (current.verifyEnabled) await ensureChannel(guild, plan, category, { key: "verifyChannelId", name: "ยืนยันตัวตน", type: text, audience: "unverified", aliases: ["verify"] });
-    await ensureChannel(guild, plan, category, { name: "กฎ", type: text, audience: "everyone-read", aliases: ["กฎเซิร์ฟ", "rules"] });
     await ensureChannel(guild, plan, category, { name: "ประกาศ", type: text, audience: "members-read", aliases: ["announcements", "news"] });
-    if (current.statusEnabled) await ensureChannel(guild, plan, category, { key: "statusChannelId", name: "สถานะระบบ", type: text, audience: "members-read", aliases: ["status"] });
+    if (current.welcomeEnabled) await ensureChannel(guild, plan, category, { key: "welcomeChannelId", name: "welcome", bold: true, type: text, audience: "everyone-read", aliases: ["ยินดีต้อนรับ"] });
+    if (current.leaveEnabled) await ensureChannel(guild, plan, category, { key: "leaveChannelId", name: "sayonara", bold: true, type: text, audience: "everyone-read", aliases: ["คนออก", "goodbye", "leave"] });
+    if (current.verifyEnabled) await ensureChannel(guild, plan, category, { key: "verifyChannelId", name: "verify", bold: true, type: text, audience: "unverified", aliases: ["ยืนยันตัวตน"] });
+    if (current.roleCheckEnabled) await ensureChannel(guild, plan, category, { key: "roleCheckChannelId", name: "roles", bold: true, type: text, audience: "members-read", aliases: ["เช็คยศ", "check roles"] });
+    if (current.statusEnabled) await ensureChannel(guild, plan, category, { key: "statusChannelId", name: "system-status", bold: true, type: text, audience: "members-read", aliases: ["สถานะระบบ", "status"] });
   });
 
   await step("หมวดพูดคุย", async () => {
     const category = await ensureCategory(guild, plan, "Community", "พูดคุย", "members");
     await ensureChannel(guild, plan, category, { name: "แชททั่วไป", type: text, audience: "members", aliases: ["general", "แชท", "ทั่วไป"] });
     await ensureChannel(guild, plan, category, { name: "รูปภาพ", type: text, audience: "members", aliases: ["media", "รูป"] });
-    await ensureChannel(guild, plan, category, { name: "คำสั่งบอท", type: text, audience: "members", aliases: ["bot commands", "commands"] });
+    await ensureChannel(guild, plan, category, { name: "links", bold: true, type: text, audience: "members-read", aliases: ["ลิงก์"] });
   });
 
   await step("หมวดห้องเสียง", async () => {
@@ -287,15 +300,6 @@ export async function buildMissing(guild: Guild): Promise<Plan & { problems: str
     if (current.tempVoiceEnabled) await ensureChannel(guild, plan, category, { key: "tempHubChannelId", name: "สร้างห้องเสียง", type: voice, audience: "members" });
     await ensureChannel(guild, plan, category, { name: "นั่งเล่น", type: voice, audience: "members", aliases: ["lounge", "general"] });
   });
-
-  if (current.boostEnabled) {
-    await step("ห้องบูสต์", async () => {
-      const hint = exists(guild, current.boostChannelId, [text]);
-      const category = await ensureCategory(guild, plan, "Boost", "บูสเตอร์", "members", hint && "parentId" in hint ? hint.parentId ?? "" : "");
-      await ensureChannel(guild, plan, category, { key: "boostChannelId", name: "บูสต์", type: text, audience: "members-read", aliases: ["boost", "boosts"] });
-      await ensureChannel(guild, plan, category, { key: "boostLoungeChannelId", name: "ห้องบูสเตอร์", type: text, audience: "boosters", aliases: ["booster lounge", "boosters"] });
-    });
-  }
 
   if (current.ticketsEnabled) {
     await step("หมวด Ticket", async () => {
@@ -309,10 +313,10 @@ export async function buildMissing(guild: Guild): Promise<Plan & { problems: str
   await step("หมวดทีมงาน", async () => {
     const category = await ensureCategory(guild, plan, "Staff", "ทีมงาน", "staff");
     await ensureChannel(guild, plan, category, { name: "ห้องทีมงาน", type: text, audience: "staff", aliases: ["staff chat"] });
+    await ensureChannel(guild, plan, category, { name: "คำสั่งบอท", type: text, audience: "staff", aliases: ["bot commands", "commands", "ตั้งค่าบอท", "bot setup"] });
     if (current.securityEnabled) {
       await ensureChannel(guild, plan, category, { key: "securityChannelId", name: "แจ้งเตือนความปลอดภัย", type: text, audience: "staff", aliases: ["security", "security log", "แจ้งเตือน"] });
     }
-    await ensureChannel(guild, plan, category, { name: "ตั้งค่าบอท", type: text, audience: "staff", aliases: ["bot setup"] });
   });
 
   return { ...plan, problems };

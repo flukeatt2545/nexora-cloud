@@ -5,13 +5,14 @@ import {
   MessageFlags,
   type ButtonInteraction,
   type GuildMember,
+  type PartialGuildMember,
   type TextChannel,
 } from "discord.js";
 import { assignable } from "./access";
 import { logBotError } from "./api";
 import { welcomeCard } from "./image";
 import { fillTemplate, settings } from "./settings";
-import { brandEmbed, errorEmbed, okEmbed } from "./ui";
+import { brandEmbed, COLOR, errorEmbed, okEmbed } from "./ui";
 
 const ephemeral = MessageFlags.Ephemeral as const;
 
@@ -53,6 +54,33 @@ export async function onMemberJoin(member: GuildMember) {
   if (!current.verifyEnabled && current.memberRoleId && assignable(member.guild, current.memberRoleId)) {
     await member.roles.add(current.memberRoleId, "สมาชิกใหม่").catch((error) => logBotError("member role", error));
   }
+}
+
+/** A member left: say goodbye in the leave room, with a card when it is turned on. */
+export async function onMemberLeave(member: GuildMember | PartialGuildMember) {
+  const current = settings();
+  const user = member.user;
+  if (!current?.leaveEnabled || !current.leaveChannelId || !user || user.bot) return;
+  const channel = member.guild.channels.cache.get(current.leaveChannelId);
+  if (channel?.type !== ChannelType.GuildText && channel?.type !== ChannelType.GuildAnnouncement) return;
+  const name = member.displayName || user.globalName || user.username;
+  const text = fillTemplate(current.leaveMessage, { user: `**${name}**`, name, server: member.guild.name, count: member.guild.memberCount.toLocaleString("th-TH") });
+  const embed = brandEmbed(COLOR.warn).setDescription(text).setTimestamp(new Date());
+  const files: AttachmentBuilder[] = [];
+  if (current.leaveImage) {
+    try {
+      const days = member.joinedTimestamp ? Math.max(0, Math.floor((Date.now() - member.joinedTimestamp) / 86400000)) : null;
+      const picture = await welcomeCard({
+        name, username: user.username, server: member.guild.name, count: member.guild.memberCount, leaving: { days },
+        avatarUrl: user.displayAvatarURL({ extension: "png", size: 256, forceStatic: true }),
+      });
+      files.push(new AttachmentBuilder(picture, { name: "leave.png" }));
+      embed.setImage("attachment://leave.png");
+    } catch (error) {
+      logBotError("leave image", error);
+    }
+  }
+  await (channel as TextChannel).send({ embeds: [embed], files }).catch((error) => logBotError("leave message", error));
 }
 
 export async function onVerify(interaction: ButtonInteraction) {

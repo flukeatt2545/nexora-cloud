@@ -47,6 +47,8 @@ type Slot = {
 const SLOTS: Slot[] = [
   { key: "welcomeChannelId", label: "ห้องต้อนรับ", kind: "text" },
   { key: "verifyChannelId", label: "ห้องยืนยันตัวตน", kind: "text" },
+  { key: "leaveChannelId", label: "ห้องคนออก", kind: "text" },
+  { key: "roleCheckChannelId", label: "ห้องเช็คยศ", kind: "text" },
   { key: "memberRoleId", label: "ยศสมาชิก (ได้ตอนยืนยัน)", kind: "role" },
   { key: "ticketChannelId", label: "ห้องปุ่มเปิด Ticket", kind: "text" },
   { key: "ticketCategoryId", label: "หมวดที่สร้างห้อง Ticket", kind: "category" },
@@ -70,6 +72,9 @@ const FEATURES: { key: keyof Settings; label: string; description: string }[] = 
   { key: "nameEmoji", label: "อีโมจิในชื่อห้องและยศ", description: "『👋』ยินดีต้อนรับ (ปิด = กรอบกับอักษรพิเศษอย่างเดียว)" },
   { key: "welcomeEnabled", label: "ต้อนรับสมาชิกใหม่", description: "ส่งข้อความต้อนรับในห้องต้อนรับ" },
   { key: "welcomeImage", label: "ภาพต้อนรับ", description: "แนบภาพการ์ดต้อนรับพร้อมรูปโปรไฟล์และชื่อ" },
+  { key: "roleCheckEnabled", label: "ห้องเช็คยศ", description: "แผงปุ่มเช็คยศของฉัน (คนกดเห็นคำตอบคนเดียว)" },
+  { key: "leaveEnabled", label: "แจ้งคนออก", description: "ส่งข้อความลาก่อนในห้องคนออกเมื่อมีคนออกจากเซิร์ฟ" },
+  { key: "leaveImage", label: "ภาพคนออก", description: "แนบการ์ดลาก่อนพร้อมรูปโปรไฟล์และเวลาที่อยู่ด้วยกัน" },
   { key: "verifyEnabled", label: "ยืนยันตัวตน", description: "กดปุ่มแล้วได้ยศสมาชิก" },
   { key: "ticketsEnabled", label: "Ticket", description: "ปุ่มเปิดห้องคุยส่วนตัวกับทีมงาน" },
   { key: "tempVoiceEnabled", label: "ห้องเสียงชั่วคราว", description: "เข้าห้อง ➕ แล้วได้ห้องเสียงของตัวเอง" },
@@ -85,6 +90,7 @@ const FEATURES: { key: keyof Settings; label: string; description: string }[] = 
 
 const TEXTS: { key: keyof Settings; label: string; hint: string; max: number; long: boolean }[] = [
   { key: "welcomeMessage", label: "ข้อความต้อนรับ", hint: "{user} = แท็กคนเข้า, {name} = ชื่อ, {server} = ชื่อเซิร์ฟ, {count} = ลำดับสมาชิก", max: 1500, long: true },
+  { key: "leaveMessage", label: "ข้อความคนออก", hint: "{name} = ชื่อ, {server} = ชื่อเซิร์ฟ, {count} = จำนวนสมาชิกที่เหลือ", max: 1500, long: true },
   { key: "verifyMessage", label: "ข้อความแผงยืนยันตัวตน", hint: "", max: 1500, long: true },
   { key: "boostPerks", label: "สิทธิประโยชน์ของบูสเตอร์", hint: "เขียนเป็นบรรทัด ๆ แสดงในแผงบูสต์", max: 1000, long: true },
   { key: "ticketMessage", label: "ข้อความแผง Ticket", hint: "", max: 1500, long: true },
@@ -118,6 +124,8 @@ function homePage(current: Settings) {
       `สไตล์ชื่อตอนนี้: ${STYLE_LABELS[current.nameStyle] ?? STYLE_LABELS.frame} · อีโมจิ ${on(current.nameEmoji)}`,
     ].join("\n"))
     .addFields(
+      { name: `เช็คยศ ${on(current.roleCheckEnabled)}`, value: `ห้อง ${slotText(current, "roleCheckChannelId")}`, inline: true },
+      { name: `คนออก ${on(current.leaveEnabled)} · ภาพ ${on(current.leaveImage)}`, value: `ห้อง ${slotText(current, "leaveChannelId")}` },
       { name: `ต้อนรับ ${on(current.welcomeEnabled)} · ภาพ ${on(current.welcomeImage)} · ยืนยันตัวตน ${on(current.verifyEnabled)}`,
         value: `ห้องต้อนรับ ${slotText(current, "welcomeChannelId")}\nห้องยืนยัน ${slotText(current, "verifyChannelId")} · ยศสมาชิก ${slotText(current, "memberRoleId")}` },
       { name: `Ticket ${on(current.ticketsEnabled)}`,
@@ -343,7 +351,7 @@ export async function onSetupComponent(interaction: ButtonInteraction | StringSe
     await interaction.deferUpdate();
     await applySettings(interaction.client, true);
     await interaction.editReply(homePage(settings() ?? current));
-    await interaction.followUp({ embeds: [okEmbed("ลงแผงใหม่แล้ว", "แผงยืนยันตัวตน Ticket และบูสต์ ถูกลงใหม่ที่ท้ายห้องของมัน")], flags: ephemeral });
+    await interaction.followUp({ embeds: [okEmbed("ลงแผงใหม่แล้ว", "แผงยืนยันตัวตน Ticket บูสต์ และเช็คยศ ถูกลงใหม่ที่ท้ายห้องของมัน")], flags: ephemeral });
   }
 }
 
@@ -371,7 +379,7 @@ function mayWipe(member: GuildMember) {
   return member.id === member.guild.ownerId || isBotAdmin(member.id) || member.permissions.has(PermissionFlagsBits.Administrator);
 }
 
-const CHANNEL_KEYS: (keyof Settings)[] = ["welcomeChannelId", "verifyChannelId", "rolesChannelId", "boostChannelId", "boostLoungeChannelId", "ticketChannelId", "ticketCategoryId",
+const CHANNEL_KEYS: (keyof Settings)[] = ["welcomeChannelId", "leaveChannelId", "roleCheckChannelId", "verifyChannelId", "rolesChannelId", "boostChannelId", "boostLoungeChannelId", "ticketChannelId", "ticketCategoryId",
   "ticketLogChannelId", "tempHubChannelId", "statsCategoryId", "statsMembersChannelId", "statsOnlineChannelId", "statsSiteChannelId", "statusChannelId", "securityChannelId"];
 
 export async function onWipeSubmit(interaction: ModalSubmitInteraction) {
@@ -392,7 +400,7 @@ export async function onWipeSubmit(interaction: ModalSubmitInteraction) {
   const cleared: Partial<Settings> = {};
   for (const key of CHANNEL_KEYS) (cleared as Record<string, string>)[key] = "";
   await updateSettings(interaction.user, cleared).catch((error) => logBotError("clear channel settings", error));
-  for (const key of ["verify", "roles", "ticket", "status", "boost"] as PanelKey[]) await savePanel(key, { channelId: "", messageId: "" });
+  for (const key of ["verify", "roles", "ticket", "status", "boost", "roleCheck"] as PanelKey[]) await savePanel(key, { channelId: "", messageId: "" });
   await api(interaction.user).post("/api/internal/bot/community/event", {
     kind: "wipe", guildId: guild.id, name: guild.name, created: [`ลบ ${result.deleted} ห้อง/หมวด`, ...result.failed.map((name) => `ลบไม่ได้: ${name}`)],
   }).catch((error) => logBotError("log wipe", error));

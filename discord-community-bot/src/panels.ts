@@ -17,7 +17,16 @@ export function textChannel(guild: Guild, id: string) {
  * Puts a panel's message in a channel: edits the saved one, or deletes it (it moved, or repost)
  * and sends a new one. Returns false when the channel is missing.
  */
-export async function postPanel(guild: Guild, key: PanelKey, channelId: string, payload: BaseMessageOptions, repost = false) {
+export function postPanel(guild: Guild, key: PanelKey, channelId: string, payload: BaseMessageOptions, repost = false) {
+  // One at a time per panel: two posts at once (startup, a settings change) must not make two messages.
+  const run = (locks.get(key) ?? Promise.resolve()).catch(() => undefined).then(() => post(guild, key, channelId, payload, repost));
+  locks.set(key, run);
+  return run;
+}
+
+const locks = new Map<PanelKey, Promise<unknown>>();
+
+async function post(guild: Guild, key: PanelKey, channelId: string, payload: BaseMessageOptions, repost: boolean) {
   const saved = panels()[key];
   const moved = saved.messageId && (saved.channelId !== channelId || repost);
   if (moved) await textChannel(guild, saved.channelId)?.messages.delete(saved.messageId).catch(() => undefined);
@@ -85,7 +94,7 @@ export async function syncPanels(guild: Guild, repost = false) {
 
 /** Someone deleted one of the panels: forget it, so the next sync posts it again. */
 export async function onMessageDeleted(messageId: string) {
-  for (const key of ["verify", "ticket", "status", "boost"] as PanelKey[]) {
+  for (const key of ["verify", "ticket", "status", "boost", "roleCheck"] as PanelKey[]) {
     if (panels()[key].messageId === messageId) {
       await savePanel(key, { channelId: "", messageId: "" });
       return true;

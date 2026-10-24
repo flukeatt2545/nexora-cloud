@@ -236,7 +236,8 @@ export async function onSecurityJoin(member: GuildMember) {
     }
   }
   if (young && current.securityEnabled && !member.user.bot) {
-    await alert(guild, card(COLOR.warn, "🆕 บัญชีเพิ่งสร้างเข้าเซิร์ฟ",
+    // Not awaited: the welcome should not wait for the staff notice.
+    void alert(guild, card(COLOR.warn, "🆕 บัญชีเพิ่งสร้างเข้าเซิร์ฟ",
       `<@${member.id}> (${member.user.tag}) บัญชีอายุ **${Math.max(0, Math.floor(ageDays))} วัน** (สร้างเมื่อ ${when(member.user.createdAt, "R")})`));
   }
   return false;

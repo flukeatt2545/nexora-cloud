@@ -1,6 +1,7 @@
 import { REST, Routes, type Client, type Guild } from "discord.js";
 import { logBotError } from "./api";
 import { refreshBoost } from "./boost";
+import { refreshRoleCheck } from "./rolecheck";
 import { ensureSetupChannel } from "./build";
 import { commands } from "./commands";
 import { homeGuild, homeGuildId, markApplied, reportGuild } from "./guild";
@@ -74,10 +75,14 @@ async function run(client: Client, repost: boolean) {
   }
   await ensureSetupChannel(guild);
   await removeRolesRoom(guild);
-  await syncPanels(guild, repost);
-  await refreshBoost(client, repost).catch((error) => logBotError("boost panel", error));
-  await refreshStatusPicture(client, true).catch((error) => logBotError("status picture", error));
-  await updateStats(client);
+  // The panels do not depend on each other: all of them at once instead of one after another.
+  await Promise.all([
+    syncPanels(guild, repost),
+    refreshBoost(client, repost).catch((error) => logBotError("boost panel", error)),
+    refreshRoleCheck(client, repost).catch((error) => logBotError("role check panel", error)),
+    refreshStatusPicture(client, true).catch((error) => logBotError("status picture", error)),
+    updateStats(client),
+  ]);
   markApplied(settingsVersion());
   await reportGuild(client);
 }

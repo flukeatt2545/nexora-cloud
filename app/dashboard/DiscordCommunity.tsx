@@ -26,6 +26,12 @@ type Settings = {
   welcomeChannelId: string;
   welcomeMessage: string;
   welcomeImage: boolean;
+  roleCheckEnabled: boolean;
+  roleCheckChannelId: string;
+  leaveEnabled: boolean;
+  leaveChannelId: string;
+  leaveMessage: string;
+  leaveImage: boolean;
   verifyEnabled: boolean;
   verifyChannelId: string;
   verifyMessage: string;
@@ -362,6 +368,18 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                   <Switch label="ภาพต้อนรับ" hint="แนบการ์ดต้อนรับพร้อมรูปโปรไฟล์ ชื่อ และลำดับสมาชิก" on={form.welcomeImage} onChange={(on) => set({ welcomeImage: on })} disabled={off || !form.welcomeEnabled} />
                 </Feature>
 
+                <Feature title={<Switch label="ห้องเช็คยศ" hint="แผงปุ่มเช็คยศของฉัน กดแล้วเห็นยศของตัวเองคนเดียว ดูยศของคนอื่นไม่ได้" on={form.roleCheckEnabled} onChange={(on) => set({ roleCheckEnabled: on })} disabled={off} />}>
+                  <ChannelPicker id="cmb-rolecheck" label="ห้องเช็คยศ" kind="text" value={form.roleCheckChannelId} onChange={(roleCheckChannelId) => set({ roleCheckChannelId })} guild={guild} disabled={off || !form.roleCheckEnabled}
+                    hint="ไม่มีห้อง? กด สร้างที่ขาดให้ ใน /setup บอทจะสร้างห้อง ROLES" />
+                </Feature>
+
+                <Feature title={<Switch label="แจ้งคนออก" hint="ส่งข้อความลาก่อนในห้องคนออกเมื่อมีคนออกจากเซิร์ฟ" on={form.leaveEnabled} onChange={(on) => set({ leaveEnabled: on })} disabled={off} />}>
+                  <ChannelPicker id="cmb-leave" label="ห้องคนออก" kind="text" value={form.leaveChannelId} onChange={(leaveChannelId) => set({ leaveChannelId })} guild={guild} disabled={off || !form.leaveEnabled} />
+                  <TextBox id="cmb-leave-text" label="ข้อความคนออก" value={form.leaveMessage} onChange={(leaveMessage) => set({ leaveMessage })} disabled={off || !form.leaveEnabled}
+                    hint="{name} = ชื่อ · {server} = ชื่อเซิร์ฟ · {count} = จำนวนสมาชิกที่เหลือ" />
+                  <Switch label="ภาพคนออก" hint="แนบการ์ดลาก่อนพร้อมรูปโปรไฟล์ (ขาวดำ) และจำนวนวันที่อยู่ด้วยกัน" on={form.leaveImage} onChange={(on) => set({ leaveImage: on })} disabled={off || !form.leaveEnabled} />
+                </Feature>
+
                 <Feature title={<Switch label="ยืนยันตัวตน" hint="กดปุ่มแล้วได้ยศสมาชิก (ปิด = ได้ยศสมาชิกทันทีที่เข้า)" on={form.verifyEnabled} onChange={(on) => set({ verifyEnabled: on })} disabled={off} />}>
                   <div className="dbot-fields">
                     <ChannelPicker id="cmb-verify" label="ห้องยืนยันตัวตน" kind="text" value={form.verifyChannelId} onChange={(verifyChannelId) => set({ verifyChannelId })} guild={guild} disabled={off || !form.verifyEnabled} />
@@ -417,7 +435,7 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                   </div>
                 </Feature>
 
-                <Feature title={<Switch label="แจ้งเว็บล่ม" hint="เช็กเว็บและ API ทุก 1 นาที ล่มติดกัน 2 ครั้งจึงแจ้ง และแจ้งอีกครั้งเมื่อกลับมา" on={form.statusEnabled} onChange={(on) => set({ statusEnabled: on })} disabled={off} />}>
+                <Feature title={<Switch label="แจ้งเว็บล่ม" hint="เช็กเว็บและ API ทุก 30 วินาที (ภาพสถานะอัปเดตทุกครั้ง) ล่มติดกัน 2 ครั้งจึงแจ้ง และแจ้งอีกครั้งเมื่อกลับมา" on={form.statusEnabled} onChange={(on) => set({ statusEnabled: on })} disabled={off} />}>
                   <div className="dbot-fields">
                     <ChannelPicker id="cmb-status" label="ห้องแจ้งสถานะ" kind="text" value={form.statusChannelId} onChange={(statusChannelId) => set({ statusChannelId })} guild={guild} disabled={off || !form.statusEnabled} />
                     <RolePicker id="cmb-status-role" label="แท็กยศตอนล่ม" hint="ไม่ตั้ง = ไม่แท็กใคร · ยศต้องเปิดให้ @mention ได้" value={form.statusMentionRoleId} onChange={(statusMentionRoleId) => set({ statusMentionRoleId })} guild={guild} disabled={off || !form.statusEnabled} />

@@ -30,7 +30,8 @@ const state: Record<Target, State> = {
   api: { up: true, failures: 0, downSince: null, detail: "", alert: null, history: [], latencyMs: null },
 };
 const botHistory: boolean[] = [];
-const HISTORY_LIMIT = 1440;
+const HISTORY_LIMIT = 2880;
+const CHECK_EVERY_MS = 30000;
 
 const FAILURES_FOR_DOWN = 2;
 
@@ -99,7 +100,8 @@ export async function refreshStatusPicture(client: Client, force = false) {
     { label: "บอท Discord", up: client.isReady(), detail: "ออนไลน์", latencyMs: client.ws.ping >= 0 ? Math.round(client.ws.ping) : null, uptime: uptimeOf(botHistory), history: botHistory },
   ];
   const key = rows.map((row) => `${row.label}:${row.up}`).join("|");
-  if (!force && key === lastPictureKey && Date.now() - lastPictureAt < 5 * 60 * 1000) return;
+  // A new picture after every check (30 seconds), so the numbers on it are fresh.
+  if (!force && key === lastPictureKey && Date.now() - lastPictureAt < CHECK_EVERY_MS - 5000) return;
   const picture = await statusCard(rows, "NEXORA CLOUD");
   await postPanel(guild, "status", current.statusChannelId, { files: [new AttachmentBuilder(picture, { name: "status.png" })] }, false);
   lastPictureKey = key;
@@ -147,9 +149,11 @@ async function cameBack(client: Client, target: (typeof targets)[number], s: Sta
 }
 
 async function checkAll(client: Client) {
-  for (const target of targets) {
+  // Both checks go out at once, so a slow one does not hold up the other or the picture.
+  const results = await Promise.all(targets.map((target) => check(target.url)));
+  for (const [index, target] of targets.entries()) {
     const s = state[target.key];
-    const { problem, ms } = await check(target.url);
+    const { problem, ms } = results[index];
     s.latencyMs = ms;
     push(s.history, !problem);
     if (problem) {
@@ -182,5 +186,5 @@ async function checkAll(client: Client) {
 export function startStatusChecks(client: Client, changed: () => void) {
   onChange = changed;
   void checkAll(client);
-  setInterval(() => void checkAll(client).catch((error) => logBotError("status check", error)), 60000).unref();
+  setInterval(() => void checkAll(client).catch((error) => logBotError("status check", error)), CHECK_EVERY_MS).unref();
 }

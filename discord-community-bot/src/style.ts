@@ -57,7 +57,7 @@ const ICONS: Record<string, string> = {
   owner: "👑", admin: "🛡️", moderator: "⚔️", staff: "🎫", vip: "💎", member: "✨", bots: "🤖",
   gamer: "🎮", music: "🎵", coder: "💻", artist: "🎨", student: "📚", updates: "🔔",
   // channels
-  "ยินดีต้อนรับ": "👋", "ยืนยันตัวตน": "✅", "กฎ": "📜", "ประกาศ": "📢", "สถานะระบบ": "📡",
+  "ยินดีต้อนรับ": "👋", "คนออก": "👋", welcome: "👋", sayonara: "👋", verify: "✅", roles: "🏷️", "เช็คยศ": "🏷️", "system status": "🛰️", links: "🔗", "ยืนยันตัวตน": "✅", "กฎ": "📜", "ประกาศ": "📢", "สถานะระบบ": "🛰️",
   "แชททั่วไป": "💬", "รูปภาพ": "🖼️", "คำสั่งบอท": "🤖", "สร้างห้องเสียง": "➕", "นั่งเล่น": "🛋️",
   "เปิด ticket": "🎫", "ticket log": "📝", "ห้องทีมงาน": "🛡️", "แจ้งเตือนความปลอดภัย": "🚨", "ตั้งค่าบอท": "⚙️",
   "บูสต์": "🚀", "ห้องบูสเตอร์": "💖", "สมาชิก": "👥", "ออนไลน์": "🟢", "เว็บ": "🌐",
@@ -100,7 +100,8 @@ export function categoryName(style: NameStyle, english: string, thai: string, em
   const label = (font: Font, joiner: string) =>
     [english && fancy(font === "smallCaps" ? english : english.toUpperCase(), font), thai].filter(Boolean).join(joiner);
   switch (style) {
-    case "frame": return e ? `『${e}』${label("bold", " ・ ")}` : english && thai ? `『${label("bold", "")}』・${thai}` : `『${label("bold", "")}』`;
+    // Frame: bold English, a dot, the Thai name; no emoji or brackets (START · เริ่มต้นที่นี่).
+    case "frame": return label("bold", " · ");
     case "line": return `╭┈ ${e ? `${e} ` : ""}${label("boldSans", " ┊ ")}`;
     case "cute": return e ? `⋆˚꒰${e}꒱ ${label("smallCaps", " ・ ")}` : english && thai ? `⋆˚꒰${label("smallCaps", "")}꒱ ${thai}` : `⋆˚꒰${label("smallCaps", "")}꒱`;
     default: return e ? `${e} ${thai || english}` : thai || english;
@@ -122,7 +123,10 @@ export function roleName(style: NameStyle, name: string, emoji = "") {
 
 const EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}️‍⃣]/gu;
 const FIRST_EMOJI = /\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}])*|[\u{1F1E6}-\u{1F1FF}]{2}/u;
-const FRAME_CHARS = /[『』「」【】〔〕꒰꒱┊│|╭╮╰╯┈─━・•⋆˚｡✦✧★☆:：\-_\s]+/gu;
+const FRAME_CHARS = /[『』「」【】〔〕꒰꒱┊│|╭╮╰╯┈─━・·•⋆˚｡✦✧★☆:：\-_\s]+/gu;
+
+// English room names shown in bold capitals, as the bot builds them.
+const BOLD_CHANNELS = new Set(["welcome", "sayonara", "verify", "roles", "system status", "boost", "links"]);
 
 /** The words of a name, without emoji, frame, separators or fancy letters. */
 export function nameWords(raw: string) {
@@ -147,7 +151,8 @@ export function restyle(style: NameStyle, type: ChannelType, raw: string) {
     return categoryName(style, english, mixed?.[2] ?? words, emojiOf(raw) || iconOf(english) || iconOf(mixed?.[2] ?? words) || emoji).slice(0, 100);
   }
   // Text channel names cannot have spaces (Discord turns them into dashes).
-  const name = type === ChannelType.GuildText || type === ChannelType.GuildAnnouncement || type === ChannelType.GuildForum ? words.replace(/\s+/g, "-") : words;
+  const dashed = type === ChannelType.GuildText || type === ChannelType.GuildAnnouncement || type === ChannelType.GuildForum ? words.replace(/\s+/g, "-") : words;
+  const name = BOLD_CHANNELS.has(words.toLowerCase().replace(/[-\s]+/g, " ")) ? fancy(dashed.toUpperCase(), "bold") : dashed;
   return channelName(style, name, emoji).slice(0, 100);
 }
 

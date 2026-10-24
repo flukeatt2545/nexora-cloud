@@ -29,7 +29,17 @@ type communitySettings struct {
 	WelcomeChannelID string `json:"welcomeChannelId"`
 	WelcomeMessage   string `json:"welcomeMessage"`
 	// A picture with the member's avatar and name goes with the welcome message.
-	WelcomeImage    bool   `json:"welcomeImage"`
+	WelcomeImage bool `json:"welcomeImage"`
+
+	// The role-check room: a panel with a button that shows the member their own roles.
+	RoleCheckEnabled   bool   `json:"roleCheckEnabled"`
+	RoleCheckChannelID string `json:"roleCheckChannelId"`
+
+	// A goodbye message (and picture) when a member leaves.
+	LeaveEnabled    bool   `json:"leaveEnabled"`
+	LeaveChannelID  string `json:"leaveChannelId"`
+	LeaveMessage    string `json:"leaveMessage"`
+	LeaveImage      bool   `json:"leaveImage"`
 	VerifyEnabled   bool   `json:"verifyEnabled"`
 	VerifyChannelID string `json:"verifyChannelId"`
 	VerifyMessage   string `json:"verifyMessage"`
@@ -100,6 +110,8 @@ type communityPanels struct {
 	Ticket communityPanel `json:"ticket"`
 	Status communityPanel `json:"status"`
 	Boost  communityPanel `json:"boost"`
+	// The role-check panel.
+	RoleCheck communityPanel `json:"roleCheck"`
 }
 
 type communityChannel struct {
@@ -158,6 +170,7 @@ type communityIncident struct {
 
 const (
 	communityDefaultWelcome = "ยินดีต้อนรับ {user} สู่ **{server}** 🎉\nคุณเป็นสมาชิกคนที่ {count} ของเซิร์ฟเรา"
+	communityDefaultLeave   = "{name} ออกจากเซิร์ฟเวอร์ **{server}** แล้ว\nขอบคุณที่เคยอยู่ด้วยกัน ตอนนี้เหลือสมาชิก {count} คน"
 	communityDefaultVerify  = "กดปุ่ม **ยืนยันตัวตน** ด้านล่าง เพื่อเห็นห้องอื่น ๆ ในเซิร์ฟ"
 	communityDefaultRoles   = "เลือกยศที่อยากได้จากเมนูด้านล่าง เลือกซ้ำเพื่อเอาออก"
 	communityDefaultTicket  = "มีปัญหาหรืออยากติดต่อทีมงาน กดปุ่ม **เปิด Ticket** แล้วเล่าเรื่องสั้น ๆ\nจะได้ห้องส่วนตัวที่เห็นแค่คุณกับทีมงาน"
@@ -169,6 +182,9 @@ func defaultCommunitySettings() communitySettings {
 	return communitySettings{
 		NameStyle: "frame", NameEmoji: true,
 		WelcomeEnabled: true, WelcomeMessage: communityDefaultWelcome, WelcomeImage: true,
+		// The goodbye room of the one server this bot looks after.
+		RoleCheckEnabled: true,
+		LeaveEnabled:     true, LeaveChannelID: "1563356943236473053", LeaveMessage: communityDefaultLeave, LeaveImage: true,
 		VerifyEnabled: true, VerifyMessage: communityDefaultVerify,
 		RolesMessage: communityDefaultRoles, SelfRoleIDs: []string{},
 		ManagerRoleIDs: []string{}, StaffRoleIDs: []string{}, UsageRoleIDs: []string{},
@@ -205,7 +221,7 @@ func cleanCommunityIDs(ids []string, max int, label string) ([]string, error) {
 // one with a change from Discord merged in) and tidies it.
 func validateCommunitySettings(in communitySettings) (communitySettings, error) {
 	single := map[string]*string{
-		"Server ID ": &in.GuildID, "ห้องต้อนรับ": &in.WelcomeChannelID, "ห้องยืนยันตัวตน": &in.VerifyChannelID,
+		"Server ID ": &in.GuildID, "ห้องต้อนรับ": &in.WelcomeChannelID, "ห้องคนออก": &in.LeaveChannelID, "ห้องเช็คยศ": &in.RoleCheckChannelID, "ห้องยืนยันตัวตน": &in.VerifyChannelID,
 		"ยศสมาชิก": &in.MemberRoleID, "ห้องเลือกยศ": &in.RolesChannelID, "ห้อง Ticket": &in.TicketChannelID,
 		"หมวด Ticket": &in.TicketCategoryID, "ห้อง log Ticket": &in.TicketLogChannelID, "ห้องสร้างห้องเสียง": &in.TempHubChannelID,
 		"หมวดสถิติ": &in.StatsCategoryID, "ห้องจำนวนสมาชิก": &in.StatsMembersChannelID, "ห้องคนออนไลน์": &in.StatsOnlineChannelID,
@@ -238,6 +254,7 @@ func validateCommunitySettings(in communitySettings) (communitySettings, error) 
 		label    string
 	}{
 		{&in.WelcomeMessage, communityDefaultWelcome, 1500, "ข้อความต้อนรับ"},
+		{&in.LeaveMessage, communityDefaultLeave, 1500, "ข้อความคนออก"},
 		{&in.VerifyMessage, communityDefaultVerify, 1500, "ข้อความยืนยันตัวตน"},
 		{&in.RolesMessage, communityDefaultRoles, 1500, "ข้อความเลือกยศ"},
 		{&in.TicketMessage, communityDefaultTicket, 1500, "ข้อความ Ticket"},
