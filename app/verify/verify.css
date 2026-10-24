@@ -345,6 +345,14 @@ html[data-theme="light"] .vf-glow {
 }
 html[data-theme="light"] .vf-crt { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .1) 0 1px, transparent 1px 3px), radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(var(--vf-rgb) / .12)); }
 
+/* Phones: the card covers most of the screen, so the three rows of the big name are spread to the top and the bottom (the middle one hides behind the card) and drawn a little stronger, otherwise only slivers of letters show at the edges. */
+@media (max-width: 640px) {
+  .vf { --vf-mark-a: .3; }
+  html[data-theme="light"] .vf { --vf-mark-a: .38; }
+  .vf-mark { align-content: space-between; padding-block: clamp(16px, 5vh, 56px); }
+  .vf-mark span { font-size: 24vw; }
+}
+
 .vf-title { position: relative; animation: vf-g-jolt var(--vf-glitch); }
 .vf-title::before, .vf-title::after {
   content: attr(data-text); position: absolute; inset: 0; opacity: 0; pointer-events: none; user-select: none;
