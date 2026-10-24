@@ -19,7 +19,7 @@ type PublicSettings = {
   ogColor?: string;
   primaryColor?: string;
   themeMode?: "light" | "dark";
-  // The look that is on today (halloween, christmas...); "default" is the plain look from the colour and mode.
+  // The look that is on today (halloween...); "default" is the plain look from the colour and mode.
   theme?: string;
   logoUrl?: string;
   faviconUrl?: string;

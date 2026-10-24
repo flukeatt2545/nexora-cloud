@@ -12,8 +12,8 @@ func day(value string) time.Time {
 
 func TestResolveSiteTheme(t *testing.T) {
 	halloween := themeRule{ID: "h", Theme: "halloween", Start: "2000-10-25", End: "2000-11-01", Yearly: true, Enabled: true}
-	newYear := themeRule{ID: "n", Theme: "christmas", Start: "2000-12-20", End: "2001-01-02", Yearly: true, Enabled: true}
-	oneOff := themeRule{ID: "o", Theme: "cyberpunk", Start: "2026-03-01", End: "2026-03-07", Enabled: true}
+	newYear := themeRule{ID: "n", Theme: "halloween", Start: "2000-12-20", End: "2001-01-02", Yearly: true, Enabled: true}
+	oneOff := themeRule{ID: "o", Theme: "halloween", Start: "2026-03-01", End: "2026-03-07", Enabled: true}
 
 	cases := []struct {
 		name  string
@@ -28,15 +28,15 @@ func TestResolveSiteTheme(t *testing.T) {
 		{"the last day is included", "default", []themeRule{halloween}, "2026-11-01", "halloween"},
 		{"the day before and after are not", "default", []themeRule{halloween}, "2026-10-24", "default"},
 		{"the day after is not", "default", []themeRule{halloween}, "2026-11-02", "default"},
-		{"a yearly rule can run over New Year (before)", "default", []themeRule{newYear}, "2026-12-25", "christmas"},
-		{"a yearly rule can run over New Year (after)", "default", []themeRule{newYear}, "2027-01-02", "christmas"},
+		{"a yearly rule can run over New Year (before)", "default", []themeRule{newYear}, "2026-12-25", "halloween"},
+		{"a yearly rule can run over New Year (after)", "default", []themeRule{newYear}, "2027-01-02", "halloween"},
 		{"a yearly rule can run over New Year (outside)", "default", []themeRule{newYear}, "2027-01-03", "default"},
 		{"a one-off rule counts only in its own year", "default", []themeRule{oneOff}, "2027-03-03", "default"},
-		{"a one-off rule inside its dates", "default", []themeRule{oneOff}, "2026-03-03", "cyberpunk"},
+		{"a one-off rule inside its dates", "default", []themeRule{oneOff}, "2026-03-03", "halloween"},
 		{"a rule that is switched off does nothing", "default", []themeRule{{Theme: "halloween", Start: "2000-10-25", End: "2000-11-01", Yearly: true}}, "2026-10-28", "default"},
-		{"the first rule in the list wins", "default", []themeRule{{ID: "a", Theme: "songkran", Start: "2000-10-01", End: "2000-10-31", Yearly: true, Enabled: true}, halloween}, "2026-10-28", "songkran"},
-		{"outside every rule the base theme stays", "cyberpunk", []themeRule{halloween}, "2026-06-01", "cyberpunk"},
-		{"a rule overrides the base", "cyberpunk", []themeRule{halloween}, "2026-10-28", "halloween"},
+		{"outside every rule the base theme stays", "halloween", []themeRule{newYear}, "2026-06-01", "halloween"},
+		{"a rule overrides the base", "default", []themeRule{halloween}, "2026-10-28", "halloween"},
+		{"a theme that was taken away falls back to the plain look", "christmas", nil, "2026-06-01", "default"},
 		{"an unknown base falls back to the plain look", "sparkles", nil, "2026-06-01", "default"},
 	}
 	for _, item := range cases {
@@ -51,6 +51,11 @@ func TestResolveSiteThemeNamesTheRule(t *testing.T) {
 	rules := []themeRule{{ID: "h", Theme: "halloween", Start: "2000-10-25", End: "2000-11-01", Yearly: true, Enabled: true}}
 	if _, rule := resolveSiteTheme("default", rules, day("2026-10-30")); rule == nil || rule.ID != "h" {
 		t.Error("the rule that turned the theme on should be named")
+	}
+	// Two rules over the same day: the first one in the list wins.
+	both := []themeRule{{ID: "a", Theme: "halloween", Start: "2000-10-01", End: "2000-10-31", Yearly: true, Enabled: true}, rules[0]}
+	if _, rule := resolveSiteTheme("default", both, day("2026-10-28")); rule == nil || rule.ID != "a" {
+		t.Error("the first rule in the list should win")
 	}
 	if _, rule := resolveSiteTheme("default", rules, day("2026-06-30")); rule != nil {
 		t.Error("no rule should be named outside the dates")
@@ -77,7 +82,7 @@ func TestCleanThemeRules(t *testing.T) {
 		}
 	}
 	// An ending before the start is fine for a yearly rule: it runs over New Year.
-	if _, problem := cleanThemeRules([]themeRule{{Theme: "christmas", Start: "2026-12-20", End: "2026-01-02", Yearly: true, Enabled: true}}); problem != "" {
+	if _, problem := cleanThemeRules([]themeRule{{Theme: "halloween", Start: "2026-12-20", End: "2026-01-02", Yearly: true, Enabled: true}}); problem != "" {
 		t.Errorf("a yearly rule over New Year should pass: %s", problem)
 	}
 	if _, problem := cleanThemeRules(make([]themeRule, maxThemeRules+1)); problem == "" {

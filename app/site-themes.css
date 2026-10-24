@@ -1,5 +1,5 @@
 /*
- * Site themes (Halloween, Christmas, Songkran, Cyberpunk). Which one is on comes from the admin
+ * Site themes (only Halloween so far). Which one is on comes from the admin
  * settings; app/siteThemes.ts puts data-site-theme on <html> and fixes the colour mode and the brand
  * colour. This file does the rest of the recolouring by overriding the central tokens in theme.css,
  * so every page, the dashboard and the admin pages included, follows. The pictures behind the pages
@@ -23,9 +23,6 @@ html[data-site-theme] .global-page-loading { background: transparent !important;
 
 /* Big headings get the theme's lettering. Thai text has no glyphs in these fonts and keeps the site font. */
 html[data-site-theme="halloween"] h1 { font-family: "UnifrakturCook", var(--font-body); font-weight: 700; letter-spacing: .01em; }
-html[data-site-theme="christmas"] h1 { font-family: "Mountains of Christmas", var(--font-body); font-weight: 700; }
-html[data-site-theme="songkran"] h1 { font-family: "Chonburi", var(--font-body); font-weight: 400; }
-html[data-site-theme="cyberpunk"] h1 { font-family: "Orbitron", var(--font-body); font-weight: 800; letter-spacing: .04em; }
 
 /* ── Halloween: ink and plum, one pumpkin orange ──────────────────────── */
 html[data-site-theme="halloween"][data-theme="dark"] {
@@ -47,74 +44,6 @@ html[data-site-theme="halloween"][data-theme="dark"] {
   --control-glass: rgba(22, 14, 38, .9);
   --control-line: rgba(244, 233, 208, .16);
   --control-muted: #a99dbd;
-}
-
-/* ── Christmas: a night of snow, deep blue with a red and a green ─────── */
-html[data-site-theme="christmas"][data-theme="dark"] {
-  --background: #07121c;
-  --surface: #0e1f2d;
-  --surface-strong: #152b3d;
-  --text: #f4f7f2;
-  --muted: #aac0cc;
-  --dash-bg: #06101a;
-  --dash-card: #0f2232;
-  --theme-elevated: #102433;
-  --theme-input: rgba(11, 26, 38, .9);
-  --theme-text-strong: #f4f7f2;
-  --theme-text-soft: #a7bdc8;
-  --theme-line-soft: rgba(255, 255, 255, .14);
-  --theme-hover: rgba(255, 255, 255, .07);
-  --control-surface: #0e2030;
-  --control-surface-strong: #163048;
-  --control-glass: rgba(13, 30, 44, .9);
-  --control-line: rgba(255, 255, 255, .16);
-  --control-muted: #9ab2bf;
-  --success: #3ccf86;
-}
-
-/* ── Songkran: bright, a clear blue and a marigold, light mode ────────── */
-html[data-site-theme="songkran"][data-theme="light"] {
-  --background: #e9f7ff;
-  --surface: #ffffff;
-  --surface-strong: #f0fbff;
-  --text: #0b2a44;
-  --muted: #4d6b82;
-  --dash-bg: #e4f4fd;
-  --dash-card: #ffffff;
-  --theme-elevated: #ffffff;
-  --theme-input: rgba(255, 255, 255, .95);
-  --theme-text-strong: #0b2a44;
-  --theme-text-soft: #46647b;
-  --theme-line-soft: rgba(10, 100, 160, .15);
-  --theme-hover: rgba(10, 100, 160, .06);
-  --control-surface: #ffffff;
-  --control-surface-strong: #eef9ff;
-  --control-glass: rgba(255, 255, 255, .92);
-  --control-line: rgba(10, 100, 160, .17);
-  --control-muted: #4d6b82;
-  --theme-shadow: rgba(10, 90, 150, .16);
-}
-
-/* ── Cyberpunk: black violet, magenta, and a cyan for the lines ───────── */
-html[data-site-theme="cyberpunk"][data-theme="dark"] {
-  --background: #07030f;
-  --surface: #100822;
-  --surface-strong: #1a0d36;
-  --text: #eaf6ff;
-  --muted: #9fb4d6;
-  --dash-bg: #06020d;
-  --dash-card: #0f0720;
-  --theme-elevated: #120a26;
-  --theme-input: rgba(15, 8, 32, .92);
-  --theme-text-strong: #eaf6ff;
-  --theme-text-soft: #9aaed0;
-  --theme-line-soft: rgba(0, 240, 255, .17);
-  --theme-hover: rgba(0, 240, 255, .07);
-  --control-surface: #110926;
-  --control-surface-strong: #1b0f38;
-  --control-glass: rgba(16, 9, 34, .9);
-  --control-line: rgba(0, 240, 255, .2);
-  --control-muted: #8fa3c8;
 }
 
 /* ── The two layers SiteScene draws ───────────────────────────────────── */

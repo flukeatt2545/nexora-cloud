@@ -47,7 +47,7 @@ type publicSettings struct {
 	OGColor         string `json:"ogColor"`
 	PrimaryColor    string `json:"primaryColor"`
 	ThemeMode       string `json:"themeMode"`
-	// The look that is on today (halloween, christmas...), worked out from the admin's theme and
+	// The look that is on today (halloween...), worked out from the admin's theme and
 	// date ranges. "default" is the plain look from the colour and mode above.
 	Theme               string   `json:"theme"`
 	LogoURL             string   `json:"logoUrl"`

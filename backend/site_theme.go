@@ -15,7 +15,7 @@ import (
 // works out which theme is on today (in Thai time), so every visitor sees the same one, and the web
 // page (app/siteThemes.ts) only has to draw it.
 
-var siteThemes = map[string]bool{"default": true, "halloween": true, "christmas": true, "songkran": true, "cyberpunk": true}
+var siteThemes = map[string]bool{"default": true, "halloween": true}
 
 const maxThemeRules = 24
 

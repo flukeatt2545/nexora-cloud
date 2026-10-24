@@ -138,7 +138,7 @@ function Shield() {
 }
 
 export default function VerifyClient({ token }: { token: string }) {
-  // The page wears the site theme that is on (Halloween, Christmas...); the picture behind it is SiteScene's.
+  // The page wears the site theme that is on (Halloween...); the picture behind it is SiteScene's.
   const theme = useSiteTheme();
   useFontStylesheet(theme === "halloween" ? "https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=UnifrakturCook:wght@700&display=swap" : undefined);
   const started = useRef(false);

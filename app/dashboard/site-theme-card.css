@@ -24,15 +24,6 @@
 .stc-prev-halloween { background: linear-gradient(180deg, #17102f 0%, #4a2145 62%, #c8692f 100%); }
 .stc-prev-halloween b { right: 14px; top: 10px; width: 22px; height: 22px; border-radius: 50%; background: #f1e1a6; }
 .stc-prev-halloween u { left: 0; right: 0; bottom: 0; height: 22px; background: #07030d; clip-path: polygon(0 60%, 18% 30%, 30% 60%, 44% 20%, 58% 56%, 74% 28%, 100% 62%, 100% 100%, 0 100%); }
-.stc-prev-christmas { background: linear-gradient(180deg, #06142a 0%, #123a52 70%, #1c5a58 100%); }
-.stc-prev-christmas b { left: 0; right: 0; bottom: 0; height: 24px; background: #eef6fd; clip-path: ellipse(70% 100% at 40% 100%); } /* theme-ok: the theme's own palette */
-.stc-prev-christmas u { left: 18px; bottom: 14px; width: 0; height: 0; border: 12px solid transparent; border-bottom: 30px solid #0a2a22; border-top: 0; }
-.stc-prev-songkran { background: linear-gradient(180deg, #5cc1f4 0%, #d9f2fb 70%, #fff3d2 100%); } /* theme-ok: the theme's own palette */
-.stc-prev-songkran b { left: 12px; top: 10px; width: 20px; height: 20px; border-radius: 50%; background: #ffe36a; box-shadow: 0 0 12px #ffe36a; }
-.stc-prev-songkran u { left: 0; right: 0; bottom: 0; height: 26px; background: #0b88d6; clip-path: polygon(0 40%, 14% 20%, 30% 40%, 46% 18%, 62% 40%, 78% 20%, 100% 42%, 100% 100%, 0 100%); } /* theme-ok: the theme's own palette */
-.stc-prev-cyberpunk { background: linear-gradient(180deg, #0a0420 0%, #3a0f5e 55%, #ff2bd6 100%); }
-.stc-prev-cyberpunk b { left: 50%; bottom: 18px; width: 34px; height: 34px; margin-left: -17px; border-radius: 50%; background: linear-gradient(#fff48a, #ff4fb8); }
-.stc-prev-cyberpunk u { left: 0; right: 0; bottom: 0; height: 24px; background: repeating-linear-gradient(90deg, #00f0ff 0 1px, transparent 1px 12px), #12062a; }
 
 .stc-note { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 9px; background: var(--primary-soft); color: var(--theme-text-strong); font-size: 13.5px; line-height: 1.55; }
 .stc-note svg { flex: none; color: var(--primary-ink); }

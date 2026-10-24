@@ -1,13 +1,13 @@
 import { brandVariables } from "./themeColor";
 
 /**
- * The site's themes (Halloween, Christmas...). The admin picks one on the settings page, or sets date
+ * The site's themes (only Halloween for now; add one here, in SiteScene.tsx and in backend/site_theme.go). The admin picks one on the settings page, or sets date
  * ranges in which one is on by itself (backend/site_theme.go); /api/settings/public says which is on
  * today as `theme`. A theme sets the colour mode and brand colour for the whole site, tints the
  * surfaces (app/site-themes.css) and draws a scene behind every page (app/SiteScene.tsx).
  */
 
-export type SiteThemeId = "default" | "halloween" | "christmas" | "songkran" | "cyberpunk";
+export type SiteThemeId = "default" | "halloween";
 
 export type SiteThemeInfo = {
   id: Exclude<SiteThemeId, "default">;
@@ -26,18 +26,6 @@ export const SITE_THEMES: SiteThemeInfo[] = [
   {
     id: "halloween", name: "ฮาโลวีน", blurb: "หมู่บ้านใต้พระจันทร์ บ้านผีสิง ฟักทองเรืองแสง ค้างคาว", mode: "dark", primary: "#f08a2c", swatch: ["#17102f", "#f08a2c", "#f4e9d0"],
     font: { family: "UnifrakturCook", url: "https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&display=swap" },
-  },
-  {
-    id: "christmas", name: "คริสต์มาส / ปีใหม่", blurb: "ค่ำคืนหิมะตก ต้นสน ไฟประดับ ออโรร่า", mode: "dark", primary: "#e5434f", swatch: ["#0b2342", "#e5434f", "#2fae6a"],
-    font: { family: "Mountains of Christmas", url: "https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&display=swap" },
-  },
-  {
-    id: "songkran", name: "สงกรานต์", blurb: "น้ำใส ท้องฟ้าสว่าง ดอกไม้ ลายไทย ละอองน้ำ", mode: "light", primary: "#0a8fe0", swatch: ["#bfeaff", "#0a8fe0", "#f5b82e"],
-    font: { family: "Chonburi", url: "https://fonts.googleapis.com/css2?family=Chonburi&display=swap" },
-  },
-  {
-    id: "cyberpunk", name: "ไซเบอร์พังก์ / นีออน", blurb: "เมืองยามค่ำ ตะวันนีออน พื้นกริด เส้นสแกน", mode: "dark", primary: "#ff2bd6", swatch: ["#1a0838", "#ff2bd6", "#00f0ff"],
-    font: { family: "Orbitron", url: "https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&display=swap" },
   },
 ];
 

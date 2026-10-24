@@ -20,8 +20,6 @@ const NAMES: Record<string, string> = { default: "ธีมปกติ", ...Obj
 const year = () => new Date().getFullYear();
 const PRESETS: { label: string; theme: Rule["theme"]; start: () => string; end: () => string }[] = [
   { label: "ฮาโลวีน 25 ต.ค. – 1 พ.ย.", theme: "halloween", start: () => `${year()}-10-25`, end: () => `${year()}-11-01` },
-  { label: "คริสต์มาส / ปีใหม่ 20 ธ.ค. – 3 ม.ค.", theme: "christmas", start: () => `${year()}-12-20`, end: () => `${year() + 1}-01-03` },
-  { label: "สงกรานต์ 11 – 17 เม.ย.", theme: "songkran", start: () => `${year()}-04-11`, end: () => `${year()}-04-17` },
 ];
 
 const newId = () => Math.random().toString(36).slice(2, 10);

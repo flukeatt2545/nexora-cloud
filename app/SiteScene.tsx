@@ -13,22 +13,13 @@ import "./site-angular.css";
 
 const back = {
   halloween: lazy(() => import("./siteScenes/Halloween").then((module) => ({ default: module.Back }))),
-  christmas: lazy(() => import("./siteScenes/Christmas").then((module) => ({ default: module.Back }))),
-  songkran: lazy(() => import("./siteScenes/Songkran").then((module) => ({ default: module.Back }))),
-  cyberpunk: lazy(() => import("./siteScenes/Cyberpunk").then((module) => ({ default: module.Back }))),
 };
 const front = {
   halloween: lazy(() => import("./siteScenes/Halloween").then((module) => ({ default: module.Front }))),
-  christmas: lazy(() => import("./siteScenes/Christmas").then((module) => ({ default: module.Front }))),
-  songkran: lazy(() => import("./siteScenes/Songkran").then((module) => ({ default: module.Front }))),
-  cyberpunk: lazy(() => import("./siteScenes/Cyberpunk").then((module) => ({ default: module.Front }))),
 };
 
 // Only some themes draw something above the headers (a string of lights, a pattern along the edge).
-const top = {
-  christmas: lazy(() => import("./siteScenes/Christmas").then((module) => ({ default: module.Top }))),
-  songkran: lazy(() => import("./siteScenes/Songkran").then((module) => ({ default: module.Top }))),
-} as Partial<Record<SiteThemeId, ReturnType<typeof lazy>>>;
+const top = {} as Partial<Record<SiteThemeId, ReturnType<typeof lazy>>>;
 
 export default function SiteScene() {
   const [theme, setTheme] = useState<SiteThemeId>("default");
