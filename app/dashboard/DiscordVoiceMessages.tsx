@@ -1,11 +1,10 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CircleAlert, ImagePlus, MessageSquareText, Trash2 } from "lucide-react";
+import { Check, ImagePlus, MessageSquareText, Trash2 } from "lucide-react";
 import { API_BASE } from "../runtime";
+import { Card, LoadError, type Notice, SaveBar } from "./DiscordBotParts";
 import { api } from "./DiscordMailBotSettings";
-
-type Notice = (notice: { kind: "success" | "error"; text: string }) => void;
 
 type Key = "panel" | "log" | "voicelog";
 
@@ -26,8 +25,8 @@ const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 const tabs: { key: Key; label: string; command: string }[] = [
   { key: "panel", label: "แผงห้องเสียง", command: "/setup-room-panel" },
-  { key: "log", label: "ข้อความห้อง log", command: "/setup-room-log" },
-  { key: "voicelog", label: "ข้อความห้องประวัติเข้าออก", command: "/setup-voice-log" },
+  { key: "log", label: "ห้อง log", command: "/setup-room-log" },
+  { key: "voicelog", label: "ห้องประวัติเข้าออก", command: "/setup-voice-log" },
 ];
 
 const emptyForm: Form = { title: "", body: "", file: null, removeImage: false };
@@ -176,120 +175,99 @@ export function DiscordVoiceMessages({ notify }: { notify: Notice }) {
 
   let state = "กำลังโหลด...";
   if (message) {
-    if (dirty) state = "ยังไม่ได้บันทึก";
-    else if (message.pending) state = `บอทกำลังแก้ข้อความใน Discord (${message.pending} ที่)`;
+    if (message.pending) state = `บอทกำลังแก้ข้อความใน Discord (${message.pending} ที่)`;
     else if (message.posted) state = `ลงไว้ ${message.posted} ที่ ตรงกับที่ตั้งไว้`;
     else state = `ยังไม่ได้ลง พิมพ์ ${info.command} ในห้องที่จะลง`;
   }
 
-  if (loadError) {
-    return (
-      <section className="aov-panel dbot-card dbot-wide">
-        <div className="dbot-body">
-          <div className="hv-callout is-error">
-            <CircleAlert size={18} aria-hidden="true" />
-            <p><strong>โหลดข้อความไม่ได้</strong><span>{loadError}</span></p>
-            <button type="button" onClick={() => load(true)}>ลองอีกครั้ง</button>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  if (loadError) return <LoadError title="โหลดข้อความไม่ได้" message={loadError} onRetry={() => load(true)} />;
 
   return (
-    <form className="aov-panel dbot-card dbot-wide" onSubmit={(event) => void save(event)} aria-busy={loading}>
-      <header className="dbot-card-head">
-        <span className="dbot-mark" aria-hidden="true"><MessageSquareText size={18} /></span>
-        <div>
-          <h2>ข้อความที่บอทลงไว้</h2>
-          <p>แก้ที่นี่แล้วข้อความใน Discord เปลี่ยนตาม</p>
-        </div>
-      </header>
-      <div className="dbot-body dvm-body">
-        <div className="dvm-edit">
-          <div className="th-chips dbot-types" role="tablist" aria-label="ข้อความ">
-            {tabs.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                role="tab"
-                aria-selected={tab === item.key}
-                className={tab === item.key ? "is-active" : ""}
-                onClick={() => setTab(item.key)}
-                disabled={busy}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div className="hv-field">
-            <div className="hv-field-row">
-              <label htmlFor="dvm-title">หัวข้อ</label>
-              <small>{form.title.length}/256</small>
-            </div>
-            <input id="dvm-title" value={form.title} maxLength={256} onChange={(event) => update({ title: event.target.value })} disabled={loading || busy} placeholder="เว้นว่างได้" />
-          </div>
-          <div className="hv-field">
-            <div className="hv-field-row">
-              <label htmlFor="dvm-body">ข้อความ</label>
-              <small>{form.body.length}/2000</small>
-            </div>
-            <textarea id="dvm-body" className="hv-textarea dvm-text" rows={4} value={form.body} maxLength={2000}
-              onChange={(event) => update({ body: event.target.value })} disabled={loading || busy} placeholder="เว้นว่างได้" />
-          </div>
-          <div className="hv-field">
-            <span>รูป</span>
-            <div className="dvm-image-row">
-              <input ref={fileInput} type="file" accept={IMAGE_TYPES.join(",")} hidden onChange={pickFile} />
-              <button type="button" className="hv-btn" onClick={() => fileInput.current?.click()} disabled={loading || busy}>
-                <ImagePlus size={16} aria-hidden="true" /> {hasImage ? "เปลี่ยนรูป" : "เลือกรูป"}
-              </button>
-              {hasImage && (
-                <button type="button" className="hv-btn hv-btn-danger-ghost" onClick={() => update({ file: null, removeImage: true })} disabled={loading || busy}>
-                  <Trash2 size={16} aria-hidden="true" /> เอารูปออก
-                </button>
-              )}
-            </div>
-            <small>PNG, JPG, GIF หรือ WebP ไม่เกิน 4MB รูปมีข้อความในตัวแล้ว ลบหัวข้อและข้อความออกได้</small>
-          </div>
+    <form className="bp-pane" onSubmit={(event) => void save(event)} aria-busy={loading}>
+      <Card icon={MessageSquareText} title="ข้อความที่บอทลงไว้" text="แก้ตรงนี้แล้วข้อความใน Discord เปลี่ยนตาม" busy={loading}
+        aside={message && !dirty ? <span className="bp-state"><Check size={14} aria-hidden="true" style={{ verticalAlign: "-2px" }} /> {state}</span> : undefined}>
+        <div className="bp-pills" role="tablist" aria-label="ข้อความ">
+          {tabs.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="tab"
+              aria-selected={tab === item.key}
+              className={tab === item.key ? "is-active" : ""}
+              onClick={() => setTab(item.key)}
+              disabled={busy}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
 
-        <div className="dbot-preview">
-          <small>ตัวอย่างใน Discord</small>
-          <div className="dvm-message">
-            <span className="dbot-avatar" aria-hidden="true">ห</span>
-            <div className="dvm-message-copy">
-              <b>บอทห้องเสียง <em>BOT</em></b>
-              <div className={`dvm-embed${tab === "panel" ? "" : " is-log"}`}>
-                {form.title.trim() && <strong>{form.title}</strong>}
-                {form.body.trim() && <p>{form.body}</p>}
-                { }
-                {imageUrl && <img src={imageUrl} alt="" />}
-                {hasImage && !imageUrl && <span className="dvm-image-wait">กำลังโหลดรูป...</span>}
-                {!form.title.trim() && !form.body.trim() && !hasImage && <p className="dvm-empty">ยังไม่มีอะไรให้แสดง</p>}
+        <div className="bp-split">
+          <div className="bp-edit">
+            <div className="hv-field">
+              <div className="hv-field-row">
+                <label htmlFor="vm-title">หัวข้อ</label>
+                <small>{form.title.length}/256</small>
               </div>
-              {tab === "panel" && (
-                <div className="dvm-buttons" aria-hidden="true">
-                  <span className="is-primary">สร้างห้อง</span>
-                  <span>เข้าห้องที่ล็อก</span>
-                  <span>ห้องของฉัน</span>
-                </div>
-              )}
+              <input id="vm-title" value={form.title} maxLength={256} onChange={(event) => update({ title: event.target.value })} disabled={loading || busy} placeholder="เว้นว่างได้" />
             </div>
+            <div className="hv-field">
+              <div className="hv-field-row">
+                <label htmlFor="vm-body">ข้อความ</label>
+                <small>{form.body.length}/2000</small>
+              </div>
+              <textarea id="vm-body" className="hv-textarea bp-text" rows={4} value={form.body} maxLength={2000}
+                onChange={(event) => update({ body: event.target.value })} disabled={loading || busy} placeholder="เว้นว่างได้" />
+            </div>
+            <div className="hv-field">
+              <span>รูป</span>
+              <div className="bp-image-row">
+                <input ref={fileInput} type="file" accept={IMAGE_TYPES.join(",")} hidden onChange={pickFile} />
+                <button type="button" className="hv-btn" onClick={() => fileInput.current?.click()} disabled={loading || busy}>
+                  <ImagePlus size={16} aria-hidden="true" /> {hasImage ? "เปลี่ยนรูป" : "เลือกรูป"}
+                </button>
+                {hasImage && (
+                  <button type="button" className="hv-btn hv-btn-danger-ghost" onClick={() => update({ file: null, removeImage: true })} disabled={loading || busy}>
+                    <Trash2 size={16} aria-hidden="true" /> เอารูปออก
+                  </button>
+                )}
+              </div>
+              <small>PNG, JPG, GIF หรือ WebP ไม่เกิน 4MB ถ้าในรูปมีข้อความอยู่แล้ว ลบหัวข้อกับข้อความออกได้</small>
+            </div>
+            {!isDefault && (
+              <div>
+                <button type="button" className="hv-btn" onClick={resetToDefault} disabled={loading || busy}>ใช้ข้อความเดิมของบอท</button>
+              </div>
+            )}
           </div>
+
+          <figure className="bp-dc">
+            <figcaption>ที่เห็นใน Discord</figcaption>
+            <div className="bp-message">
+              <span className="bp-dc-avatar" aria-hidden="true">ห</span>
+              <div className="bp-message-copy">
+                <b>บอทห้องเสียง <em>BOT</em></b>
+                <div className={`bp-embed${tab === "panel" ? "" : " is-log"}`}>
+                  {form.title.trim() && <strong>{form.title}</strong>}
+                  {form.body.trim() && <p>{form.body}</p>}
+                  {imageUrl && <img src={imageUrl} alt="" />}
+                  {hasImage && !imageUrl && <span className="bp-muted">กำลังโหลดรูป...</span>}
+                  {!form.title.trim() && !form.body.trim() && !hasImage && <p className="bp-muted">ยังไม่มีอะไรให้แสดง</p>}
+                </div>
+                {tab === "panel" && (
+                  <div className="bp-buttons" aria-hidden="true">
+                    <span className="is-primary">สร้างห้อง</span>
+                    <span>เข้าห้องที่ล็อก</span>
+                    <span>ห้องของฉัน</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </figure>
         </div>
-      </div>
-      <footer className="dbot-foot">
-        <span className="dbot-state">{state}</span>
-        {!isDefault && <button type="button" className="hv-btn" onClick={resetToDefault} disabled={loading || busy}>ใช้ค่าเดิม</button>}
-        {dirty && message && (
-          <button type="button" className="hv-btn" onClick={() => update({ title: message.title, body: message.body, file: null, removeImage: false })} disabled={busy}>ยกเลิก</button>
-        )}
-        <button className="hv-btn hv-btn-primary" disabled={busy || loading || !dirty}>
-          {busy && <span className="hv-spinner" aria-hidden="true" />}
-          {busy ? "กำลังบันทึก..." : "บันทึก"}
-        </button>
-      </footer>
+      </Card>
+      <SaveBar dirty={dirty} busy={busy} text="ยังไม่ได้บันทึกข้อความนี้"
+        onCancel={() => { if (message) update({ title: message.title, body: message.body, file: null, removeImage: false }); }} />
     </form>
   );
 }

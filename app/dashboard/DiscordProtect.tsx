@@ -1,10 +1,9 @@
 "use client";
 
 import { ClipboardEvent, FormEvent, KeyboardEvent, useCallback, useEffect, useState } from "react";
-import { CircleAlert, CircleCheck, ShieldCheck, X } from "lucide-react";
+import { CircleAlert, CircleCheck, Link2, MessagesSquare, ServerCog, ShieldCheck, Timer, X } from "lucide-react";
+import { Card, Fields, LoadError, type Notice, Rows, SaveBar, SwitchRow } from "./DiscordBotParts";
 import { api } from "./DiscordMailBotSettings";
-
-type Notice = (notice: { kind: "success" | "error"; text: string }) => void;
 
 type Settings = {
   protectChannels: boolean;
@@ -101,9 +100,9 @@ function TagInput({ id, label, hint, values, onChange, clean, placeholder, disab
         <label htmlFor={id}>{label}</label>
         <small>{values.length}/{max}</small>
       </div>
-      <div className={`dpr-tags${disabled ? " is-disabled" : ""}`} onClick={() => !disabled && document.getElementById(id)?.focus()}>
+      <div className={`bp-tags${disabled ? " is-disabled" : ""}`} onClick={() => !disabled && document.getElementById(id)?.focus()}>
         {values.map((value) => (
-          <span className="dpr-tag" key={value}>
+          <span className="bp-chip" key={value}>
             {value}
             <button type="button" onClick={(event) => { event.stopPropagation(); onChange(values.filter((item) => item !== value)); }}
               disabled={disabled} aria-label={`เอา ${value} ออก`} title="เอาออก">
@@ -124,20 +123,6 @@ function TagInput({ id, label, hint, values, onChange, clean, placeholder, disab
         />
       </div>
       <small>{hint}</small>
-    </div>
-  );
-}
-
-function Switch({ label, hint, on, onChange, disabled }: { label: string; hint: string; on: boolean; onChange: (on: boolean) => void; disabled: boolean }) {
-  return (
-    <div className="dbot-switch-row">
-      <div>
-        <strong>{label}</strong>
-        <small>{hint}</small>
-      </div>
-      <button type="button" role="switch" aria-checked={on} aria-label={label} className={`sc-switch${on ? " is-on" : ""}`} onClick={() => onChange(!on)} disabled={disabled}>
-        <span />
-      </button>
     </div>
   );
 }
@@ -215,103 +200,102 @@ export function DiscordProtect({ notify }: { notify: Notice }) {
     }
   }
 
-  if (loadError) {
-    return (
-      <section className="aov-panel dbot-card dbot-wide">
-        <div className="dbot-body">
-          <div className="hv-callout is-error">
-            <CircleAlert size={18} aria-hidden="true" />
-            <p><strong>โหลดระบบป้องกันไม่ได้</strong><span>{loadError}</span></p>
-            <button type="button" onClick={() => load(true)}>ลองอีกครั้ง</button>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  if (loadError) return <LoadError title="โหลดการป้องกันไม่ได้" message={loadError} onRetry={() => load(true)} />;
 
   const set = (next: Partial<Form>) => form && setForm({ ...form, ...next });
   const off = loading || busy;
 
   return (
-    <form className="aov-panel dbot-card dbot-wide" onSubmit={(event) => void save(event)} aria-busy={loading}>
-      <header className="dbot-card-head">
-        <span className="dbot-mark" aria-hidden="true"><ShieldCheck size={18} /></span>
-        <div>
-          <h2>ระบบป้องกันเซิร์ฟเวอร์</h2>
-          <p>ทำงานเงียบๆ ในทุกเซิร์ฟที่บอทห้องเสียงอยู่ คนทำผิดเห็นแค่ข้อความเตือนของตัวเอง แอดมินดูรายละเอียดได้ที่หน้าบันทึกระบบ</p>
-        </div>
-      </header>
-      {form && (
-        <div className="dbot-body dpr-body">
-          <div className="dpr-col">
-            <Switch label="ป้องกันการลบห้อง" hint="ใครลบห้อง บอทสร้างคืนทันที (เจ้าของเซิร์ฟลบห้องทั่วไปได้)" on={form.protectChannels}
-              onChange={(on) => set({ protectChannels: on })} disabled={off} />
-            <Switch label="กันลิงก์" hint="ส่งได้เฉพาะลิงก์เว็บที่อนุญาตด้านล่าง" on={form.blockLinks} onChange={(on) => set({ blockLinks: on })} disabled={off} />
-            <TagInput id="dpr-domains" label="เว็บที่อนุญาต" values={form.domains} onChange={(domains) => set({ domains })} clean={cleanDomain} max={90}
-              placeholder="พิมพ์ชื่อเว็บ เช่น youtube.com แล้วกด Enter" disabled={off || !form.blockLinks}
-              hint="วางลิงก์ทั้งลิงก์ก็ได้ ระบบเหลือแค่ชื่อเว็บให้เอง เว็บย่อยใช้ได้ด้วย เช่น m.youtube.com" />
-            <Switch label="กันลิงก์เชิญเซิร์ฟอื่น" hint="discord.gg และลิงก์เชิญทุกแบบ" on={form.blockInvites} onChange={(on) => set({ blockInvites: on })} disabled={off} />
-            <Switch label="กันข้อความสแปม" hint="Discord ตรวจข้อความที่ดูเหมือนสแปมให้" on={form.blockSpam} onChange={(on) => set({ blockSpam: on })} disabled={off} />
-          </div>
-          <div className="dpr-col">
-            <div className="hv-field">
-              <label htmlFor="dpr-mentions">แท็กได้สูงสุดต่อข้อความ</label>
-              <input id="dpr-mentions" type="number" inputMode="numeric" min={0} max={50} value={form.mentions} onChange={(event) => set({ mentions: event.target.value })} disabled={off} />
-              <small>เกินนี้ข้อความถูกบล็อกและพักการพิมพ์ 10 นาที ใส่ 0 = ไม่จำกัด</small>
+    <form className="bp-pane" onSubmit={(event) => void save(event)} aria-busy={loading}>
+      {!form ? <Card icon={ShieldCheck} title="กำลังโหลด..." busy /> : (
+        <>
+          <div className="bp-grid">
+            <div className="bp-col">
+              <Card icon={ShieldCheck} title="ห้องที่ถูกลบ" text="ใครลบห้อง บอทสร้างคืนให้ทันที" flush>
+                <Rows>
+                  <SwitchRow title="สร้างห้องคืน" hint="เจ้าของเซิร์ฟลบห้องทั่วไปได้ ส่วนคนอื่นที่ลบได้ตั้งที่ ดูแลเซิร์ฟ > ความปลอดภัย"
+                    on={form.protectChannels} onChange={(protectChannels) => set({ protectChannels })} disabled={off} />
+                </Rows>
+              </Card>
+
+              <Card icon={Link2} title="ลิงก์" text="คนที่ส่งลิงก์ที่ไม่อนุญาตจะเห็นแค่ข้อความเตือนของตัวเอง" flush>
+                <Rows>
+                  <SwitchRow title="กันลิงก์" hint="ส่งได้เฉพาะลิงก์ของเว็บที่อนุญาตด้านล่าง" on={form.blockLinks} onChange={(blockLinks) => set({ blockLinks })} disabled={off} />
+                </Rows>
+                <Fields>
+                  <TagInput id="pr-domains" label="เว็บที่อนุญาต" values={form.domains} onChange={(domains) => set({ domains })} clean={cleanDomain} max={90}
+                    placeholder="พิมพ์ชื่อเว็บ เช่น youtube.com แล้วกด Enter" disabled={off || !form.blockLinks}
+                    hint="วางลิงก์ทั้งลิงก์ก็ได้ ตัดให้เหลือแค่ชื่อเว็บให้เอง เว็บย่อยใช้ได้ด้วย เช่น m.youtube.com" />
+                </Fields>
+                <Rows>
+                  <SwitchRow title="กันลิงก์เชิญเซิร์ฟอื่น" hint="discord.gg และลิงก์เชิญทุกแบบ" on={form.blockInvites} onChange={(blockInvites) => set({ blockInvites })} disabled={off} />
+                </Rows>
+              </Card>
             </div>
-            <TagInput id="dpr-words" label="คำต้องห้าม" values={form.words} onChange={(words) => set({ words })} clean={(raw) => raw.trim().slice(0, 60)} max={900}
-              placeholder="พิมพ์คำแล้วกด Enter (ว่างไว้ = ไม่กันคำ)" disabled={off}
-              hint="คำภาษาไทยถูกกันแม้อยู่ติดกับคำอื่น วางหลายคำพร้อมกันได้ (คั่นด้วยบรรทัดใหม่หรือ ,)" />
-            <Switch label="กันพิมพ์รัว" hint="ส่งข้อความเร็วเกินไป ถูกพักการพิมพ์และลบข้อความชุดนั้น" on={form.floodEnabled} onChange={(on) => set({ floodEnabled: on })} disabled={off} />
-            <div className="dpr-flood">
-              <div className="hv-field">
-                <label htmlFor="dpr-fm">ข้อความ</label>
-                <input id="dpr-fm" type="number" inputMode="numeric" min={3} max={30} value={form.floodMessages} onChange={(event) => set({ floodMessages: event.target.value })} disabled={off || !form.floodEnabled} />
-              </div>
-              <div className="hv-field">
-                <label htmlFor="dpr-fs">ภายใน (วินาที)</label>
-                <input id="dpr-fs" type="number" inputMode="numeric" min={2} max={60} value={form.floodSeconds} onChange={(event) => set({ floodSeconds: event.target.value })} disabled={off || !form.floodEnabled} />
-              </div>
-              <div className="hv-field">
-                <label htmlFor="dpr-ft">พัก (นาที)</label>
-                <input id="dpr-ft" type="number" inputMode="numeric" min={1} max={1440} value={form.floodTimeout} onChange={(event) => set({ floodTimeout: event.target.value })} disabled={off || !form.floodEnabled} />
-              </div>
+
+            <div className="bp-col">
+              <Card icon={MessagesSquare} title="ข้อความ" text="สแปม การแท็ก และคำต้องห้าม" flush>
+                <Rows>
+                  <SwitchRow title="กันข้อความสแปม" hint="ให้ Discord ตรวจข้อความที่ดูเหมือนสแปม" on={form.blockSpam} onChange={(blockSpam) => set({ blockSpam })} disabled={off} />
+                </Rows>
+                <Fields>
+                  <div className="hv-field">
+                    <label htmlFor="pr-mentions">แท็กได้สูงสุดต่อข้อความ</label>
+                    <input id="pr-mentions" type="number" inputMode="numeric" min={0} max={50} value={form.mentions} onChange={(event) => set({ mentions: event.target.value })} disabled={off} />
+                    <small>เกินแล้วข้อความถูกบล็อกและพักการพิมพ์ 10 นาที ใส่ 0 = ไม่จำกัด</small>
+                  </div>
+                  <TagInput id="pr-words" label="คำต้องห้าม" values={form.words} onChange={(words) => set({ words })} clean={(raw) => raw.trim().slice(0, 60)} max={900}
+                    placeholder="พิมพ์คำแล้วกด Enter" disabled={off}
+                    hint="คำไทยถูกกันแม้ติดกับคำอื่น วางหลายคำพร้อมกันได้ คั่นด้วยบรรทัดใหม่หรือ ," />
+                </Fields>
+              </Card>
+
+              <Card icon={Timer} title="พิมพ์รัว" text="ส่งข้อความเร็วเกินไปจะถูกพักการพิมพ์ และลบข้อความชุดนั้น" flush
+                toggle={{ label: "กันพิมพ์รัว", on: form.floodEnabled, onChange: (floodEnabled) => set({ floodEnabled }), disabled: off }}>
+                <Fields>
+                  <div className="bp-three">
+                    <div className="hv-field">
+                      <label htmlFor="pr-fm">ข้อความ</label>
+                      <input id="pr-fm" type="number" inputMode="numeric" min={3} max={30} value={form.floodMessages} onChange={(event) => set({ floodMessages: event.target.value })} disabled={off || !form.floodEnabled} />
+                    </div>
+                    <div className="hv-field">
+                      <label htmlFor="pr-fs">ภายใน (วินาที)</label>
+                      <input id="pr-fs" type="number" inputMode="numeric" min={2} max={60} value={form.floodSeconds} onChange={(event) => set({ floodSeconds: event.target.value })} disabled={off || !form.floodEnabled} />
+                    </div>
+                    <div className="hv-field">
+                      <label htmlFor="pr-ft">พัก (นาที)</label>
+                      <input id="pr-ft" type="number" inputMode="numeric" min={1} max={1440} value={form.floodTimeout} onChange={(event) => set({ floodTimeout: event.target.value })} disabled={off || !form.floodEnabled} />
+                    </div>
+                  </div>
+                </Fields>
+              </Card>
             </div>
           </div>
-          <div className="dpr-guilds">
-            <strong>สถานะแต่ละเซิร์ฟ</strong>
+
+          <Card icon={ServerCog} title="เซิร์ฟที่บอทอยู่" text="แอดมินและคนที่มีสิทธิ์จัดการเซิร์ฟไม่โดนกฎพวกนี้">
             {guilds.length === 0 ? (
-              <p>ยังไม่มีข้อมูล บอทจะรายงานภายใน 15 วินาทีหลังออนไลน์</p>
+              <p className="bp-note">ยังไม่มีข้อมูล บอทจะรายงานภายใน 15 วินาทีหลังออนไลน์</p>
             ) : (
-              <ul>
+              <ul className="bp-servers">
                 {guilds.map((guild) => (
                   <li key={guild.guildId}>
-                    <span className={`dpr-dot${guild.problems.length ? " is-warn" : ""}`} aria-hidden="true">
-                      {guild.problems.length ? <CircleAlert size={16} /> : <CircleCheck size={16} />}
+                    <span className={`bp-dot${guild.problems.length ? " is-warn" : ""}`} aria-hidden="true">
+                      {guild.problems.length ? <CircleAlert size={18} /> : <CircleCheck size={18} />}
                     </span>
                     <div>
                       <b>{guild.guildName || guild.guildId}</b>
-                      <small>
-                        {guild.appliedVersion < version ? "กำลังใช้กฎใหม่..." : guild.problems.length ? "ใช้งานได้บางส่วน" : "ใช้งานได้ครบ"}
-                      </small>
-                      {guild.problems.map((problem) => <small key={problem} className="dpr-problem">{problem}</small>)}
+                      <small>{guild.appliedVersion < version ? "กำลังใช้กฎใหม่..." : guild.problems.length ? "ทำงานได้บางส่วน" : "ทำงานได้ครบ"}</small>
+                      {guild.problems.map((problem) => <small key={problem} className="bp-warn">{problem}</small>)}
                     </div>
                   </li>
                 ))}
               </ul>
             )}
-            <p>แอดมินและคนที่มีสิทธิ์จัดการเซิร์ฟเวอร์ไม่โดนกฎเหล่านี้</p>
-          </div>
-        </div>
+          </Card>
+
+          <SaveBar dirty={dirty} busy={busy} onCancel={() => saved && setForm(saved)} />
+        </>
       )}
-      <footer className="dbot-foot">
-        <span className="dbot-state">{loading ? "กำลังโหลด..." : dirty ? "ยังไม่ได้บันทึก" : "ไม่มีอะไรเปลี่ยน"}</span>
-        {dirty && <button type="button" className="hv-btn" onClick={() => saved && setForm(saved)} disabled={busy}>ยกเลิก</button>}
-        <button className="hv-btn hv-btn-primary" disabled={busy || loading || !dirty}>
-          {busy && <span className="hv-spinner" aria-hidden="true" />}
-          {busy ? "กำลังบันทึก..." : "บันทึก"}
-        </button>
-      </footer>
     </form>
   );
 }

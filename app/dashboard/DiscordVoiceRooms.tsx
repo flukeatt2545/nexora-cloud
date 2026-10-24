@@ -1,10 +1,9 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { CircleAlert, KeyRound, LockKeyhole, LockKeyholeOpen, RefreshCw, Trash2, Volume2 } from "lucide-react";
+import { KeyRound, LockKeyhole, LockKeyholeOpen, RefreshCw, Trash2, Volume2 } from "lucide-react";
+import { Card, Fields, LoadError, type Notice, SaveBar, ago } from "./DiscordBotParts";
 import { api } from "./DiscordMailBotSettings";
-
-type Notice = (notice: { kind: "success" | "error"; text: string }) => void;
 
 type VoiceSettings = {
   enabled: boolean;
@@ -35,10 +34,10 @@ type VoiceRoom = {
 type Form = { enabled: boolean; max: string; empty: string; failures: string; lockout: string };
 
 const fields = [
-  { key: "max", label: "ห้องต่อคน", min: 0, max: 20, hint: "0 คือสร้างไม่ได้" },
-  { key: "empty", label: "ลบห้องว่างหลัง (นาที)", min: 1, max: 1440, hint: "นับจากคนสุดท้ายออก" },
-  { key: "failures", label: "ใส่รหัสผิดได้ (ครั้ง)", min: 1, max: 20, hint: "ครบแล้วห้ามลองห้องนั้น" },
-  { key: "lockout", label: "ห้ามลองนาน (นาที)", min: 1, max: 1440, hint: "ต่อคน ต่อห้อง" },
+  { key: "max", label: "ห้องต่อคน", min: 0, max: 20, hint: "ใส่ 0 = สร้างห้องไม่ได้" },
+  { key: "empty", label: "ลบห้องว่างหลัง (นาที)", min: 1, max: 1440, hint: "นับจากคนสุดท้ายออกจากห้อง" },
+  { key: "failures", label: "ใส่รหัสผิดได้ (ครั้ง)", min: 1, max: 20, hint: "ผิดครบแล้วลองห้องนั้นอีกไม่ได้" },
+  { key: "lockout", label: "ห้ามลองนาน (นาที)", min: 1, max: 1440, hint: "นับแยกต่อคน ต่อห้อง" },
 ] as const;
 
 function toForm(settings: VoiceSettings): Form {
@@ -49,15 +48,6 @@ function toForm(settings: VoiceSettings): Form {
     failures: String(settings.maxFailures),
     lockout: String(settings.lockoutMinutes),
   };
-}
-
-function since(value: string) {
-  const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000));
-  if (minutes < 1) return "เมื่อสักครู่";
-  if (minutes < 60) return `${minutes} นาทีก่อน`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} ชั่วโมงก่อน`;
-  return `${Math.round(hours / 24)} วันก่อน`;
 }
 
 /** Limits for the voice room bot, and the rooms that exist right now (superadmin). */
@@ -142,49 +132,14 @@ export function DiscordVoiceRooms({ notify }: { notify: Notice }) {
   // The bot can be in several servers: name the server when the list mixes them.
   const manyServers = new Set(rooms.map((room) => room.guildId)).size > 1;
 
-  if (loadError) {
-    return (
-      <section className="aov-panel dbot-card dbot-wide">
-        <div className="dbot-body">
-          <div className="hv-callout is-error">
-            <CircleAlert size={18} aria-hidden="true" />
-            <p><strong>โหลดห้องไม่ได้</strong><span>{loadError}</span></p>
-            <button type="button" onClick={() => load()}>ลองอีกครั้ง</button>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  if (loadError) return <LoadError title="โหลดห้องไม่ได้" message={loadError} onRetry={() => load()} />;
 
   return (
     <>
-      <form className="aov-panel dbot-card" onSubmit={(event) => void save(event)} aria-busy={loading}>
-        <header className="dbot-card-head">
-          <span className="dbot-mark" aria-hidden="true"><KeyRound size={18} /></span>
-          <div>
-            <h2>กติกาห้อง</h2>
-            <p>ใช้กับทุกห้องของบอทนี้</p>
-          </div>
-        </header>
-        <div className="dbot-body">
-          <div className="dbot-switch-row">
-            <div>
-              <strong>เปิดให้สร้างห้อง</strong>
-              <small>{form.enabled ? "สร้างห้องใหม่ได้" : "ปิดอยู่ ห้องเดิมยังใช้ได้"}</small>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={form.enabled}
-              aria-label="เปิดให้สร้างห้อง"
-              className={`sc-switch${form.enabled ? " is-on" : ""}`}
-              onClick={() => setForm({ ...form, enabled: !form.enabled })}
-              disabled={loading}
-            >
-              <span />
-            </button>
-          </div>
-          <div className="dbot-fields">
+      <form className="bp-pane" onSubmit={(event) => void save(event)} aria-busy={loading}>
+        <Card icon={KeyRound} title="กติกาของห้อง" text="ใช้กับทุกห้องของบอทนี้" flush busy={loading}
+          toggle={{ label: "เปิดให้สร้างห้อง", on: form.enabled, onChange: (enabled) => setForm({ ...form, enabled }), disabled: loading }}>
+          <Fields>
             {fields.map((field) => (
               <div className="hv-field" key={field.key}>
                 <label htmlFor={`voice-${field.key}`}>{field.label}</label>
@@ -203,53 +158,45 @@ export function DiscordVoiceRooms({ notify }: { notify: Notice }) {
                 <small>{field.hint}</small>
               </div>
             ))}
-          </div>
-        </div>
-        <footer className="dbot-foot">
-          <span className="dbot-state">{loading ? "กำลังโหลด..." : dirty ? "ยังไม่ได้บันทึก" : "ไม่มีอะไรเปลี่ยน"}</span>
-          {dirty && <button type="button" className="hv-btn" onClick={() => saved && setForm(saved)} disabled={busy}>ยกเลิก</button>}
-          <button className="hv-btn hv-btn-primary" disabled={busy || loading || !dirty}>
-            {busy && <span className="hv-spinner" aria-hidden="true" />}
-            {busy ? "กำลังบันทึก..." : "บันทึก"}
-          </button>
-        </footer>
+          </Fields>
+        </Card>
+        <SaveBar dirty={dirty} busy={busy} onCancel={() => saved && setForm(saved)}
+          text={form.enabled ? "ยังไม่ได้บันทึก" : "ยังไม่ได้บันทึก ถ้าบันทึกจะสร้างห้องใหม่ไม่ได้ ห้องเดิมยังใช้ได้"} />
       </form>
 
-      <section className="aov-panel dbot-card dbot-wide" aria-busy={loading}>
-        <header className="dbot-card-head">
-          <span className="dbot-mark" aria-hidden="true"><Volume2 size={18} /></span>
-          <div>
-            <h2>ห้องที่เปิดอยู่ <span className="dbot-count">{rooms.length}</span></h2>
-            <p>ลบที่นี่แล้วห้องใน Discord หายด้วย</p>
-          </div>
-          <button type="button" className="hv-btn hv-icon-btn dbot-refresh" onClick={() => load(true)} disabled={loading} aria-label="โหลดใหม่" title="โหลดใหม่">
-            <RefreshCw size={16} aria-hidden="true" className={loading ? "spin" : ""} />
-          </button>
-        </header>
+      <Card icon={Volume2} title="ห้องที่เปิดอยู่" text="ลบที่นี่แล้วห้องใน Discord หายด้วย" flush busy={loading}
+        aside={(
+          <>
+            <span className="bp-count">{rooms.length}</span>
+            <button type="button" className="hv-btn hv-icon-btn bp-refresh" onClick={() => load(true)} disabled={loading} aria-label="โหลดใหม่" title="โหลดใหม่">
+              <RefreshCw size={16} aria-hidden="true" className={loading ? "spin" : ""} />
+            </button>
+          </>
+        )}>
         {rooms.length === 0 ? (
-          <p className="dbot-empty">{loading ? "กำลังโหลด..." : "ยังไม่มีห้อง"}</p>
+          <p className="bp-empty">{loading ? "กำลังโหลด..." : "ยังไม่มีห้อง"}</p>
         ) : (
-          <ul className="dbot-rooms">
+          <ul className="bp-list">
             {rooms.map((room) => (
               <li key={room.id} className={room.deleteRequested ? "is-leaving" : undefined}>
-                <span className={`dbot-room-lock${room.locked ? " is-locked" : ""}`} title={room.locked ? (room.hasPassword ? "ล็อกอยู่" : "เข้าได้เฉพาะเจ้าของ") : "ใครก็เข้าได้"}>
+                <span className={`bp-lock${room.locked ? " is-locked" : ""}`} title={room.locked ? (room.hasPassword ? "ล็อกอยู่" : "เข้าได้เฉพาะเจ้าของ") : "ใครก็เข้าได้"}>
                   {room.locked ? <LockKeyhole size={16} aria-hidden="true" /> : <LockKeyholeOpen size={16} aria-hidden="true" />}
                 </span>
-                <div className="dbot-room-copy">
+                <div className="bp-item">
                   <a href={`https://discord.com/channels/${room.guildId}/${room.channelId}`} target="_blank" rel="noreferrer">{room.name}</a>
                   <small>
-                    {manyServers && room.guildName && <>{room.guildName} · </>}
+                    {manyServers && room.guildName && <>{room.guildName}, </>}
                     @{room.ownerUsername || room.ownerDiscordId}
-                    {room.siteUsername && <> · บัญชีเว็บ {room.siteUsername}</>}
-                    {" · "}{room.kind === "join" ? "Join to Create" : "คำสั่ง /room"}
-                    {room.hasPassword ? <> · ใส่รหัสแล้ว {room.accessCount} คน</> : " · ยังไม่ได้ตั้งรหัส"}
-                    {" · "}{since(room.createdAt)}
+                    {room.siteUsername && <>, บัญชีเว็บ {room.siteUsername}</>}
+                    {", "}{room.kind === "join" ? "Join to Create" : "คำสั่ง /room"}
+                    {room.hasPassword ? <>, ใส่รหัสแล้ว {room.accessCount} คน</> : ", ยังไม่ได้ตั้งรหัส"}
+                    {", "}{ago(room.createdAt)}
                   </small>
                 </div>
                 {room.deleteRequested ? (
-                  <span className="dbot-state">กำลังลบ...</span>
+                  <span className="bp-state">กำลังลบ...</span>
                 ) : confirmId === room.id ? (
-                  <span className="dbot-room-actions">
+                  <span className="bp-actions">
                     <button type="button" className="hv-btn" onClick={() => setConfirmId(0)} disabled={deletingId === room.id}>ไม่ลบ</button>
                     <button type="button" className="hv-btn hv-btn-danger-ghost" onClick={() => void remove(room)} disabled={deletingId === room.id}>ลบเลย</button>
                   </span>
@@ -262,7 +209,7 @@ export function DiscordVoiceRooms({ notify }: { notify: Notice }) {
             ))}
           </ul>
         )}
-      </section>
+      </Card>
     </>
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { CircleAlert, MailPlus } from "lucide-react";
+import { MailPlus } from "lucide-react";
 import { API_BASE } from "../runtime";
-import "./discord-mail-bot-settings.css";
+import { Card, Fields, LoadError, Rows, SaveBar, SwitchRow } from "./DiscordBotParts";
 
 type Notice = (notice: { kind: "success" | "error"; text: string }) => void;
 
@@ -158,71 +158,36 @@ export function MailBotSelfServiceSettings({ notify }: { notify: Notice }) {
   }
 
   return (
-    <form className="aov-panel dbot-card" onSubmit={(event) => void save(event)} aria-busy={loading}>
-      <header className="dbot-card-head">
-        <span className="dbot-mark" aria-hidden="true"><MailPlus size={18} /></span>
-        <div>
-          <h2>สร้างเมลผ่านบอท</h2>
-          <p>สมาชิกที่ผูก Discord กับเว็บสร้างกล่องเมลเองได้</p>
-        </div>
-      </header>
-
-      {loadError ? (
-        <div className="dbot-body">
-          <div className="hv-callout is-error">
-            <CircleAlert size={18} aria-hidden="true" />
-            <p><strong>โหลดไม่ได้</strong><span>{loadError}</span></p>
-            <button type="button" onClick={load}>ลองอีกครั้ง</button>
+    <form className="bp-pane" onSubmit={(event) => void save(event)} aria-busy={loading}>
+      <Card icon={MailPlus} title="ให้สมาชิกสร้างเมลเอง" text="คนที่ผูก Discord กับเว็บแล้ว กดสร้างกล่องเมลเองจากบอทได้" flush busy={loading}>
+        {loadError ? (
+          <div className="bp-card-body">
+            <LoadError title="โหลดไม่ได้" message={loadError} onRetry={load} />
           </div>
-        </div>
-      ) : (
-        <div className="dbot-body">
-          <div className="dbot-switch-row">
-            <div>
-              <strong>ให้สมาชิกสร้างเอง</strong>
-              <small>{form.enabled ? "สร้างได้จากปุ่มในบอท" : "ปิดอยู่ แอดมินยังสร้างให้ได้"}</small>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={form.enabled}
-              aria-label="เปิดให้สมาชิกสร้างเมลเอง"
-              className={`sc-switch${form.enabled ? " is-on" : ""}`}
-              onClick={() => setForm({ ...form, enabled: !form.enabled })}
-              disabled={loading}
-            >
-              <span />
-            </button>
-          </div>
-          <div className="dbot-fields">
-            <div className="hv-field">
-              <label htmlFor="mailbot-max">กล่องต่อคน</label>
-              <input id="mailbot-max" type="number" inputMode="numeric" min={0} max={50} step={1} value={form.max}
-                onChange={(event) => setForm({ ...form, max: event.target.value })} disabled={loading} required />
-              <small>นับเฉพาะกล่องบนโดเมนกลาง</small>
-            </div>
-            <div className="hv-field">
-              <label htmlFor="mailbot-quota">พื้นที่ต่อกล่อง (GB)</label>
-              <input id="mailbot-quota" type="number" inputMode="decimal" min={0.01} max={100} step={0.01} value={form.quotaGb}
-                onChange={(event) => setForm({ ...form, quotaGb: event.target.value })} disabled={loading} required />
-              <small>ใช้กับกล่องที่สร้างใหม่</small>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!loadError && (
-        <footer className="dbot-foot">
-          <span className="dbot-state">{loading ? "กำลังโหลด..." : dirty ? "ยังไม่ได้บันทึก" : "ไม่มีอะไรเปลี่ยน"}</span>
-          {dirty && (
-            <button type="button" className="hv-btn" onClick={() => saved && setForm(saved)} disabled={busy}>ยกเลิก</button>
-          )}
-          <button className="hv-btn hv-btn-primary" disabled={busy || loading || !dirty}>
-            {busy && <span className="hv-spinner" aria-hidden="true" />}
-            {busy ? "กำลังบันทึก..." : "บันทึก"}
-          </button>
-        </footer>
-      )}
+        ) : (
+          <>
+            <Rows>
+              <SwitchRow title="สมาชิกสร้างเมลเองได้" hint={form.enabled ? "สร้างได้จากปุ่มในบอท" : "ปิดอยู่ แอดมินยังสร้างให้ได้"}
+                on={form.enabled} onChange={(enabled) => setForm({ ...form, enabled })} disabled={loading} />
+            </Rows>
+            <Fields>
+              <div className="hv-field">
+                <label htmlFor="mailbot-max">กล่องต่อคน</label>
+                <input id="mailbot-max" type="number" inputMode="numeric" min={0} max={50} step={1} value={form.max}
+                  onChange={(event) => setForm({ ...form, max: event.target.value })} disabled={loading} required />
+                <small>นับเฉพาะกล่องบนโดเมนกลาง</small>
+              </div>
+              <div className="hv-field">
+                <label htmlFor="mailbot-quota">พื้นที่ต่อกล่อง (GB)</label>
+                <input id="mailbot-quota" type="number" inputMode="decimal" min={0.01} max={100} step={0.01} value={form.quotaGb}
+                  onChange={(event) => setForm({ ...form, quotaGb: event.target.value })} disabled={loading} required />
+                <small>ใช้กับกล่องที่สร้างหลังจากนี้</small>
+              </div>
+            </Fields>
+          </>
+        )}
+      </Card>
+      {!loadError && <SaveBar dirty={dirty} busy={busy} onCancel={() => saved && setForm(saved)} />}
     </form>
   );
 }

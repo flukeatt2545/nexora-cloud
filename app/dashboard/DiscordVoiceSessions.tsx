@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CircleAlert, History, RefreshCw, Search } from "lucide-react";
+import { History, RefreshCw, Search } from "lucide-react";
+import { Card, LoadError } from "./DiscordBotParts";
 import { api } from "./DiscordMailBotSettings";
 
 type Session = {
@@ -88,69 +89,60 @@ export function DiscordVoiceSessions() {
   const manyServers = Boolean(page && page.guilds > 1);
 
   return (
-    <section className="aov-panel dbot-card dbot-wide" aria-busy={loading}>
-      <header className="dbot-card-head">
-        <span className="dbot-mark" aria-hidden="true"><History size={18} /></span>
-        <div>
-          <h2>ประวัติเข้าออกห้องเสียง</h2>
-          <p>ใครอยู่ห้องไหน นานเท่าไร ทุกเซิร์ฟเวอร์ที่บอทอยู่ เก็บไว้ 90 วัน</p>
-        </div>
-        <button type="button" className="hv-btn hv-icon-btn dbot-refresh" onClick={() => load(search)} disabled={loading} aria-label="โหลดใหม่" title="โหลดใหม่">
+    <Card icon={History} title="ประวัติเข้าออกห้องเสียง" text="ใครอยู่ห้องไหน นานเท่าไร ทุกเซิร์ฟที่บอทอยู่ เก็บไว้ 90 วัน" flush busy={loading}
+      aside={(
+        <button type="button" className="hv-btn hv-icon-btn bp-refresh" onClick={() => load(search)} disabled={loading} aria-label="โหลดใหม่" title="โหลดใหม่">
           <RefreshCw size={16} aria-hidden="true" className={loading ? "spin" : ""} />
         </button>
-      </header>
-      <div className="dvs-tools">
-        <label className="dvs-search">
+      )}>
+      <div className="bp-tools">
+        <label className="bp-search">
           <Search size={16} aria-hidden="true" />
           <input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="ค้นชื่อคน ชื่อห้อง หรือเซิร์ฟเวอร์"
+            placeholder="ค้นชื่อคน ชื่อห้อง หรือชื่อเซิร์ฟ"
             aria-label="ค้นประวัติ"
           />
         </label>
         {page && (
-          <span className="dbot-state">
-            {page.count.toLocaleString("th-TH")} ครั้ง · {page.people.toLocaleString("th-TH")} คน · รวม {voiceDuration(page.totalSeconds)}
+          <span className="bp-state">
+            {page.count.toLocaleString("th-TH")} ครั้ง, {page.people.toLocaleString("th-TH")} คน, รวม {voiceDuration(page.totalSeconds)}
           </span>
         )}
       </div>
       {loadError ? (
-        <div className="dbot-body">
-          <div className="hv-callout is-error">
-            <CircleAlert size={18} aria-hidden="true" />
-            <p><strong>โหลดประวัติไม่ได้</strong><span>{loadError}</span></p>
-            <button type="button" onClick={() => load(search)}>ลองอีกครั้ง</button>
-          </div>
+        <div className="bp-card-body">
+          <LoadError title="โหลดประวัติไม่ได้" message={loadError} onRetry={() => load(search)} />
         </div>
       ) : !page || page.sessions.length === 0 ? (
-        <p className="dbot-empty">{loading ? "กำลังโหลด..." : search ? "ไม่พบประวัติที่ตรงกับคำค้น" : "ยังไม่มีประวัติ ข้อมูลเริ่มเก็บเมื่อมีคนเข้าห้องเสียง"}</p>
+        <p className="bp-empty">{loading ? "กำลังโหลด..." : search ? "ไม่พบประวัติที่ตรงกับคำค้น" : "ยังไม่มีประวัติ จะเริ่มเก็บเมื่อมีคนเข้าห้องเสียง"}</p>
       ) : (
         <>
-          <ul className="dbot-rooms dvs-list">
+          <ul className="bp-list">
             {page.sessions.map((session) => (
               <li key={session.id}>
-                <div className="dbot-room-copy">
+                <div className="bp-item">
                   <strong>
                     {session.displayName || session.username || session.discordId}
                     {session.username && session.displayName && session.username !== session.displayName && <small> @{session.username}</small>}
                   </strong>
                   <small>
                     <a href={`https://discord.com/channels/${session.guildId}/${session.channelId}`} target="_blank" rel="noreferrer">{session.channelName || "ห้องเสียง"}</a>
-                    {manyServers && session.guildName && <> · {session.guildName}</>}
-                    {" · "}{when(session)}
+                    {manyServers && session.guildName && <>, {session.guildName}</>}
+                    {", "}{when(session)}
                   </small>
                 </div>
-                <span className={`dvs-time${session.leftAt ? "" : " is-live"}`}>
-                  {!session.leftAt && <span className="dvs-live">อยู่ตอนนี้</span>}
+                <span className="bp-time">
+                  {!session.leftAt && <span className="bp-live">อยู่ตอนนี้</span>}
                   {voiceDuration(session.seconds)}
                 </span>
               </li>
             ))}
           </ul>
           {page.hasMore && (
-            <div className="dvs-more">
+            <div className="bp-more">
               <button type="button" className="hv-btn" onClick={() => void more()} disabled={loadingMore}>
                 {loadingMore ? "กำลังโหลด..." : "โหลดเพิ่ม"}
               </button>
@@ -158,6 +150,6 @@ export function DiscordVoiceSessions() {
           )}
         </>
       )}
-    </section>
+    </Card>
   );
 }
