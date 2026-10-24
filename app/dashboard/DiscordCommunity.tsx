@@ -64,6 +64,7 @@ type Settings = {
   securityEnabled: boolean;
   securityChannelId: string;
   securitySiteEvents: boolean;
+  securitySiteChannelId: string;
   antiNukeEnabled: boolean;
   antiSpamEnabled: boolean;
   newAccountDays: number;
@@ -490,8 +491,10 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
               <div className="cmb-wide">
                 <Feature title={<Switch label="แจ้งเตือนความปลอดภัย" hint="ห้องที่เห็นเฉพาะทีมงาน: ใครเตะ แบน ลบห้อง/ยศ ให้ยศสิทธิ์สูง เชิญบอทหรือสร้าง webhook และบัญชีเพิ่งสร้างที่เข้าเซิร์ฟ" on={form.securityEnabled} onChange={(on) => set({ securityEnabled: on })} disabled={off} />}>
                   <div className="dbot-fields">
-                    <ChannelPicker id="cmb-security" label="ห้องแจ้งเตือนความปลอดภัย" kind="text" value={form.securityChannelId} onChange={(securityChannelId) => set({ securityChannelId })} guild={guild} disabled={off || !form.securityEnabled}
-                      hint="ไม่มีห้อง? กด สร้างที่ขาดให้ ใน /setup บอทจะสร้างห้อง แจ้งเตือนความปลอดภัย ในหมวดทีมงาน" />
+                    <ChannelPicker id="cmb-security" label="ห้องกิจกรรมใน Discord" kind="text" value={form.securityChannelId} onChange={(securityChannelId) => set({ securityChannelId })} guild={guild} disabled={off || !form.securityEnabled}
+                      hint="เตะ แบน ลบห้อง/ยศ anti-nuke กันสแปม · ไม่มีห้อง? กด สร้างที่ขาดให้ ใน /setup" />
+                    <ChannelPicker id="cmb-security-site" label="ห้องกิจกรรมบนเว็บ" kind="text" value={form.securitySiteChannelId} onChange={(securitySiteChannelId) => set({ securitySiteChannelId })} guild={guild} disabled={off || !form.securityEnabled || !form.securitySiteEvents}
+                      hint="เหตุการณ์ของเว็บไปห้องนี้ห้องเดียว ไม่ปนกับห้อง Discord · ไม่ตั้ง = รอไว้ไม่ส่ง" />
                     <div className="hv-field">
                       <label htmlFor="cmb-new-days">บัญชีใหม่ = อายุน้อยกว่า (วัน)</label>
                       <input id="cmb-new-days" type="number" inputMode="numeric" min={0} max={30} value={form.newAccountDays}
@@ -499,7 +502,7 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                       <small>แจ้งเมื่อบัญชีที่อายุน้อยกว่านี้เข้าเซิร์ฟ และเตะออกตอนมีคนเข้ารัว · 0 = ไม่เช็ก</small>
                     </div>
                   </div>
-                  <Switch label="เหตุการณ์ความปลอดภัยของเว็บ" hint="ส่งเหตุการณ์ที่ติ๊กไว้ใน Webhook ความปลอดภัยของเว็บ (ล็อกอิน เปลี่ยนรหัส ลบบัญชี ล็อกเว็บ ฯลฯ) เข้าห้องนี้ด้วย"
+                  <Switch label="เหตุการณ์ความปลอดภัยของเว็บ" hint="ส่งเหตุการณ์ที่ติ๊กไว้ใน Webhook ความปลอดภัยของเว็บ (ล็อกอิน เปลี่ยนรหัส ลบบัญชี ล็อกเว็บ ฯลฯ) เข้าห้องกิจกรรมบนเว็บ แยกจากห้อง Discord"
                     on={form.securitySiteEvents} onChange={(on) => set({ securitySiteEvents: on })} disabled={off || !form.securityEnabled} />
                   <Switch label="Anti-nuke" hint="ใครลบห้องหรือยศ 3 ครั้ง หรือเตะ/แบน 4 ครั้งภายใน 1 นาที ถูกถอดยศและพักการพิมพ์ 1 ชั่วโมง (บอทถูกเตะ) · เจ้าของเซิร์ฟไม่โดน"
                     on={form.antiNukeEnabled} onChange={(on) => set({ antiNukeEnabled: on })} disabled={off} />

@@ -49,6 +49,14 @@ function securityChannel(guild: Guild) {
   return channel?.type === ChannelType.GuildText ? (channel as TextChannel) : undefined;
 }
 
+/** The room for the website's events, apart from the Discord one. */
+function siteChannel(guild: Guild) {
+  const current = settings();
+  if (!current?.securityEnabled || !current.securitySiteEvents || !current.securitySiteChannelId) return undefined;
+  const channel = guild.channels.cache.get(current.securitySiteChannelId);
+  return channel?.type === ChannelType.GuildText ? (channel as TextChannel) : undefined;
+}
+
 // At most 20 alerts a minute, so an attack does not bury the room (or hit Discord's limits).
 let sentThisMinute = 0;
 let dropped = 0;
@@ -301,12 +309,14 @@ setInterval(() => {
 export function startSiteSecurityFeed(client: Client) {
   setInterval(async () => {
     const guild = homeGuild(client);
-    if (!guild || !securityChannel(guild)) return;
+    const channel = guild ? siteChannel(guild) : undefined;
+    // Without its own room the events wait (the API keeps them a day); they are never mixed into the Discord room.
+    if (!guild || !channel) return;
     try {
       const res = await api().get<{ items: { id: number; embed: APIEmbed }[] }>("/api/internal/bot/community/security-feed");
       const posted: number[] = [];
       for (const item of res.data.items) {
-        await alert(guild, item.embed);
+        await channel.send({ embeds: [item.embed] }).catch((error) => logBotError("site activity", error));
         posted.push(item.id);
       }
       if (posted.length) await api().post("/api/internal/bot/community/security-feed/ack", { ids: posted });

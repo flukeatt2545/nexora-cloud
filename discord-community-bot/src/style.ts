@@ -57,7 +57,7 @@ const ICONS: Record<string, string> = {
   owner: "👑", admin: "🛡️", moderator: "⚔️", staff: "🎫", vip: "💎", member: "✨", bots: "🤖",
   gamer: "🎮", music: "🎵", coder: "💻", artist: "🎨", student: "📚", updates: "🔔",
   // channels
-  "ยินดีต้อนรับ": "👋", "คนออก": "👋", welcome: "👋", sayonara: "👋", verify: "✅", roles: "🏷️", "เช็คยศ": "🏷️", "system status": "🛰️", links: "🔗", "ยืนยันตัวตน": "✅", "กฎ": "📜", "ประกาศ": "📢", "สถานะระบบ": "🛰️",
+  "ยินดีต้อนรับ": "👋", "คนออก": "👋", welcome: "👋", "web activity": "🌐", "discord activity": "🚨", sayonara: "👋", verify: "✅", roles: "🏷️", "เช็คยศ": "🏷️", "system status": "🛰️", links: "🔗", "ยืนยันตัวตน": "✅", "กฎ": "📜", "ประกาศ": "📢", "สถานะระบบ": "🛰️",
   "แชททั่วไป": "💬", "รูปภาพ": "🖼️", "คำสั่งบอท": "🤖", "สร้างห้องเสียง": "➕", "นั่งเล่น": "🛋️",
   "เปิด ticket": "🎫", "ticket log": "📝", "ห้องทีมงาน": "🛡️", "แจ้งเตือนความปลอดภัย": "🚨", "ตั้งค่าบอท": "⚙️",
   "บูสต์": "🚀", "ห้องบูสเตอร์": "💖", "สมาชิก": "👥", "ออนไลน์": "🟢", "เว็บ": "🌐",
@@ -126,7 +126,7 @@ const FIRST_EMOJI = /\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic
 const FRAME_CHARS = /[『』「」【】〔〕꒰꒱┊│|╭╮╰╯┈─━・·•⋆˚｡✦✧★☆:：\-_\s]+/gu;
 
 // English room names shown in bold capitals, as the bot builds them.
-const BOLD_CHANNELS = new Set(["welcome", "sayonara", "verify", "roles", "system status", "boost", "links"]);
+const BOLD_CHANNELS = new Set(["welcome", "sayonara", "verify", "roles", "system status", "web activity", "discord activity", "boost", "links"]);
 
 /** The words of a name, without emoji, frame, separators or fancy letters. */
 export function nameWords(raw: string) {

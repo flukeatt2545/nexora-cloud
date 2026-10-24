@@ -91,8 +91,10 @@ type communitySettings struct {
 	SecurityEnabled    bool   `json:"securityEnabled"`
 	SecurityChannelID  string `json:"securityChannelId"`
 	SecuritySiteEvents bool   `json:"securitySiteEvents"`
-	AntiNukeEnabled    bool   `json:"antiNukeEnabled"`
-	AntiSpamEnabled    bool   `json:"antiSpamEnabled"`
+	// The website's events get a room of their own, apart from what happens in Discord.
+	SecuritySiteChannelID string `json:"securitySiteChannelId"`
+	AntiNukeEnabled       bool   `json:"antiNukeEnabled"`
+	AntiSpamEnabled       bool   `json:"antiSpamEnabled"`
 	// Accounts younger than this many days are flagged on joining (and kicked during a raid). 0 = off.
 	NewAccountDays int `json:"newAccountDays"`
 }
@@ -226,7 +228,7 @@ func validateCommunitySettings(in communitySettings) (communitySettings, error) 
 		"หมวด Ticket": &in.TicketCategoryID, "ห้อง log Ticket": &in.TicketLogChannelID, "ห้องสร้างห้องเสียง": &in.TempHubChannelID,
 		"หมวดสถิติ": &in.StatsCategoryID, "ห้องจำนวนสมาชิก": &in.StatsMembersChannelID, "ห้องคนออนไลน์": &in.StatsOnlineChannelID,
 		"ห้องสถานะเว็บ": &in.StatsSiteChannelID, "ห้องแจ้งสถานะ": &in.StatusChannelID, "ยศที่แท็กตอนเว็บล่ม": &in.StatusMentionRoleID,
-		"ห้องแจ้งเตือนความปลอดภัย": &in.SecurityChannelID, "ห้องบูสต์": &in.BoostChannelID, "ห้องบูสเตอร์": &in.BoostLoungeChannelID,
+		"ห้องแจ้งเตือนความปลอดภัย": &in.SecurityChannelID, "ห้องกิจกรรมเว็บ": &in.SecuritySiteChannelID, "ห้องบูสต์": &in.BoostChannelID, "ห้องบูสเตอร์": &in.BoostLoungeChannelID,
 	}
 	for label, value := range single {
 		*value = strings.TrimSpace(*value)
@@ -758,7 +760,7 @@ func (s *server) botCommunityEvent(c *fiber.Ctx) error {
 // its security room. Only when that room is on and asks for website events.
 func (s *server) queueCommunitySecurity(ctx context.Context, event auditEvent) {
 	settings, _, _, err := s.loadCommunitySettings(ctx)
-	if err != nil || !settings.SecurityEnabled || !settings.SecuritySiteEvents || settings.SecurityChannelID == "" {
+	if err != nil || !settings.SecurityEnabled || !settings.SecuritySiteEvents || settings.SecuritySiteChannelID == "" {
 		return
 	}
 	embed, err := json.Marshal(buildDiscordEmbed(event))

@@ -63,7 +63,8 @@ const SLOTS: Slot[] = [
   { key: "statsMembersChannelId", label: "ห้องสถิติ: สมาชิก", kind: "voice" },
   { key: "statsOnlineChannelId", label: "ห้องสถิติ: ออนไลน์", kind: "voice" },
   { key: "statsSiteChannelId", label: "ห้องสถิติ: สถานะเว็บ", kind: "voice" },
-  { key: "securityChannelId", label: "ห้องแจ้งเตือนความปลอดภัย", kind: "text" },
+  { key: "securityChannelId", label: "ห้องแจ้งเตือนความปลอดภัย (กิจกรรมใน Discord)", kind: "text" },
+  { key: "securitySiteChannelId", label: "ห้องกิจกรรมเว็บ (เหตุการณ์ของเว็บ)", kind: "text" },
   { key: "boostChannelId", label: "ห้องบูสต์ (แผงความคืบหน้า)", kind: "text" },
   { key: "boostLoungeChannelId", label: "ห้องบูสเตอร์ (เฉพาะคนบูสต์)", kind: "text" },
 ];
@@ -83,7 +84,7 @@ const FEATURES: { key: keyof Settings; label: string; description: string }[] = 
   { key: "statusImage", label: "ภาพสถานะระบบ", description: "ภาพสถานะเว็บ API บอท อัปเดตเองในห้องแจ้งสถานะ" },
   { key: "boostEnabled", label: "ห้องบูสต์", description: "แถบความคืบหน้าบูสต์ สิทธิประโยชน์ และรายชื่อบูสเตอร์" },
   { key: "securityEnabled", label: "แจ้งเตือนความปลอดภัย", description: "เตะ แบน ลบห้อง/ยศ ให้ยศสิทธิ์สูง บอทใหม่ บัญชีเพิ่งสร้าง" },
-  { key: "securitySiteEvents", label: "เหตุการณ์ความปลอดภัยของเว็บ", description: "ส่งเหตุการณ์ NEXORA Security เข้าห้องแจ้งเตือน" },
+  { key: "securitySiteEvents", label: "เหตุการณ์ความปลอดภัยของเว็บ", description: "ส่งเหตุการณ์ NEXORA Security เข้าห้องกิจกรรมเว็บ (แยกจากห้อง Discord)" },
   { key: "antiNukeEnabled", label: "Anti-nuke", description: "ลบห้อง/ยศ หรือแบนรัว ๆ ถูกถอดยศและพักการพิมพ์" },
   { key: "antiSpamEnabled", label: "กันสแปมและคนเข้ารัว", description: "ลิงก์เชิญ แท็กเยอะ พิมพ์รัว และโหมดกัน raid" },
 ];
@@ -136,7 +137,7 @@ function homePage(current: Settings) {
       { name: `แจ้งเว็บล่ม ${on(current.statusEnabled)}`, value: `ห้อง ${slotText(current, "statusChannelId")} · ภาพ ${on(current.statusImage)}`, inline: true },
       { name: `บูสต์ ${on(current.boostEnabled)}`, value: `แผง ${slotText(current, "boostChannelId")} · ห้องบูสเตอร์ ${slotText(current, "boostLoungeChannelId")}`, inline: true },
       { name: `ความปลอดภัย ${on(current.securityEnabled)}`,
-        value: `ห้อง ${slotText(current, "securityChannelId")} · Anti-nuke ${on(current.antiNukeEnabled)} · กันสแปม ${on(current.antiSpamEnabled)}` },
+        value: `Discord ${slotText(current, "securityChannelId")} · เว็บ ${slotText(current, "securitySiteChannelId")}\nAnti-nuke ${on(current.antiNukeEnabled)} · กันสแปม ${on(current.antiSpamEnabled)}` },
       { name: "สิทธิ์", value: `ผู้ดูแลบอท ${slotText(current, "managerRoleIds")}\nใช้ Ticket/ห้องเสียงได้ ${current.usageRoleIds.length ? slotText(current, "usageRoleIds") : "ทุกคน"}` },
     );
   const features = new StringSelectMenuBuilder()
@@ -392,7 +393,7 @@ function mayWipe(member: GuildMember) {
 }
 
 const CHANNEL_KEYS: (keyof Settings)[] = ["welcomeChannelId", "leaveChannelId", "roleCheckChannelId", "verifyChannelId", "rolesChannelId", "boostChannelId", "boostLoungeChannelId", "ticketChannelId", "ticketCategoryId",
-  "ticketLogChannelId", "tempHubChannelId", "statsCategoryId", "statsMembersChannelId", "statsOnlineChannelId", "statsSiteChannelId", "statusChannelId", "securityChannelId"];
+  "ticketLogChannelId", "tempHubChannelId", "statsCategoryId", "statsMembersChannelId", "statsOnlineChannelId", "statsSiteChannelId", "statusChannelId", "securityChannelId", "securitySiteChannelId"];
 
 export async function onWipeSubmit(interaction: ModalSubmitInteraction) {
   const member = interaction.member as GuildMember;

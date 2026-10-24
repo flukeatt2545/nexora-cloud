@@ -60,6 +60,7 @@ function problems(guild: Guild): string[] {
   channel(current.tempHubChannelId, "ห้องสร้างห้องเสียง", current.tempVoiceEnabled);
   channel(current.statusChannelId, "ห้องแจ้งสถานะ", current.statusEnabled);
   channel(current.securityChannelId, "ห้องแจ้งเตือนความปลอดภัย", current.securityEnabled);
+  channel(current.securitySiteChannelId, "ห้องกิจกรรมเว็บ", current.securityEnabled && current.securitySiteEvents);
   if (current.securityEnabled && !me.permissions.has(PermissionFlagsBits.ViewAuditLog)) out.push("บอทยังไม่มีสิทธิ์ View Audit Log (แจ้งว่าใครลบห้อง/แบนใคร และ anti-nuke)");
   if ((current.antiNukeEnabled || current.antiSpamEnabled) && !me.permissions.has(PermissionFlagsBits.ModerateMembers)) out.push("บอทยังไม่มีสิทธิ์ Timeout Members (พักการพิมพ์คนที่สแปมหรือทำลายเซิร์ฟ)");
   if (current.securityEnabled && !current.securityChannelId) out.push("เปิดแจ้งเตือนความปลอดภัยแล้ว แต่ยังไม่ได้เลือกห้อง (กด สร้างที่ขาดให้ ใน /setup)");

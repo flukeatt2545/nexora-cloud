@@ -315,7 +315,11 @@ export async function buildMissing(guild: Guild): Promise<Plan & { problems: str
     await ensureChannel(guild, plan, category, { name: "ห้องทีมงาน", type: text, audience: "staff", aliases: ["staff chat"] });
     await ensureChannel(guild, plan, category, { name: "คำสั่งบอท", type: text, audience: "staff", aliases: ["bot commands", "commands", "ตั้งค่าบอท", "bot setup"] });
     if (current.securityEnabled) {
-      await ensureChannel(guild, plan, category, { key: "securityChannelId", name: "แจ้งเตือนความปลอดภัย", type: text, audience: "staff", aliases: ["security", "security log", "แจ้งเตือน"] });
+      // What happens in Discord and what happens on the website are two rooms.
+      await ensureChannel(guild, plan, category, { key: "securityChannelId", name: "แจ้งเตือนความปลอดภัย", type: text, audience: "staff", aliases: ["discord-activity", "security", "security log", "แจ้งเตือน"] });
+      if (current.securitySiteEvents) {
+        await ensureChannel(guild, plan, category, { key: "securitySiteChannelId", name: "web-activity", bold: true, type: text, audience: "staff", aliases: ["กิจกรรมเว็บ", "web activity", "web log"] });
+      }
     }
   });
 

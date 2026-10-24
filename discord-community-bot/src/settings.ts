@@ -57,6 +57,7 @@ export type Settings = {
   securityEnabled: boolean;
   securityChannelId: string;
   securitySiteEvents: boolean;
+  securitySiteChannelId: string;
   antiNukeEnabled: boolean;
   antiSpamEnabled: boolean;
   newAccountDays: number;
