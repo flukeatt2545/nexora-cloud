@@ -89,6 +89,11 @@ function card(color: number, title: string, description: string) {
   return brandEmbed(color).setAuthor({ name: `${BRAND} · SECURITY` }).setTitle(title).setDescription(description).setTimestamp(new Date());
 }
 
+/** Tells the security room that someone cleared messages (/clear). */
+export function announceCleanup(guild: Guild, who: GuildMember, scope: string, count: number) {
+  return alert(guild, card(COLOR.warn, "🧹 ลบข้อความ", `${who} ลบ **${count}** ข้อความ\nขอบเขต: ${scope}`));
+}
+
 function logEvent(kind: "nuke" | "spam" | "raid", guild: Guild, name: string, id: string, details: string[]) {
   void api().post("/api/internal/bot/community/event", { kind, guildId: guild.id, name, id, created: details }).catch((error) => logBotError("log security", error));
 }

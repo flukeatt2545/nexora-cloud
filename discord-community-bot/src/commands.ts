@@ -82,6 +82,19 @@ export const commands = [
       .addIntegerOption((option) => option.setName("count").setNameLocalizations({ th: "ห้อง" }).setDescription("1–5 (1 = ห้องแรกก็โดน)").setMinValue(1).setMaxValue(5).setRequired(true))),
 
   new SlashCommandBuilder()
+    .setName("clear")
+    .setNameLocalizations({ th: "ลบข้อความ" })
+    .setDescription("ลบข้อความในห้องนี้ ห้องที่เลือก หรือทุกห้อง (ทีมงานที่จัดการข้อความได้)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .setIntegrationTypes(ApplicationIntegrationType.GuildInstall)
+    .setContexts(InteractionContextType.Guild)
+    .addIntegerOption((option) => option.setName("count").setNameLocalizations({ th: "จำนวน" }).setDescription("ลบกี่ข้อความล่าสุด (ไม่ใส่ = ลบทั้งหมด จะถามยืนยันก่อน)").setMinValue(1).setMaxValue(1000))
+    .addChannelOption((option) => option.setName("room").setNameLocalizations({ th: "ห้อง" }).setDescription("ห้องที่จะลบ (ไม่ใส่ = ห้องนี้)")
+      .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread))
+    .addUserOption((option) => option.setName("member").setNameLocalizations({ th: "สมาชิก" }).setDescription("ลบเฉพาะข้อความของคนนี้"))
+    .addBooleanOption((option) => option.setName("everywhere").setNameLocalizations({ th: "ทุกห้อง" }).setDescription("ลบทุกห้องข้อความในเซิร์ฟ ข้ามห้อง log และ Ticket (เจ้าของ/Administrator)")),
+
+  new SlashCommandBuilder()
     .setName("ticket")
     .setDescription("จัดการ Ticket (ใช้ในห้อง Ticket)")
     .setIntegrationTypes(ApplicationIntegrationType.GuildInstall)

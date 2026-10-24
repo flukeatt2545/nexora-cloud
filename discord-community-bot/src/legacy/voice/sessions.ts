@@ -40,6 +40,38 @@ function who(member: GuildMember) {
   return { discordId: member.id, username: member.user.username, displayName: member.displayName };
 }
 
+// Finds the join/leave log channel of a server (set by places.ts, which keeps the list).
+type LogLookup = (guild: Guild) => GuildBasedChannel | undefined;
+let logOf: LogLookup = () => undefined;
+
+export function useVoiceLogLookup(lookup: LogLookup) {
+  logOf = lookup;
+}
+
+function roomName(channel: { name: string }) {
+  return `🔊 **${escapeMarkdown(channel.name || "ห้องเสียง")}**`;
+}
+
+/**
+ * The card for someone coming in or changing rooms, posted as it happens (leaving is posted with
+ * how long they stayed, see sessionEmbed). The avatar and name are in the header like there.
+ */
+export function joinEmbed(member: GuildMember, before: { name: string } | null, after: { name: string }) {
+  const moved = before !== null;
+  return new EmbedBuilder()
+    .setColor(COLOR.ok)
+    .setAuthor({ name: `${member.displayName} ${moved ? "ย้ายห้องเสียง" : "เข้าห้องเสียง"}`.slice(0, 256), iconURL: member.displayAvatarURL({ size: 64 }) })
+    .setDescription(moved ? `${roomName(before)} → ${roomName(after)}` : roomName(after))
+    .addFields({ name: "เวลา", value: `<t:${Math.floor(Date.now() / 1000)}:t>`, inline: true });
+}
+
+function announceJoin(guild: Guild, member: GuildMember, before: { name: string } | null, after: { name: string }) {
+  const log = logOf(guild);
+  if (!log?.isTextBased()) return;
+  void log.send({ embeds: [joinEmbed(member, before, after)], allowedMentions: { parse: [] }, flags: MessageFlags.SuppressNotifications })
+    .catch((error) => logBotError("post voice join", error));
+}
+
 export function onSessionVoiceState(oldState: VoiceState, newState: VoiceState) {
   const member = newState.member ?? oldState.member;
   if (!member || member.user.bot) return;
@@ -47,6 +79,7 @@ export function onSessionVoiceState(oldState: VoiceState, newState: VoiceState) 
   const after = counted(newState.channel);
   if (before?.id === after?.id) return;
   const guild = newState.guild;
+  if (after) announceJoin(guild, member, before, after);
   enqueue(`${guild.id}:${member.id}`, () => api().post("/api/internal/bot/voice/sessions/move", {
     guildId: guild.id,
     guildName: guild.name,

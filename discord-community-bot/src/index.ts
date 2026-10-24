@@ -24,6 +24,7 @@ import { onRoleCheckButton } from "./rolecheck";
 import { announceRestore, onAuditLogEntry, onSecurityJoin, onSecurityMessage, startSiteSecurityFeed } from "./security";
 import { loadSettings, settings, updateSettings } from "./settings";
 import { onProtectCommand } from "./guard";
+import { onPurgeButton, onPurgeCommand } from "./purge";
 import { isRoomChannel } from "./legacy/voice/rooms";
 import { noteChannelDeleted, onChannelRestored } from "./trust";
 import { CHANNEL_KEYS, onCreateCommand, onSetupCommand, onSetupComponent, onSetupText, onWipeSubmit } from "./setup";
@@ -231,6 +232,7 @@ async function route(interaction: Interaction) {
     if (interaction.commandName === "setup") await onSetupCommand(interaction);
     else if (interaction.commandName === "create") await onCreateCommand(interaction);
     else if (interaction.commandName === "protect") await onProtectCommand(interaction);
+    else if (interaction.commandName === "clear") await onPurgeCommand(interaction);
     else if (interaction.commandName === "ticket") await onTicketCommand(interaction);
     return;
   }
@@ -248,6 +250,7 @@ async function route(interaction: Interaction) {
     if (id === "cm:verify") return onVerify(interaction);
     if (id === "cm:ticket:open") return onTicketButton(interaction);
     if (id === "cm:rolecheck:me") return onRoleCheckButton(interaction);
+    if (id.startsWith("cm:purge:")) return onPurgeButton(interaction);
     if (id.startsWith("cm:ticket:claim:")) return onTicketClaim(interaction);
     if (id.startsWith("cm:ticket:close:")) return onTicketCloseButton(interaction);
   }

@@ -7,6 +7,7 @@ import {
   PermissionFlagsBits,
   escapeMarkdown,
   type Client,
+  type Guild,
   type GuildBasedChannel,
   type Message,
   type NonThreadGuildBasedChannel,
@@ -17,7 +18,7 @@ import { buildMessage, loadMessages, messageVersion, OLD_LOG_TITLE, type Message
 import { HUB_NAME, OLD_HUB_NAMES, rememberHub, setHubs } from "./rooms";
 import { protectSettings, reportProtection } from "./protect";
 import { channelRestored, isTrusted, wasThrowaway } from "../../trust";
-import { postSessionFeed } from "./sessions";
+import { postSessionFeed, useVoiceLogLookup } from "./sessions";
 import { COLOR } from "./ui";
 
 // Channels the bot uses, kept in the site's database so they survive a restart:
@@ -53,6 +54,22 @@ const retryAt = new Map<string, number>();
 const known = new Map<string, Place>();
 // Channels being put back after someone deleted them, so the check does not forget them meanwhile.
 const restoring = new Set<string>();
+
+/** A server's join/leave log channel, if one is set. */
+function voiceLogChannel(guild: Guild) {
+  for (const place of known.values()) {
+    if (place.kind !== "voicelog" || place.guildId !== guild.id) continue;
+    const channel = guild.channels.cache.get(place.channelId);
+    if (channel?.isTextBased()) return channel;
+  }
+  return undefined;
+}
+useVoiceLogLookup(voiceLogChannel);
+
+/** The rooms of the bot's panels and logs (a message clean-up leaves them alone). */
+export function botPlaceChannelIds() {
+  return [...known.values()].filter((place) => place.kind !== "hub").map((place) => place.channelId);
+}
 
 export async function addPlace(kind: "hub" | MessageKey, guildId: string, channelId: string, name: string, messageId = "", messageVersion = 0) {
   await api().post("/api/internal/bot/voice/places", { kind, guildId, channelId, name, messageId, messageVersion });
