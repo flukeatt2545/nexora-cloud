@@ -492,8 +492,6 @@ func main() {
 	admin.Get("/logs", requireRoles("superadmin"), s.adminLogs)
 	admin.Get("/settings", requireRoles("superadmin"), s.adminSettings)
 	admin.Patch("/settings", requireRoles("superadmin"), s.updateAdminSettings)
-	admin.Get("/site-theme", requireRoles("superadmin"), s.adminSiteTheme)
-	admin.Put("/site-theme", requireRoles("superadmin"), s.updateAdminSiteTheme)
 	admin.Get("/topups/summary", requireRoles("superadmin", "admin"), s.adminTopupSummary)
 	admin.Get("/topups/transactions", requireRoles("superadmin", "admin"), s.adminTopupTransactions)
 	admin.Get("/topups/transactions/:id", requireRoles("superadmin", "admin"), s.adminTopupTransaction)

@@ -36,20 +36,17 @@ type currentUser struct {
 }
 
 type publicSettings struct {
-	BrandName       string `json:"brandName"`
-	SiteTitle       string `json:"siteTitle"`
-	SiteTitleMode   string `json:"siteTitleMode"`
-	SiteDescription string `json:"siteDescription"`
-	OGTitle         string `json:"ogTitle"`
-	OGDescription   string `json:"ogDescription"`
-	OGImageURL      string `json:"ogImageUrl"`
-	OGCardType      string `json:"ogCardType"`
-	OGColor         string `json:"ogColor"`
-	PrimaryColor    string `json:"primaryColor"`
-	ThemeMode       string `json:"themeMode"`
-	// The look that is on today (halloween...), worked out from the admin's theme and
-	// date ranges. "default" is the plain look from the colour and mode above.
-	Theme               string   `json:"theme"`
+	BrandName           string   `json:"brandName"`
+	SiteTitle           string   `json:"siteTitle"`
+	SiteTitleMode       string   `json:"siteTitleMode"`
+	SiteDescription     string   `json:"siteDescription"`
+	OGTitle             string   `json:"ogTitle"`
+	OGDescription       string   `json:"ogDescription"`
+	OGImageURL          string   `json:"ogImageUrl"`
+	OGCardType          string   `json:"ogCardType"`
+	OGColor             string   `json:"ogColor"`
+	PrimaryColor        string   `json:"primaryColor"`
+	ThemeMode           string   `json:"themeMode"`
 	LogoURL             string   `json:"logoUrl"`
 	FaviconURL          string   `json:"faviconUrl"`
 	AuthBackgroundURL   string   `json:"authBackgroundUrl"`
@@ -486,7 +483,6 @@ func (s *server) publicSettingsHandler(c *fiber.Ctx) error {
 	settings.FaviconURL = s.sanitizeAssetURL(c, settings.FaviconURL)
 	settings.AuthBackgroundURL = s.sanitizeAssetURL(c, settings.AuthBackgroundURL)
 	settings.OGImageURL = s.sanitizeAssetURL(c, settings.OGImageURL)
-	settings.Theme = s.currentSiteTheme(c.Context())
 	settings.SessionTTLMinutes = 0
 	settings.SessionTTLSeconds = 0
 	settings.WebhookEnabled = false

@@ -7,13 +7,8 @@ import "./theme.css";
 import "./user-app.css";
 import "./dashboard/admin-overview.css";
 import ThemeLoader from "./ThemeLoader";
-import SiteScene from "./SiteScene";
 import ConsoleWarning from "./ConsoleWarning";
 import { brandVariables } from "./themeColor";
-import { SITE_THEMES, siteThemeBoot } from "./siteThemes";
-
-// What the page needs to know about each theme before the first paint: its colour mode and brand colour.
-const SITE_THEME_BOOT = Object.fromEntries(SITE_THEMES.map((theme) => [theme.id, [theme.mode, theme.primary]]));
 import { fetchServerApiJson } from "./runtime.server";
 
 export const viewport: Viewport = {
@@ -94,11 +89,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         {/* The rule is written for pages/_document; this root layout already loads the fonts on every page. */}
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" />
-        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: `try{var d=document.documentElement,t=localStorage.getItem("nexora-theme");if(t==="light"||t==="dark")d.dataset.theme=t;var c=localStorage.getItem("nexora-primary"),v=c&&(${brandVariables.toString()})(c);if(v)for(var k in v)d.style.setProperty(k,v[k]);(${siteThemeBoot.toString()})(${JSON.stringify(SITE_THEME_BOOT)},${brandVariables.toString()})}catch(e){}` }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: `try{var d=document.documentElement,t=localStorage.getItem("nexora-theme");if(t==="light"||t==="dark")d.dataset.theme=t;var c=localStorage.getItem("nexora-primary"),v=c&&(${brandVariables.toString()})(c);if(v)for(var k in v)d.style.setProperty(k,v[k])}catch(e){}` }} />
       </head>
       <body>
         <ThemeLoader />
-        <SiteScene />
         <ConsoleWarning />
         {children}
       </body>

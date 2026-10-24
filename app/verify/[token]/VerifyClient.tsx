@@ -2,11 +2,8 @@
 
 import { CircleAlert, ExternalLink, LoaderCircle } from "lucide-react";
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
-import { useFontStylesheet } from "../../fontLink";
 import { API_BASE } from "../../runtime";
 import "../verify.css";
-import { useSiteTheme } from "../../useSiteTheme";
-import { PanelDecor, THEME_TAG, ThemeBadgeIcon } from "../ThemeDecor";
 
 // The page a member opens from the verify button in Discord. The API decides what is checked
 // (backend/discord_verify.go); this page only shows the steps and talks to it. The look follows
@@ -138,9 +135,6 @@ function Shield() {
 }
 
 export default function VerifyClient({ token }: { token: string }) {
-  // The page wears the site theme that is on (Halloween...); the picture behind it is SiteScene's.
-  const theme = useSiteTheme();
-  useFontStylesheet(theme === "halloween" ? "https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=UnifrakturCook:wght@700&display=swap" : undefined);
   const started = useRef(false);
   const [view, setView] = useState<View>("loading");
   const [info, setInfo] = useState<Info | null>(null);
@@ -289,7 +283,7 @@ export default function VerifyClient({ token }: { token: string }) {
   let number = 0;
 
   return (
-    <main className={`vf${theme !== "default" ? ` is-${theme}` : ""}`} data-view={view}>
+    <main className="vf" data-view={view}>
       <div className="vf-bg" aria-hidden="true">
         <i className="vf-glow" />
         <i className="vf-lines" />
@@ -304,11 +298,10 @@ export default function VerifyClient({ token }: { token: string }) {
 
       <div className="vf-frame">
         <section className="vf-panel" aria-live="polite" aria-busy={view === "loading"}>
-          <PanelDecor theme={theme} />
           <header className="vf-top vf-in" style={step(0)}>
             <i className="vf-diamond" aria-hidden="true" />
             <b>NEXORA CLOUD</b>
-            <span>{THEME_TAG[theme] ?? "DISCORD VERIFY"}</span>
+            <span>DISCORD VERIFY</span>
           </header>
 
           <span className="vf-slice" style={{ "--y": "14%", "--h": "5%" } as CSSProperties} aria-hidden="true" />
@@ -347,7 +340,7 @@ export default function VerifyClient({ token }: { token: string }) {
                   : failed ? <span className="vf-bang">!</span>
                   : view === "loading" ? <LoaderCircle className="vf-spin" />
                   : avatar ? <img src={avatar} alt="" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.style.display = "none"; }} />
-                  : theme !== "default" ? <ThemeBadgeIcon theme={theme} /> : <Shield />}
+                  : <Shield />}
               </div>
               </div>
               {view === "done" && <span className="vf-burst">{Array.from({ length: 14 }, (_, index) => <i key={index} style={{ "--r": `${index * (360 / 14)}deg`, "--d": `${(index % 4) * 40}ms` } as CSSProperties} />)}</span>}
