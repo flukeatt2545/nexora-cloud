@@ -340,9 +340,9 @@ func (s *server) topupWithSlip(c *fiber.Ctx) error {
 }
 
 func checkSlipsReceiverMatches(result checkSlipsVerification, expected checkSlipsReceiver) bool {
-	if result.ReceiverMatch != nil && *result.ReceiverMatch {
-		return true
-	}
+	// The request asks the provider not to validate the receiver (receiver_validation_mode=none),
+	// so its receiver_match flag says nothing about this platform's account. The bank and the
+	// masked account number below are the check.
 	if result.Receiver == nil || result.Receiver.Account == nil || result.Receiver.Account.Masked == nil {
 		return false
 	}

@@ -145,9 +145,13 @@ function collectClientIps(): array
             $ips[] = $value;
         }
     }
-    $remote = trim((string)($_SERVER["REMOTE_ADDR"] ?? ""));
-    if ($remote !== "") {
-        $ips[] = $remote;
+    // REMOTE_ADDR is the proxy in front of phpMyAdmin, never the visitor. It is only a fallback
+    // when no forwarding header named the visitor at all (a local setup without a proxy header).
+    if (count($ips) === 0) {
+        $remote = trim((string)($_SERVER["REMOTE_ADDR"] ?? ""));
+        if ($remote !== "") {
+            $ips[] = $remote;
+        }
     }
     return array_values(array_unique($ips));
 }

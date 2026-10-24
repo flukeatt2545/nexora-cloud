@@ -325,6 +325,8 @@ func (s *server) setUserRole(c *fiber.Ctx) error {
 }
 
 func (s *server) revokeUserSessions(c *fiber.Ctx, userID int64) {
+	// A suspended, demoted or password-reset account must not keep a code-server token either.
+	_, _ = s.db.Exec(c.Context(), `UPDATE hosting_workspace_access_tokens SET revoked_at = COALESCE(revoked_at, NOW()) WHERE user_id = $1 AND revoked_at IS NULL`, userID)
 	rows, err := s.db.Query(c.Context(), `UPDATE user_sessions SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL RETURNING token_hash`, userID)
 	if err != nil {
 		return

@@ -138,9 +138,31 @@ func (s *server) recordStudentDiscordRevocation(ctx context.Context, studentCode
 	`, code, userID, strings.TrimSpace(discordUsername))
 }
 
+// revokeStudentSessions ends the sessions that student SSO created before tickets stopped signing
+// anyone in (migration 055 tagged them with the student code), so an unbind also cuts those.
+func (s *server) revokeStudentSessions(ctx context.Context, studentCode string) {
+	code := strings.TrimSpace(studentCode)
+	if code == "" || s.db == nil {
+		return
+	}
+	rows, err := s.db.Query(ctx, `UPDATE user_sessions SET revoked_at = NOW() WHERE LOWER(student_code) = LOWER($1) AND revoked_at IS NULL RETURNING token_hash`, code)
+	if err != nil {
+		log.Printf("[ERROR] revokeStudentSessions %q: %v", code, err)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var hash string
+		if rows.Scan(&hash) == nil && s.redis != nil {
+			s.redis.Del(ctx, "session:"+hash)
+		}
+	}
+}
+
 func (s *server) cutStudentLiveAccess(ctx context.Context, studentCode string, databaseID int64) {
 	s.expireStudentDatabaseTickets(ctx, databaseID)
 	s.revokeStudentWorkspaceTokens(ctx, studentCode)
+	s.revokeStudentSessions(ctx, studentCode)
 	if databaseID > 0 {
 		if err := s.rotateTenantDatabasePassword(ctx, databaseID); err != nil {
 			log.Printf("[ERROR] cutStudentLiveAccess rotate password for db %d: %v", databaseID, err)
@@ -1381,11 +1403,13 @@ func (s *server) consumeWorkspaceTicketWithTicket(c *fiber.Ctx, ticket string) e
 
 	ownerUser.Permissions = permissionsForRole(ownerUser.Role)
 
-	if err := s.createSession(c, &ownerUser); err != nil {
-		log.Printf("[ERROR] consumeWorkspaceTicket createSession failed: %v", err)
-		return fiber.NewError(fiber.StatusInternalServerError)
+	// The ticket opens the code workspace only. It used to log the redeemer in as the site owner,
+	// which handed a student the owner's whole account (a superadmin's, for sites they own) and
+	// could not be cut when the student was unbound. The workspace token below is all it needs.
+	var subdomain string
+	if err := s.db.QueryRow(c.Context(), `SELECT subdomain FROM hosting_sites WHERE public_id = $1 AND deleted_at IS NULL`, ticketData.SitePublicID).Scan(&subdomain); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(apiError{Error: "ไม่พบเว็บไซต์", Code: "site_not_found"})
 	}
-	s.db.Exec(c.Context(), `UPDATE users SET last_login_at = NOW() WHERE id = $1`, ownerUser.ID)
 
 	var logSiteID any = ticketData.SiteID
 	if ticketData.SiteID <= 0 {
@@ -1429,6 +1453,7 @@ func (s *server) consumeWorkspaceTicketWithTicket(c *fiber.Ctx, ticket string) e
 	return c.JSON(fiber.Map{
 		"success":        true,
 		"siteId":         ticketData.SitePublicID,
+		"subdomain":      subdomain,
 		"redirectUrl":    "/workspace?id=" + ticketData.SitePublicID,
 		"workspaceToken": workspaceToken,
 	})

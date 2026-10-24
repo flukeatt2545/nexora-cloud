@@ -156,7 +156,9 @@ func (s *server) provisionStalwartDomain(ctx context.Context, dbID int64, domain
 		}
 		existingID = found
 	}
-	enabled := status != "suspended"
+	// Only an approved domain is a local domain. A pending or unverified one, which any user can
+	// add by name, would otherwise change how mail to that domain is routed for every tenant.
+	enabled := status == "active"
 	if existingID != "" {
 		raw, err := s.stalwartMethod(ctx, "x:Domain/set", map[string]any{"update": map[string]any{
 			existingID: map[string]any{"isEnabled": enabled},

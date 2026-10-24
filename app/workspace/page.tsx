@@ -64,6 +64,19 @@ function WorkspaceContainerContent() {
           if (ticketData.siteId) {
             activeSiteId = ticketData.siteId;
           }
+
+          // A redeemed ticket no longer signs anyone in. It carries the workspace token itself,
+          // so go straight to the code host instead of asking the API for the site as a user.
+          if (ticketData.workspaceToken && ticketData.subdomain && isMounted) {
+            const host = typeof window !== "undefined" ? window.location.hostname : "nkn02.com";
+            const base = host.includes("localhost") ? "localhost" : "nkn02.com";
+            const proto = typeof window !== "undefined" ? window.location.protocol : "https:";
+            const port = host.includes("localhost") && window.location.port ? `:${window.location.port}` : "";
+            const direct = `${proto}//code-${ticketData.subdomain}.${base}${port}?token=${encodeURIComponent(ticketData.workspaceToken)}`;
+            setTargetUrl(direct);
+            window.location.replace(direct);
+            return;
+          }
         }
 
         if (!activeSiteId) {

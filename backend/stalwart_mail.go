@@ -12,6 +12,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	mailaddr "net/mail"
 	"net/textproto"
 	"net/url"
 	"strings"
@@ -314,7 +315,8 @@ func writeMailAddressHeader(values []mailRecipientInput) string {
 	for _, value := range values {
 		address := normalizeRecipient(value.Address)
 		if strings.TrimSpace(value.Name) != "" {
-			result = append(result, mime.QEncoding.Encode("UTF-8", strings.TrimSpace(value.Name))+" <"+address+">")
+			// Quote the name: a bare name such as 'x <a@b>, y' would add recipients to the header.
+			result = append(result, (&mailaddr.Address{Name: strings.TrimSpace(value.Name), Address: address}).String())
 		} else {
 			result = append(result, address)
 		}
@@ -322,7 +324,26 @@ func writeMailAddressHeader(values []mailRecipientInput) string {
 	return strings.Join(result, ", ")
 }
 
+// headerToken makes a caller-supplied header value one line: any CR, LF or NUL is dropped so the
+// value cannot start a new header (Bcc, Cc, ...).
+func headerToken(value string) string {
+	return strings.TrimSpace(strings.Map(func(r rune) rune {
+		if r == '\r' || r == '\n' || r == 0 {
+			return -1
+		}
+		return r
+	}, value))
+}
+
 func buildStalwartEML(from, fromName, subject, textBody, htmlBody, inReplyTo string, references []string, input mailComposeInput) ([]byte, int64, error) {
+	inReplyTo = headerToken(inReplyTo)
+	cleanRefs := make([]string, 0, len(references))
+	for _, ref := range references {
+		if ref = headerToken(ref); ref != "" {
+			cleanRefs = append(cleanRefs, ref)
+		}
+	}
+	references = cleanRefs
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	headers := []string{

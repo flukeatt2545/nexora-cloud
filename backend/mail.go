@@ -268,6 +268,11 @@ func (s *server) createMailDomain(c *fiber.Ctx) error {
 	if domain == "" {
 		return c.Status(400).JSON(apiError{Error: "รูปแบบโดเมนไม่ถูกต้อง", Code: "invalid_domain"})
 	}
+	// The platform's own names (the hosting domain and everything under it) are not for users to
+	// claim: the Cloudflare token behind auto-configure writes DNS in that zone.
+	if base := strings.ToLower(strings.TrimSpace(s.cfg.cfDomain)); base != "" && (domain == base || strings.HasSuffix(domain, "."+base)) && actor.Role != "superadmin" {
+		return c.Status(403).JSON(apiError{Error: "ไม่สามารถเพิ่มโดเมนของแพลตฟอร์มได้", Code: "reserved_domain"})
+	}
 	kind := "custom"
 	if input.Kind == "platform" {
 		if actor.Role != "superadmin" {
@@ -326,6 +331,11 @@ func (s *server) verifyMailDomain(c *fiber.Ctx) error {
 
 func (s *server) autoConfigureMailDomainDNS(c *fiber.Ctx) error {
 	actor := current(c)
+	// This writes DNS with the platform's Cloudflare token, which only holds the platform's own
+	// zones. A user's domain is not in them, so only platform admins may use it.
+	if actor.Role != "admin" && actor.Role != "superadmin" {
+		return c.Status(403).JSON(apiError{Error: "ตั้งค่า DNS อัตโนมัติได้เฉพาะผู้ดูแลระบบ กรุณาเพิ่มเรคคอร์ด DNS ด้วยตนเอง", Code: "forbidden"})
+	}
 	var dbID int64
 	var providerID, domain string
 	err := s.db.QueryRow(c.Context(), `SELECT id,COALESCE(provider_domain_id,''),domain FROM mail_domains WHERE public_id=$1 AND deleted_at IS NULL AND (owner_user_id=$2 OR $3 IN ('admin','superadmin'))`, c.Params("id"), actor.ID, actor.Role).Scan(&dbID, &providerID, &domain)

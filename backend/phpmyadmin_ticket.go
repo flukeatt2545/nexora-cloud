@@ -149,7 +149,9 @@ func ticketIPMatches(storedHash string, ips []string) bool {
 			continue
 		}
 		seen[ip] = true
-		if subtle.ConstantTimeCompare([]byte(storedHash), []byte(hashBinding(ip))) == 1 || isPrivateIP(ip) {
+		// Only the requester's own address matches. A private address used to pass for anyone,
+		// and phpMyAdmin's REMOTE_ADDR (the proxy's container address) is always private.
+		if subtle.ConstantTimeCompare([]byte(storedHash), []byte(hashBinding(ip))) == 1 {
 			return true
 		}
 	}

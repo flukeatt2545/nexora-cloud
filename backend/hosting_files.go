@@ -13,6 +13,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/gofiber/fiber/v2"
@@ -75,7 +76,19 @@ func (s *server) latestHostingSourceKey(ctx context.Context, siteID int64) (stri
 	return key, nil
 }
 
+// hostingSourceSlots bounds how many source archives are inflated into memory at once. One
+// archive can inflate to 1 GiB, and the API process is shared by every tenant.
+var hostingSourceSlots = make(chan struct{}, 3)
+
 func (s *server) loadHostingSource(ctx context.Context, siteID int64) (map[string]sourceFile, error) {
+	select {
+	case hostingSourceSlots <- struct{}{}:
+		defer func() { <-hostingSourceSlots }()
+	case <-time.After(15 * time.Second):
+		return nil, errors.New("source archives are busy, try again")
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 	key, err := s.latestHostingSourceKey(ctx, siteID)
 	if err != nil {
 		return nil, err

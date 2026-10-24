@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -89,10 +90,20 @@ type siteAccess struct {
 
 func normalizeSubdomain(value string) (string, bool) {
 	value = strings.ToLower(strings.TrimSpace(value))
-	if len(value) < 3 || len(value) > 63 || reservedSubdomains[value] || !subdomainPattern.MatchString(value) {
+	// "code-<x>" is the code-server host of site <x> (the gateway and the TLS check strip the
+	// prefix), so a site named that way could never be reached and <x> would take over its host.
+	if len(value) < 3 || len(value) > 63 || reservedSubdomains[value] || strings.HasPrefix(value, "code-") || !subdomainPattern.MatchString(value) {
 		return "", false
 	}
 	return value, true
+}
+
+// platformBaseDomain is the hosting domain whose names belong to the platform and its tenants.
+func platformBaseDomain() string {
+	if value := strings.ToLower(strings.TrimSpace(os.Getenv("CF_HOSTING_DOMAIN"))); value != "" {
+		return strings.TrimSuffix(value, ".")
+	}
+	return "nkn02.com"
 }
 
 func normalizeCustomDomain(value string) (string, bool) {
@@ -101,6 +112,11 @@ func normalizeCustomDomain(value string) (string, bool) {
 		return "", true
 	}
 	if len(value) > 253 || !domainPattern.MatchString(value) {
+		return "", false
+	}
+	// The platform's own names, and every tenant's <subdomain>.<base> host, are not custom domains:
+	// a claim there would be served under a name another site or the platform already uses.
+	if base := platformBaseDomain(); value == base || strings.HasSuffix(value, "."+base) {
 		return "", false
 	}
 	return value, true
@@ -702,6 +718,11 @@ func (s *server) addHostingMember(c *fiber.Ctx) error {
 	`, access.DBID, userID, body.Role, actor.ID); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError)
 	}
+	if body.Role == "viewer" {
+		if err := revokeHostingWorkspaceTokens(c.Context(), tx, access.DBID, userID); err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError)
+		}
+	}
 	if err := insertHostingOperation(c.Context(), tx, access.DBID, actor.ID, "member.upsert", key, hash, publicID); err != nil {
 		return hostingConflict(c, err)
 	}
@@ -750,6 +771,9 @@ func (s *server) removeHostingMember(c *fiber.Ctx) error {
 	var subdomain string
 	_ = tx.QueryRow(c.Context(), "SELECT subdomain FROM hosting_sites WHERE id=$1", access.DBID).Scan(&subdomain)
 	if _, err := tx.Exec(c.Context(), `DELETE FROM hosting_site_members WHERE site_id=$1 AND user_id=$2`, access.DBID, userID); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError)
+	}
+	if err := revokeHostingWorkspaceTokens(c.Context(), tx, access.DBID, userID); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError)
 	}
 	if err := insertHostingOperation(c.Context(), tx, access.DBID, actor.ID, "member.remove", key, hash, publicID); err != nil {
@@ -1187,4 +1211,15 @@ func (s *server) canManageSite(ctx context.Context, siteID int64, user *currentU
 	var count int
 	err := s.db.QueryRow(ctx, `SELECT count(*) FROM hosting_sites s LEFT JOIN hosting_site_members member ON member.site_id = s.id WHERE s.id = $1 AND (s.owner_user_id = $2 OR (member.user_id = $2 AND member.role != 'viewer'))`, siteID, user.ID).Scan(&count)
 	return err == nil && count > 0
+}
+
+// revokeHostingWorkspaceTokens ends a user's code-server tokens for one site. The gateway only
+// checks the token row, so losing site access (removed, made a viewer) has to revoke it here.
+func revokeHostingWorkspaceTokens(ctx context.Context, tx pgx.Tx, siteID, userID int64) error {
+	_, err := tx.Exec(ctx, `
+		UPDATE hosting_workspace_access_tokens
+		SET revoked_at = COALESCE(revoked_at, NOW())
+		WHERE site_id = $1 AND user_id = $2 AND revoked_at IS NULL
+	`, siteID, userID)
+	return err
 }

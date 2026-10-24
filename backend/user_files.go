@@ -1920,7 +1920,7 @@ func (s *server) loadPublicSharedCategory(c *fiber.Ctx, token string) (*publicSh
 		return nil, c.Status(404).JSON(apiError{Error: "ไม่พบลิงก์นี้"})
 	}
 	item := &publicSharedCategory{}
-	err := s.db.QueryRow(c.Context(), `SELECT s.category_id,COALESCE(s.owner_user_id,0),s.is_admin_share,c.name,s.share_expires_at FROM user_file_category_shares s JOIN user_file_categories c ON c.id=s.category_id WHERE s.share_token=$1 AND s.share_enabled=TRUE AND (s.share_expires_at IS NULL OR s.share_expires_at>NOW())`, token).Scan(&item.CategoryID, &item.OwnerID, &item.IsAdmin, &item.Name, &item.ExpiresAt)
+	err := s.db.QueryRow(c.Context(), `SELECT s.category_id,COALESCE(s.owner_user_id,0),s.is_admin_share,c.name,s.share_expires_at FROM user_file_category_shares s JOIN user_file_categories c ON c.id=s.category_id WHERE s.share_token=$1 AND s.share_enabled=TRUE AND c.is_visible=TRUE AND (s.share_expires_at IS NULL OR s.share_expires_at>NOW())`, token).Scan(&item.CategoryID, &item.OwnerID, &item.IsAdmin, &item.Name, &item.ExpiresAt)
 	if err == nil {
 		return item, nil
 	}
@@ -2047,7 +2047,7 @@ func (s *server) getPublicSharedUserFileCategory(c *fiber.Ctx) error {
 	}
 
 	// 2. Load Files
-	query := `SELECT public_id,original_name,content_type,size_bytes,folder_id,password_enabled,created_at FROM user_files WHERE category_id=$1 AND is_visible=TRUE AND deleted_at IS NULL`
+	query := `SELECT public_id,original_name,content_type,size_bytes,folder_id,password_enabled,created_at FROM user_files WHERE category_id=$1 AND is_visible=TRUE AND deleted_at IS NULL AND (folder_id IS NULL OR folder_id IN (SELECT id FROM user_file_folders WHERE is_visible=TRUE))`
 	args := []any{item.CategoryID}
 	if !item.IsAdmin {
 		query += ` AND owner_user_id=$2`

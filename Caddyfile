@@ -122,6 +122,12 @@
 
 		@api_prefix path /api/*
 		handle @api_prefix {
+			# Login, OAuth, public share pages and webhooks never carry a large body. Only uploads do, and
+			# those are not matched here, so an anonymous caller cannot make the API buffer 264 MiB.
+			@small_body path /api/auth/* /api/public/* /api/webhooks/*
+			request_body @small_body {
+				max_size 1MB
+			}
 			reverse_proxy api:8080 {
 				trusted_proxies private_ranges 127.0.0.1/32 172.16.0.0/12 10.0.0.0/8 192.168.0.0/16
 			}
@@ -148,6 +154,19 @@
 	}
 
 	handle /api/* {
+		# Login, OAuth, public share pages and webhooks never carry a large body. Only uploads do, and
+		# those are not matched here, so an anonymous caller cannot make the API buffer 264 MiB.
+		@small_body path /api/auth/* /api/public/* /api/webhooks/*
+		request_body @small_body {
+			max_size 1MB
+		}
+		# The gate above lists a fixed set of hosts. Any other host that reaches the API (a custom
+		# domain, a direct request to the origin) gets the same lockdown check.
+		@api_ungated not host nkn02.com www.nkn02.com api.nkn02.com localhost 127.0.0.1
+		forward_auth @api_ungated api:8080 {
+			uri /api/internal/lockdown/gate
+			header_up X-Lockdown-Original-URI {uri}
+		}
 		reverse_proxy api:8080 {
 			trusted_proxies private_ranges 127.0.0.1/32 172.16.0.0/12 10.0.0.0/8 192.168.0.0/16
 		}

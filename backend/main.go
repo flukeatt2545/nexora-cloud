@@ -293,6 +293,16 @@ func main() {
 	app.Use(s.originGuard)
 	app.Use(s.ipBanGuard)
 
+	// /api/internal/* is for the bots and phpMyAdmin, which call the API directly. A request that
+	// came through the edge carries X-Forwarded-For; refuse it here as well, so these routes stay
+	// closed even if the edge's own block is bypassed. Caddy's gate check is the one exception.
+	app.Use(func(c *fiber.Ctx) error {
+		if strings.HasPrefix(c.Path(), "/api/internal/") && c.Path() != "/api/internal/lockdown/gate" && c.Get("X-Forwarded-For") != "" {
+			return c.SendStatus(fiber.StatusNotFound)
+		}
+		return c.Next()
+	})
+
 	app.Get("/health", s.health)
 	app.Get("/api/internal/lockdown/gate", s.lockdownGate)
 	app.Get("/api/status-page", s.apiStatusPage)
@@ -348,7 +358,7 @@ func main() {
 	publicFiles.Post("/:token/download", s.rateLimit("public_file_download", 60, time.Hour), s.downloadPublicSharedUserFile)
 	publicCategories := app.Group("/api/public/file-categories", sensitiveResponseHeaders)
 	publicCategories.Get("/:token", s.getPublicSharedUserFileCategory)
-	publicCategories.Post("/:token/folders/:folderId/unlock", s.unlockPublicSharedUserCategoryFolder)
+	publicCategories.Post("/:token/folders/:folderId/unlock", s.rateLimit("public_folder_unlock", 20, 10*time.Minute), s.unlockPublicSharedUserCategoryFolder)
 	publicCategories.Get("/:token/files/:id/download", s.rateLimit("public_category_file_download", 60, time.Hour), s.downloadPublicSharedUserCategoryFile)
 	publicCategories.Post("/:token/files/:id/download", s.rateLimit("public_category_file_download", 60, time.Hour), s.downloadPublicSharedUserCategoryFile)
 

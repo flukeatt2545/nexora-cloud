@@ -160,7 +160,15 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			resp.Header.Del("Server")
 			resp.Header.Del("X-Powered-By")
 			resp.Header.Del("X-Frame-Options")
-			resp.Header.Set("Content-Security-Policy", "frame-ancestors 'self' https://nkn02.com https://*.nkn02.com http://localhost:*")
+			// Only the platform's own pages may frame the workspace. Tenant sites live on sibling
+			// subdomains of the same domain, so a wildcard here let any of them frame it.
+			ancestors := []string{"'self'", "http://localhost:*"}
+			for _, base := range g.baseDomains {
+				if base != "localhost" {
+					ancestors = append(ancestors, "https://"+base, "https://www."+base)
+				}
+			}
+			resp.Header.Set("Content-Security-Policy", "frame-ancestors "+strings.Join(ancestors, " "))
 			return nil
 		}
 		r.Header.Set("X-Forwarded-Host", host)
@@ -218,6 +226,7 @@ func (g *gateway) lookup(ctx context.Context, host, subdomain string) (siteRoute
 		    ($1 <> '' AND LOWER(subdomain)=LOWER($1))
 		    OR (custom_domain IS NOT NULL AND LOWER(custom_domain)=LOWER($2))
 		  )
+		ORDER BY ($1 <> '' AND LOWER(subdomain)=LOWER($1)) DESC, id
 		LIMIT 1
 	`, subdomain, host).Scan(
 		&route.publicID, &route.name, &route.port, &route.status, &route.health, &route.maintenance,

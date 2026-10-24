@@ -278,7 +278,10 @@ func (d *dockerClient) runBuildContainer(ctx context.Context, name, image, volum
 		"Env":        []string{"CI=true", "NODE_ENV=production", "HOME=/tmp"},
 		"Labels":     runtimeLabels("builder"),
 		"HostConfig": map[string]any{
-			"Binds":          []string{volume + ":/workspace:rw"},
+			"Binds": []string{volume + ":/workspace:rw"},
+			// Tenant install and build scripts run here. The default bridge reaches the host and its
+			// private network; the bot network is the one the egress firewall already covers.
+			"NetworkMode":    botNetworkName,
 			"ReadonlyRootfs": true,
 			"CapDrop":        []string{"ALL"},
 			"SecurityOpt":    []string{"no-new-privileges:true"},
