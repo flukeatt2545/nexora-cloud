@@ -19,7 +19,9 @@ const front = {
 };
 
 // Only some themes draw something above the headers (a string of lights, a pattern along the edge).
-const top = {} as Partial<Record<SiteThemeId, ReturnType<typeof lazy>>>;
+const top: Partial<Record<SiteThemeId, ReturnType<typeof lazy>>> = {
+  halloween: lazy(() => import("./siteScenes/HalloweenSlime")),
+};
 
 export default function SiteScene() {
   const [theme, setTheme] = useState<SiteThemeId>("default");

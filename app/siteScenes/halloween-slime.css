@@ -1,0 +1,27 @@
+/*
+ * Halloween: what the theme needs in CSS for the effects in halloween-fx.js and halloween-edges.js (slime
+ * on the banner and the cards, pumpkins, the skeleton-hand pointer) and for the cobwebs and spider that
+ * HalloweenSlime.tsx draws.
+ */
+
+/* The slime is a canvas inside the banner and the cards. The banner clips its slides at its edges, so its
+   top is opened up (a clip-path that reaches above it) for the pumpkins to stand on; the cards get room
+   under the drips so they do not cover the title. */
+html[data-site-theme="halloween"] .homepage-banner-carousel { overflow: visible; clip-path: inset(-90px 0 0 0); }
+html[data-site-theme="halloween"] .quick-grid a { padding-top: 34px !important; }
+
+/* ── Cobwebs and spider over the pages ──────────────── */
+.hs-web { position: absolute; width: clamp(72px, 11vw, 150px); height: auto; overflow: visible; fill: none; stroke: rgb(244 233 208 / .42); stroke-width: .8; }
+.hs-web-tl { left: 0; top: 0; }
+.hs-web-tr { right: 0; top: 0; scale: -1 1; }
+.hs-spider-wrap { position: absolute; left: clamp(22px, 5vw, 70px); top: 0; width: 26px; display: block; }
+.hs-spider-wrap .hw-spider { display: block; width: 26px; }
+.hs-spider-wrap .hw-spider i { display: block; width: 1px; height: 22px; margin: 0 auto -3px; background: rgb(244 233 208 / .55); transform-origin: 50% 0; animation: hw-thread 11s ease-in-out infinite; }
+.hs-spider-wrap .hw-spider svg { display: block; width: 26px; fill: #0a0612; filter: drop-shadow(0 0 1px rgb(244 233 208 / .5)); }
+
+/* The top layer is normally a thin strip; here it is the whole screen, so the webs are not cut off. */
+.st-top.st-halloween { inset: 0; height: auto; }
+
+/* The skeleton-hand pointer (halloween-fx.js) stands in for the mouse pointer, so the real one is hidden while it is on. */
+html.halloween-bone-cursor,
+html.halloween-bone-cursor * { cursor: none !important; }
