@@ -44,7 +44,8 @@ export function protectSettings() {
 
 type RuleKind = "link" | "invite" | "spam" | "mention" | "word";
 
-// The bot's rules are told apart from an admin's own by their creator and these names.
+// The bot's rules are told apart from an admin's own by these names (not by who made them: the
+// voice module used to be a bot of its own, and its rules were made by that bot).
 const RULE_NAMES: Record<RuleKind, string> = {
   link: "NEXORA · ลิงก์",
   invite: "NEXORA · ลิงก์เชิญ",
@@ -61,6 +62,9 @@ const NOTES: Record<RuleKind, string> = {
   mention: "แท็กคนเยอะเกินไปในข้อความเดียว",
   word: "ข้อความนี้มีคำที่เซิร์ฟนี้ไม่อนุญาต",
 };
+
+// Kinds of rule a server can have only one of.
+const ONE_PER_SERVER = new Set<AutoModerationRuleTriggerType>([AutoModerationRuleTriggerType.Spam, AutoModerationRuleTriggerType.MentionSpam]);
 
 const THAI = /[฀-๿]/;
 
@@ -127,7 +131,7 @@ export async function applyProtection(guild: Guild) {
     try {
       const rules = await guild.autoModerationRules.fetch();
       for (const [kind, wanted] of wantedRules(me.permissions.has(PermissionFlagsBits.ModerateMembers))) {
-        const mine = rules.find((rule) => rule.creatorId === me.id && rule.name === RULE_NAMES[kind]);
+        const mine = rules.find((rule) => rule.name === RULE_NAMES[kind]);
         try {
           if (!wanted) {
             if (mine) await mine.delete("ปิดใน ระบบป้องกันเซิร์ฟเวอร์");
@@ -138,6 +142,9 @@ export async function applyProtection(guild: Guild) {
             void _type;
             await mine.edit(changes);
             ruleKinds.set(mine.id, kind);
+          } else if (ONE_PER_SERVER.has(wanted.triggerType) && rules.some((rule) => rule.triggerType === wanted.triggerType)) {
+            // Discord allows one rule of this kind and the server's own is already there: leave it be.
+            problems.push(`ตั้งกฎ "${RULE_NAMES[kind].replace("NEXORA · ", "")}" ไม่ได้ เพราะเซิร์ฟมีกฎแบบนี้อยู่แล้ว (ไม่ใช่ของบอท บอทเลยไม่แตะ)`);
           } else {
             const made = await guild.autoModerationRules.create(wanted);
             ruleKinds.set(made.id, kind);
