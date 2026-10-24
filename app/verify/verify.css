@@ -1,7 +1,9 @@
 /*
  * The Discord verify page (/verify/[token]). It matches the welcome card the bot draws: black and
- * red, cut corners, big type, a ring around the picture. It is dark in both site themes on purpose,
- * the same way the card in Discord is; the accent is the site's brand colour (red on nkn02.com).
+ * red, cut corners, big type, a ring around the picture. It follows the site's light or dark mode
+ * (html[data-theme]): dark is the card in Discord, light is the same card on a pale page. Every colour
+ * that differs between the two is a --vf- token, set in .vf and overridden for light just below it.
+ * The accent is the site's brand colour (red on nkn02.com).
  */
 
 .vf {
@@ -11,9 +13,25 @@
   --vf-orange: color-mix(in srgb, var(--primary) 62%, #ff9a3d);
   --vf-deep: color-mix(in srgb, var(--primary) 42%, #000);
   --vf-ok: #3ddc97;
+  --vf-ok-rgb: 61 220 151;
+  --vf-ok-soft: #b7ffd9;
   --vf-ink: #fff;
+  --vf-text: #d3d3d8;
+  --vf-strong: #f3f3f5;
+  --vf-todo: #cdcdd2;
+  --vf-brand-ink: #e9e9ec;
   --vf-dim: #a39da1;
   --vf-line: rgba(255, 255, 255, .12);
+  --vf-page: #060508;
+  --vf-panel: linear-gradient(135deg, #0a0708 0%, #120609 58%, #1b070d 100%);
+  --vf-core: #050405;
+  --vf-tint: rgba(255, 255, 255, .035);
+  --vf-tint-edge: rgba(255, 255, 255, .1);
+  --vf-well: rgba(0, 0, 0, .25);
+  --vf-well-edge: rgba(255, 255, 255, .2);
+  --vf-alert-ink: color-mix(in srgb, var(--danger) 40%, #fff);
+  --vf-glitch-blend: screen;
+  --vf-mark-a: .15;
   --vf-cut: clamp(18px, 4vw, 30px);
   --vf-badge: clamp(112px, 24vw, 224px);
   position: relative;
@@ -24,7 +42,7 @@
   place-items: center;
   padding: max(16px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   overflow: hidden;
-  background: #060508;
+  background: var(--vf-page);
   color: var(--vf-ink);
   font-family: inherit;
 }
@@ -47,7 +65,7 @@
 /* The big outlined name behind the card: three rows that each drift sideways on their own (the page's script picks where to and how long, VerifyClient.tsx) */
 .vf-mark {
   position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: clamp(0px, .8vw, 12px); overflow: hidden;
-  color: transparent; -webkit-text-stroke: 2px rgb(var(--vf-rgb) / .15);
+  color: transparent; -webkit-text-stroke: 2px rgb(var(--vf-rgb) / var(--vf-mark-a));
   user-select: none;
 }
 .vf-mark span {
@@ -80,7 +98,7 @@
   clip-path: polygon(0 0, calc(100% - var(--vf-cut) + .41px) 0, 100% calc(var(--vf-cut) - .41px), 100% 100%, calc(var(--vf-cut) - .41px) 100%, 0 calc(100% - var(--vf-cut) + .41px));
   background:
     radial-gradient(60% 80% at 92% 30%, rgb(var(--vf-rgb) / .18), transparent 70%),
-    linear-gradient(135deg, #0a0708 0%, #120609 58%, #1b070d 100%);
+    var(--vf-panel);
 }
 .vf-panel::before {
   content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
@@ -101,7 +119,7 @@
 
 /* Brand line */
 .vf-top { display: flex; align-items: center; gap: 12px; }
-.vf-top b { color: #e9e9ec; font-size: 13px; font-weight: 700; letter-spacing: .32em; } /* theme-ok: this page is dark in both themes */
+.vf-top b { color: var(--vf-brand-ink); font-size: 13px; font-weight: 700; letter-spacing: .32em; }
 .vf-top span { margin-left: auto; color: var(--vf-dim); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: .18em; }
 .vf-diamond { width: 12px; height: 12px; flex: none; background: var(--vf-red); transform: rotate(45deg); box-shadow: 0 0 14px rgb(var(--vf-rgb) / .8); animation: vf-blink 2.6s ease-in-out infinite; }
 
@@ -109,7 +127,7 @@
 .vf-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: clamp(16px, 4vw, 48px); }
 .vf-copy { display: grid; justify-items: start; gap: 12px; min-width: 0; }
 .vf-kicker { margin: 0; color: var(--vf-red-soft); font-family: var(--font-gaming, inherit); font-size: clamp(1.05rem, 2.4vw, 1.5rem); font-weight: 600; }
-.vf-title { margin: 0; max-width: 100%; color: #fff; font-family: var(--font-gaming, inherit); font-size: clamp(2.5rem, 8.4vw, 4.9rem); font-weight: 800; line-height: 1.04; overflow-wrap: anywhere; }
+.vf-title { margin: 0; max-width: 100%; color: var(--vf-ink); font-family: var(--font-gaming, inherit); font-size: clamp(2.5rem, 8.4vw, 4.9rem); font-weight: 800; line-height: 1.04; overflow-wrap: anywhere; }
 .vf-title.is-long { font-size: clamp(1.9rem, 6vw, 3.3rem); }
 /* One word with no spaces: keep it on one line, smaller if the column is narrow (--vf-n = letters that take width) */
 .vf-copy { container-type: inline-size; width: 100%; } /* width: containment stops it sizing to its text, so a centred grid would shrink it to nothing */
@@ -121,9 +139,9 @@
 .vf-facts div { min-width: 0; padding-right: 22px; }
 .vf-facts div + div { padding-left: 22px; border-left: 1px solid var(--vf-line); }
 .vf-facts dt { margin: 0 0 2px; color: var(--vf-dim); font-size: 13px; }
-.vf-facts dd { margin: 0; color: #fff; font-family: var(--font-gaming, inherit); font-size: clamp(1.1rem, 2.6vw, 1.55rem); font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.vf-facts dd { margin: 0; color: var(--vf-ink); font-family: var(--font-gaming, inherit); font-size: clamp(1.1rem, 2.6vw, 1.55rem); font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
 .vf-facts em { color: var(--vf-dim); font-style: normal; font-weight: 500; }
-.vf-lead { margin: 0; max-width: 46ch; color: #d3d3d8; font-size: clamp(.95rem, 1.9vw, 1.08rem); line-height: 1.75; } /* theme-ok: this page is dark in both themes */
+.vf-lead { margin: 0; max-width: 46ch; color: var(--vf-text); font-size: clamp(.95rem, 1.9vw, 1.08rem); line-height: 1.75; }
 
 /* The badge: a picture (or a shield) in a ring, with a dashed ring turning slowly around it */
 .vf-badge { --ra: var(--vf-red); --rb: var(--vf-orange); position: relative; width: var(--vf-badge); height: var(--vf-badge); flex: none; }
@@ -137,7 +155,7 @@
 .vf-core {
   position: absolute; inset: 17%; display: grid; place-items: center; overflow: hidden; border-radius: 50%;
   border: 4px solid transparent;
-  background: linear-gradient(#050405, #050405) padding-box, linear-gradient(135deg, var(--rb), var(--ra)) border-box;
+  background: linear-gradient(var(--vf-core), var(--vf-core)) padding-box, linear-gradient(135deg, var(--rb), var(--ra)) border-box;
   box-shadow: 0 0 40px color-mix(in srgb, var(--ra) 38%, transparent);
   animation: vf-glowing 3.4s ease-in-out infinite;
 }
@@ -149,8 +167,8 @@
 .vf-check { width: 52%; height: 52%; fill: none; stroke: var(--vf-ok); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 .vf-check path { stroke-dasharray: 30; animation: vf-draw-once .65s cubic-bezier(.3, .7, .2, 1) .25s both; }
 .vf-badge.is-loading .vf-ring-arc { animation-duration: 1.4s; }
-.vf-badge.is-done { --ra: var(--vf-ok); --rb: #b7ffd9; }
-.vf-badge.is-done .vf-ring-dash { border-color: rgba(61, 220, 151, .4); }
+.vf-badge.is-done { --ra: var(--vf-ok); --rb: var(--vf-ok-soft); }
+.vf-badge.is-done .vf-ring-dash { border-color: rgb(var(--vf-ok-rgb) / .4); }
 .vf-badge.is-failed .vf-ring-arc { animation: none; border-color: var(--ra); opacity: .55; filter: none; }
 .vf-badge.is-failed .vf-core { animation: none; }
 .vf-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
@@ -164,16 +182,16 @@
 .vf-steps { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .vf-steps li {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px;
-  padding: 11px 14px 11px 12px; border-left: 3px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .035);
+  padding: 11px 14px 11px 12px; border-left: 3px solid var(--vf-tint-edge); background: var(--vf-tint);
   transition: background-color .3s ease, border-color .3s ease;
 }
 .vf-steps li[data-state="now"] { border-left-color: var(--vf-red); background: rgb(var(--vf-rgb) / .09); }
-.vf-steps li[data-state="done"] { border-left-color: var(--vf-ok); background: rgba(61, 220, 151, .07); }
+.vf-steps li[data-state="done"] { border-left-color: var(--vf-ok); background: rgb(var(--vf-ok-rgb) / .07); }
 .vf-steps div { display: grid; gap: 1px; min-width: 0; }
-.vf-steps b { color: #f3f3f5; font-size: 15px; font-weight: 600; line-height: 1.4; } /* theme-ok: this page is dark in both themes */
+.vf-steps b { color: var(--vf-strong); font-size: 15px; font-weight: 600; line-height: 1.4; }
 .vf-steps small { color: var(--vf-dim); font-size: 13px; line-height: 1.45; }
 .vf-steps em { padding: 2px 10px; border: 1px solid var(--vf-line); color: var(--vf-dim); font-family: var(--font-gaming, inherit); font-size: 12px; font-style: normal; font-weight: 500; line-height: 1.5; white-space: nowrap; }
-.vf-steps li[data-state="todo"] b { color: #cdcdd2; } /* theme-ok: this page is dark in both themes */
+.vf-steps li[data-state="todo"] b { color: var(--vf-todo); }
 .vf-node {
   width: 32px; height: 32px; display: grid; place-items: center;
   clip-path: polygon(30% 0, 100% 0, 100% 70%, 70% 100%, 0 100%, 0 30%);
@@ -183,11 +201,11 @@
 .vf-node i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .7; }
 .vf-node .vf-check { width: 20px; height: 20px; stroke-width: 3; }
 .vf-steps li[data-state="now"] .vf-node { background: var(--vf-red); color: #fff; animation: vf-pulse 2s ease-in-out infinite; }
-.vf-steps li[data-state="done"] .vf-node { background: rgba(61, 220, 151, .16); }
+.vf-steps li[data-state="done"] .vf-node { background: rgb(var(--vf-ok-rgb) / .16); }
 
-.vf-captcha { display: grid; place-items: center; min-height: 86px; padding: 12px; border: 1px dashed rgba(255, 255, 255, .2); background: rgba(0, 0, 0, .25); }
+.vf-captcha { display: grid; place-items: center; min-height: 86px; padding: 12px; border: 1px dashed var(--vf-well-edge); background: var(--vf-well); }
 .vf-captcha-box { min-height: 65px; max-width: 100%; }
-.vf-captcha.is-ok { border-style: solid; border-color: rgba(61, 220, 151, .45); background: rgba(61, 220, 151, .06); }
+.vf-captcha.is-ok { border-style: solid; border-color: rgb(var(--vf-ok-rgb) / .45); background: rgb(var(--vf-ok-rgb) / .06); }
 .vf-captcha.is-ok .vf-captcha-box { position: absolute; width: 1px; height: 1px; min-height: 0; overflow: hidden; opacity: 0; pointer-events: none; }
 .vf-captcha { position: relative; }
 .vf-captcha-ok { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0; min-height: 62px; color: var(--vf-ok); font-size: 15px; font-weight: 600; animation: vf-in .4s ease both; }
@@ -195,7 +213,7 @@
 
 .vf-alert {
   display: flex; align-items: flex-start; gap: 9px; margin: 0; padding: 11px 13px;
-  border-left: 3px solid var(--danger); background: rgb(var(--danger-rgb) / .12); color: color-mix(in srgb, var(--danger) 40%, #fff); font-size: 14px; line-height: 1.55;
+  border-left: 3px solid var(--danger); background: rgb(var(--danger-rgb) / .12); color: var(--vf-alert-ink); font-size: 14px; line-height: 1.55;
   animation: vf-shake .5s cubic-bezier(.3, .6, .3, 1) both;
 }
 .vf-alert svg { flex: none; margin-top: 3px; }
@@ -215,7 +233,7 @@
 }
 .vf-btn:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.1) saturate(1.1); }
 .vf-btn:active:not(:disabled) { transform: translateY(0); filter: brightness(.96); }
-.vf-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.vf-btn:focus-visible { outline: 2px solid var(--vf-ink); outline-offset: 3px; }
 .vf-btn:disabled { cursor: not-allowed; filter: grayscale(.7) brightness(.65); }
 .vf-btn:disabled::after { animation: none; opacity: 0; }
 
@@ -279,8 +297,8 @@
 
 /* Done: the whole headline turns green, like the ring */
 .vf[data-view="done"] .vf-kicker { color: var(--vf-ok); }
-.vf[data-view="done"] .vf-bar { background: linear-gradient(90deg, var(--vf-ok), #b7ffd9); }
-.vf[data-view="done"] .vf-diamond { background: var(--vf-ok); box-shadow: 0 0 14px rgba(61, 220, 151, .8); }
+.vf[data-view="done"] .vf-bar { background: linear-gradient(90deg, var(--vf-ok), var(--vf-ok-soft)); }
+.vf[data-view="done"] .vf-diamond { background: var(--vf-ok); box-shadow: 0 0 14px rgb(var(--vf-ok-rgb) / .8); }
 
 /*
  * Signal glitch. Every 6 seconds (after a pause at the start) the whole screen stutters for about
@@ -295,10 +313,42 @@
   --vf-glitch: 6s steps(1, end) 2s infinite;
 }
 
+/* Light mode: the same card on a pale page. Text goes dark, the green and the pale red are deepened to stay readable, and the glitch layers multiply instead of screen (a screen blend vanishes on white). */
+html[data-theme="light"] .vf {
+  --vf-red-soft: color-mix(in srgb, var(--primary) 88%, #000);
+  --vf-ok: #0e9f63;
+  --vf-ok-rgb: 14 159 99;
+  --vf-ok-soft: #5fd9a3;
+  --vf-ink: #17090c;
+  --vf-text: #4c4044;
+  --vf-strong: #1d1215;
+  --vf-todo: #52464a;
+  --vf-brand-ink: #2b1c20;
+  --vf-dim: #6c6064;
+  --vf-line: rgba(23, 9, 12, .14);
+  --vf-page: #f6f2f3;
+  --vf-panel: linear-gradient(135deg, #ffffff 0%, #fcf3f4 58%, #f8e6e9 100%);
+  --vf-core: #ffffff;
+  --vf-tint: rgba(23, 9, 12, .035);
+  --vf-tint-edge: rgba(23, 9, 12, .12);
+  --vf-well: rgba(23, 9, 12, .04);
+  --vf-well-edge: rgba(23, 9, 12, .22);
+  --vf-alert-ink: color-mix(in srgb, var(--danger) 72%, #000);
+  --vf-glitch-cool: #0a9ab8;
+  --vf-glitch-blend: multiply;
+  --vf-mark-a: .22;
+}
+html[data-theme="light"] .vf-glow {
+  background:
+    radial-gradient(48% 56% at 82% 18%, rgb(var(--vf-rgb) / .20), transparent 62%),
+    radial-gradient(46% 58% at 8% 92%, rgb(var(--vf-rgb) / .12), transparent 66%);
+}
+html[data-theme="light"] .vf-crt { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .1) 0 1px, transparent 1px 3px), radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(var(--vf-rgb) / .12)); }
+
 .vf-title { position: relative; animation: vf-g-jolt var(--vf-glitch); }
 .vf-title::before, .vf-title::after {
   content: attr(data-text); position: absolute; inset: 0; opacity: 0; pointer-events: none; user-select: none;
-  overflow-wrap: anywhere; mix-blend-mode: screen;
+  overflow-wrap: anywhere; mix-blend-mode: var(--vf-glitch-blend);
 }
 .vf-title::before { color: var(--vf-red-soft); animation: vf-g-slice-a var(--vf-glitch); }
 .vf-title::after { color: var(--vf-glitch-cool); animation: vf-g-slice-b var(--vf-glitch); }
@@ -314,7 +364,7 @@
 .vf-bg .vf-wslice {
   position: absolute; left: 0; right: 0; top: var(--y); height: var(--h); opacity: 0;
   background: linear-gradient(90deg, transparent, rgb(var(--vf-rgb) / .3) 12%, rgb(var(--vf-rgb) / .12) 60%, transparent);
-  mix-blend-mode: screen; animation: vf-g-wbar var(--vf-glitch);
+  mix-blend-mode: var(--vf-glitch-blend); animation: vf-g-wbar var(--vf-glitch);
 }
 .vf-bg .vf-wslice.is-b { background: linear-gradient(270deg, transparent, rgb(63 230 255 / .22) 14%, rgb(63 230 255 / .08) 60%, transparent); animation-name: vf-g-wbar-b; }
 .vf-crt {
@@ -326,7 +376,7 @@
 .vf-panel > .vf-slice {
   position: absolute; left: 0; right: 0; top: var(--y); height: var(--h); z-index: 2; opacity: 0; pointer-events: none;
   background: linear-gradient(90deg, transparent 0%, rgb(var(--vf-rgb) / .3) 18%, rgb(var(--vf-rgb) / .14) 70%, transparent 100%);
-  mix-blend-mode: screen; animation: vf-g-bar var(--vf-glitch);
+  mix-blend-mode: var(--vf-glitch-blend); animation: vf-g-bar var(--vf-glitch);
 }
 .vf-panel > .vf-slice.is-b { background: linear-gradient(270deg, transparent 0%, rgb(63 230 255 / .2) 22%, rgb(63 230 255 / .08) 70%, transparent 100%); animation-name: vf-g-bar-b; }
 
@@ -415,7 +465,7 @@
   52% { opacity: .7; }
 }
 @keyframes vf-g-mark {
-  0%, 5%, 52.8%, 100% { -webkit-text-stroke-color: rgb(var(--vf-rgb) / .13); translate: 0 0; }
+  0%, 5%, 52.8%, 100% { -webkit-text-stroke-color: rgb(var(--vf-rgb) / var(--vf-mark-a)); translate: 0 0; }
   0.4% { -webkit-text-stroke-color: rgb(var(--vf-rgb) / .55); translate: -26px 0; }
   1.2% { -webkit-text-stroke-color: rgb(63 230 255 / .35); translate: 34px 0; }
   2% { -webkit-text-stroke-color: rgb(var(--vf-rgb) / .55); translate: -14px 0; }
