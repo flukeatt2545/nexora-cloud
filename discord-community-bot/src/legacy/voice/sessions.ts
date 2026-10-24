@@ -101,6 +101,24 @@ export function sessionLine(session: VoiceSession, withMember = true) {
   return `${who}อยู่ ${room} ไป **${duration(session.seconds)}**\n${times}`;
 }
 
+/**
+ * One ended stay for the log channel: who (name and avatar in the header), the room, then
+ * how long and when they came and went as three short columns.
+ */
+export function sessionEmbed(session: VoiceSession, guild?: Guild) {
+  const style = session.seconds >= 72000 ? "f" : "t";
+  const avatar = guild?.members.cache.get(session.discordId)?.displayAvatarURL({ size: 64 });
+  return new EmbedBuilder()
+    .setColor(COLOR.brand)
+    .setAuthor({ name: `${session.displayName || session.username || "สมาชิก"} ออกจากห้องเสียง`.slice(0, 256), ...(avatar ? { iconURL: avatar } : {}) })
+    .setDescription(`🔊 **${escapeMarkdown(session.channelName || "ห้องเสียง")}**`)
+    .addFields(
+      { name: "อยู่นาน", value: duration(session.seconds), inline: true },
+      { name: "เข้า", value: `<t:${unix(session.joinedAt)}:${style}>`, inline: true },
+      { name: "ออก", value: session.leftAt ? `<t:${unix(session.leftAt)}:${style}>` : "ยังอยู่", inline: true },
+    );
+}
+
 /** Posts ended sessions to each server's join/leave log channel. */
 export async function postSessionFeed(logs: Map<string, GuildBasedChannel>) {
   const res = await api().get<{ sessions: VoiceSession[] }>("/api/internal/bot/voice/sessions/feed");
@@ -115,10 +133,7 @@ export async function postSessionFeed(logs: Map<string, GuildBasedChannel>) {
       const batch = mine.slice(i, i + 10);
       try {
         await channel.send({
-          embeds: batch.map((session) => new EmbedBuilder()
-            .setColor(COLOR.brand)
-            .setTitle("ออกจากห้องแล้ว")
-            .setDescription(sessionLine(session))),
+          embeds: batch.map((session) => sessionEmbed(session, "guild" in channel ? channel.guild : undefined)),
           allowedMentions: { parse: [] },
           flags: MessageFlags.SuppressNotifications,
         });
