@@ -1,7 +1,7 @@
 import { Collection, makeGuild, makeInteraction, makeMember, reply, requests, requestsTo, spy, useSettings, lastEmbed } from "./support";
 import assert from "node:assert/strict";
-import { beforeEach, test } from "node:test";
-import { onVerify } from "../src/members";
+import { beforeEach, mock, test } from "node:test";
+import { onVerify, VERIFY_MESSAGE_MS } from "../src/members";
 import { giveVerifiedRoles } from "../src/verifyweb";
 
 // Verifying on the website: the button hands out a link instead of the role, and the role comes
@@ -41,6 +41,31 @@ test("on the website levels the button gives a link and no role", async () => {
   const button = answer.components[0].toJSON().components[0];
   assert.equal(button.url, "https://nkn02.com/verify/abc");
   assert.ok(answer.flags, "the link is private to the member");
+});
+
+test("the link message disappears after ten seconds, and a second click removes the first one at once", async () => {
+  reply("POST", "/api/internal/bot/community/verify/start", { url: "https://nkn02.com/verify/abc" });
+  const guild = server();
+  const member = person(guild, "U1");
+  const first = makeInteraction(guild, member);
+  const second = makeInteraction(guild, member);
+  first.deleteReply = spy();
+  second.deleteReply = spy();
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    await onVerify(first);
+    assert.equal(first.deleteReply.calls.length, 0, "still there right after it is sent");
+    await onVerify(second);
+    assert.equal(first.deleteReply.calls.length, 1, "the earlier message goes when a new one is sent");
+    assert.equal(second.deleteReply.calls.length, 0);
+    mock.timers.tick(VERIFY_MESSAGE_MS - 1);
+    assert.equal(second.deleteReply.calls.length, 0);
+    mock.timers.tick(1);
+    assert.equal(second.deleteReply.calls.length, 1, "gone after ten seconds");
+  } finally {
+    mock.timers.reset();
+  }
+  assert.equal(VERIFY_MESSAGE_MS, 10000);
 });
 
 test("the plain button level still gives the role straight away", async () => {

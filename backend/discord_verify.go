@@ -37,7 +37,9 @@ type verifyTicket struct {
 	// Set once the member has signed in with Discord and it was the account that asked for the link.
 	Identified bool `json:"identified"`
 	HasAvatar  bool `json:"hasAvatar"`
-	Attempts   int  `json:"attempts"`
+	// Their Discord picture, shown on the verify page once they have signed in.
+	AvatarURL string `json:"avatarUrl"`
+	Attempts  int    `json:"attempts"`
 }
 
 func verifyTicketKey(token string) string { return "dverify:t:" + tokenHash(token) }
@@ -284,7 +286,7 @@ func (s *server) communityVerifyInfo(c *fiber.Ctx) error {
 		siteKey = s.cfg.turnstileSiteKey
 	}
 	return c.JSON(fiber.Map{
-		"guildName": guildName, "username": ticket.Username, "identified": ticket.Identified,
+		"guildName": guildName, "username": ticket.Username, "identified": ticket.Identified, "avatarUrl": ticket.AvatarURL,
 		"captcha": settings.VerifyCaptcha, "siteKey": siteKey, "ready": !settings.VerifyCaptcha || s.turnstileReady(),
 		"minAgeDays": settings.VerifyMinAgeDays, "needAvatar": settings.VerifyNeedAvatar,
 	})
@@ -327,6 +329,7 @@ func (s *server) communityVerifyCallback(c *fiber.Ctx, state oauthState, code st
 	}
 	ticket.Identified = true
 	ticket.HasAvatar = identity.AvatarURL != ""
+	ticket.AvatarURL = identity.AvatarURL
 	if name := cleanText(firstNonEmpty(identity.DisplayName, identity.Username), 64); name != "" {
 		ticket.Username = name
 	}

@@ -83,8 +83,10 @@ export async function onMemberLeave(member: GuildMember | PartialGuildMember) {
   await (channel as TextChannel).send({ embeds: [embed], files }).catch((error) => logBotError("leave message", error));
 }
 
-// The website link lasts ten minutes (backend/discord_verify.go); the private message goes with it.
-const VERIFY_LINK_MS = 10 * 60 * 1000;
+// The private message with the link is short-lived: it goes after ten seconds (the link itself
+// lasts ten minutes, backend/discord_verify.go), and asking again removes the earlier one at once.
+export const VERIFY_MESSAGE_MS = 10 * 1000;
+const openLinks = new Map<string, ButtonInteraction>();
 
 /** Verify on the website: the member gets a one-time link in a private message. */
 async function sendVerifyLink(interaction: ButtonInteraction) {
@@ -95,11 +97,18 @@ async function sendVerifyLink(interaction: ButtonInteraction) {
     await interaction.reply({
       embeds: [brandEmbed().setTitle("ยืนยันตัวตนผ่านเว็บ").setDescription(
         "กดปุ่มด้านล่างเพื่อไปที่เว็บ ทำตามขั้นตอน (ไม่กี่วินาที) แล้วกลับมาที่ Discord ยศสมาชิกจะขึ้นให้เอง\n\nลิงก์ใช้ได้ครั้งเดียวภายใน 10 นาที ห้ามส่งให้คนอื่น",
-      )],
+      ).setFooter({ text: "ข้อความนี้จะหายไปเองใน 10 วินาที" })],
       components: [row(linkButton(res.data.url, "ไปยืนยันที่เว็บ"))],
       flags: ephemeral,
     });
-    setTimeout(() => interaction.deleteReply().catch(() => undefined), VERIFY_LINK_MS).unref();
+    // Only one message per member: the earlier one (if it is still there) goes now.
+    const earlier = openLinks.get(interaction.user.id);
+    openLinks.set(interaction.user.id, interaction);
+    earlier?.deleteReply().catch(() => undefined);
+    setTimeout(() => {
+      interaction.deleteReply().catch(() => undefined);
+      if (openLinks.get(interaction.user.id) === interaction) openLinks.delete(interaction.user.id);
+    }, VERIFY_MESSAGE_MS).unref();
   } catch (error) {
     logBotError("verify link", error);
     await interaction.reply({ embeds: [errorEmbed("ยังยืนยันไม่ได้", apiMessage(error, "ขอลิงก์ยืนยันไม่สำเร็จ ลองใหม่อีกครั้ง"))], flags: ephemeral });

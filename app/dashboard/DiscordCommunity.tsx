@@ -1,10 +1,10 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, CircleAlert, CircleCheck, DoorOpen, Gem, Hash, LogOut, Megaphone, Palette, Server, ShieldAlert, ShieldCheck, Siren, Ticket, UserCheck, UserCog, UserPlus, Volume2, X,
 } from "lucide-react";
-import { Card, Fields, LoadError, type Notice, Rows, SaveBar, SwitchRow, ago } from "./DiscordBotParts";
+import { Card, Fields, LoadError, type Notice, Row, Rows, SaveBar, SwitchRow, ago } from "./DiscordBotParts";
 import { api } from "./DiscordMailBotSettings";
 
 // Same fields as communitySettings in backend/discord_community.go.
@@ -23,10 +23,10 @@ type VerifyLevel = "button" | "standard" | "strict" | "lockdown";
 // Each level fills in the checks below it; they can still be changed one by one afterwards.
 // "button" keeps the checks as they are (they are not used).
 const VERIFY_LEVELS: { value: VerifyLevel; label: string; text: string; checks?: { verifyCaptcha: boolean; verifyMinAgeDays: number; verifyNeedAvatar: boolean } }[] = [
-  { value: "button", label: "ปุ่มธรรมดา", text: "กดปุ่มใน Discord แล้วได้ยศทันที ไม่กันบอทเลย" },
-  { value: "standard", label: "มาตรฐาน", text: "ไปยืนยันที่เว็บ เข้าสู่ระบบ Discord + captcha + บัญชีอายุ 3 วันขึ้นไป", checks: { verifyCaptcha: true, verifyMinAgeDays: 3, verifyNeedAvatar: false } },
-  { value: "strict", label: "เข้ม", text: "มาตรฐาน + บัญชีอายุ 7 วันขึ้นไป + ต้องมีรูปโปรไฟล์", checks: { verifyCaptcha: true, verifyMinAgeDays: 7, verifyNeedAvatar: true } },
-  { value: "lockdown", label: "ล็อกดาวน์", text: "ใช้ตอนโดนบุกเซิร์ฟ บัญชีอายุ 30 วันขึ้นไป + ต้องมีรูปโปรไฟล์", checks: { verifyCaptcha: true, verifyMinAgeDays: 30, verifyNeedAvatar: true } },
+  { value: "button", label: "ปุ่มธรรมดา", text: "กดปุ่มใน Discord แล้วได้ยศทันที ไม่กันบอท" },
+  { value: "standard", label: "มาตรฐาน", text: "ยืนยันที่เว็บ + captcha + บัญชีอายุ 3 วันขึ้นไป", checks: { verifyCaptcha: true, verifyMinAgeDays: 3, verifyNeedAvatar: false } },
+  { value: "strict", label: "เข้ม", text: "บัญชีอายุ 7 วันขึ้นไป + ต้องมีรูปโปรไฟล์", checks: { verifyCaptcha: true, verifyMinAgeDays: 7, verifyNeedAvatar: true } },
+  { value: "lockdown", label: "ล็อกดาวน์", text: "ตอนโดนบุกเซิร์ฟ บัญชีอายุ 30 วันขึ้นไป + ต้องมีรูปโปรไฟล์", checks: { verifyCaptcha: true, verifyMinAgeDays: 30, verifyNeedAvatar: true } },
 ];
 
 type Settings = {
@@ -224,6 +224,7 @@ function IdsBox({ id, label, hint, value, onChange, disabled, max }: {
   id: string; label: string; hint: string; value: string[]; onChange: (value: string[]) => void; disabled: boolean; max: number;
 }) {
   const [draft, setDraft] = useState(() => value.join("\n"));
+  const ref = useAutoGrow(draft);
   const wrong = draft.split(/[\s,;]+/).filter((word) => word && !DISCORD_ID.test(word));
   function edit(text: string) {
     setDraft(text);
@@ -233,9 +234,9 @@ function IdsBox({ id, label, hint, value, onChange, disabled, max }: {
     <div className="hv-field">
       <div className="hv-field-row">
         <label htmlFor={id}>{label}</label>
-        <small>{value.length}/{max}</small>
+        <small className="bp-counter">{value.length}/{max}</small>
       </div>
-      <textarea id={id} className="hv-textarea" rows={3} inputMode="numeric" spellCheck={false} placeholder="123456789012345678"
+      <textarea id={id} ref={ref} className="hv-textarea" rows={2} inputMode="numeric" spellCheck={false} placeholder="123456789012345678"
         value={draft} onChange={(event) => edit(event.target.value)} disabled={disabled} />
       {wrong.length > 0
         ? <small className="bp-warn">ไม่ใช่ ID ที่ถูกต้อง เลยไม่ถูกบันทึก: {wrong.slice(0, 3).join(", ")}{wrong.length > 3 ? " ..." : ""}</small>
@@ -244,16 +245,50 @@ function IdsBox({ id, label, hint, value, onChange, disabled, max }: {
   );
 }
 
+const TEXTAREA_MAX_HEIGHT = 280;
+
+/**
+ * A text box that grows with what is typed (up to a limit, then it scrolls) instead of being
+ * dragged bigger by its corner. It also sizes itself when its tab is shown for the first time.
+ */
+function useAutoGrow(value: string) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const fit = useCallback(() => {
+    const box = ref.current;
+    if (!box || !box.offsetParent) return;
+    box.style.height = "auto";
+    const frame = box.offsetHeight - box.clientHeight;
+    box.style.height = `${Math.min(box.scrollHeight + frame, TEXTAREA_MAX_HEIGHT)}px`;
+    box.style.overflowY = box.scrollHeight + frame > TEXTAREA_MAX_HEIGHT ? "auto" : "hidden";
+  }, []);
+  useEffect(() => fit(), [value, fit]);
+  useEffect(() => {
+    const box = ref.current;
+    if (!box || typeof ResizeObserver === "undefined") return;
+    let width = -1;
+    const watcher = new ResizeObserver(([entry]) => {
+      const next = Math.round(entry.contentRect.width);
+      if (next === width) return;
+      width = next;
+      fit();
+    });
+    watcher.observe(box);
+    return () => watcher.disconnect();
+  }, [fit]);
+  return ref;
+}
+
 function TextBox({ id, label, hint, value, onChange, disabled, max = 1500 }: {
   id: string; label: string; hint?: string; value: string; onChange: (value: string) => void; disabled: boolean; max?: number;
 }) {
+  const ref = useAutoGrow(value);
   return (
     <div className="hv-field">
       <div className="hv-field-row">
         <label htmlFor={id}>{label}</label>
-        <small>{value.length}/{max}</small>
+        <small className="bp-counter">{value.length}/{max}</small>
       </div>
-      <textarea id={id} className="hv-textarea bp-text" rows={3} maxLength={max} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
+      <textarea id={id} ref={ref} className="hv-textarea bp-text" rows={2} maxLength={max} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
       {hint && <small>{hint}</small>}
     </div>
   );
@@ -437,15 +472,20 @@ export function DiscordCommunity({ notify, section }: { notify: Notice; section:
                   </Fields>
                   <Fields>
                     <div className="hv-field">
-                      <label htmlFor="cm-verify-level">ระดับการยืนยัน</label>
-                      <select id="cm-verify-level" className="hv-select" value={form.verifyLevel} disabled={off || !form.verifyEnabled}
-                        onChange={(event) => {
-                          const level = VERIFY_LEVELS.find((item) => item.value === event.target.value);
-                          if (level) set({ verifyLevel: level.value, ...level.checks });
-                        }}>
-                        {VERIFY_LEVELS.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
-                      </select>
-                      <small>{VERIFY_LEVELS.find((level) => level.value === form.verifyLevel)?.text}</small>
+                      <div className="hv-field-row">
+                        <label id="cm-verify-level">ระดับการยืนยัน</label>
+                      </div>
+                      <div className="bp-levels" role="radiogroup" aria-labelledby="cm-verify-level">
+                        {VERIFY_LEVELS.map((level) => (
+                          <button key={level.value} type="button" role="radio" aria-checked={form.verifyLevel === level.value}
+                            className={`bp-level${form.verifyLevel === level.value ? " is-on" : ""}`} disabled={off || !form.verifyEnabled}
+                            onClick={() => set({ verifyLevel: level.value, ...level.checks })}>
+                            <b>{level.label}</b>
+                            <small>{level.text}</small>
+                          </button>
+                        ))}
+                      </div>
+                      <small>เลือกระดับแล้วค่าด้านล่างถูกตั้งให้ แก้ทีละข้อต่อได้</small>
                     </div>
                   </Fields>
                   {form.verifyLevel !== "button" && (
@@ -455,21 +495,26 @@ export function DiscordCommunity({ notify, section }: { notify: Notice; section:
                           onChange={(verifyCaptcha) => set({ verifyCaptcha })} disabled={off || !form.verifyEnabled} />
                         <SwitchRow title="ต้องมีรูปโปรไฟล์ Discord" hint="บัญชีบอทสแปมมักไม่ตั้งรูป" on={form.verifyNeedAvatar}
                           onChange={(verifyNeedAvatar) => set({ verifyNeedAvatar })} disabled={off || !form.verifyEnabled} />
+                        <Row title="อายุบัญชี Discord ขั้นต่ำ" hint="ดูจากรหัสบัญชี ปลอมไม่ได้ ใส่ 0 = ไม่เช็ก (สูงสุด 365)" htmlFor="cm-verify-age">
+                          <input id="cm-verify-age" className="bp-number" type="number" inputMode="numeric" min={0} max={365} value={form.verifyMinAgeDays}
+                            onChange={(event) => set({ verifyMinAgeDays: Number(event.target.value) })} disabled={off || !form.verifyEnabled} />
+                          <span className="bp-unit">วัน</span>
+                        </Row>
                       </Rows>
-                      <Fields>
-                        <NumberField id="cm-verify-age" label="อายุบัญชี Discord ขั้นต่ำ (วัน)" hint="0 = ไม่เช็ก ตั้งได้ถึง 365 วัน อายุบัญชีดูจากรหัสบัญชี ปลอมไม่ได้"
-                          value={form.verifyMinAgeDays} onChange={(verifyMinAgeDays) => set({ verifyMinAgeDays })} min={0} max={365} disabled={off || !form.verifyEnabled} />
-                      </Fields>
-                      {form.verifyEnabled && form.verifyCaptcha && data && !data.verifyCaptchaReady && (
-                        <Fields>
-                          <small className="bp-warn">ยังไม่ได้ใส่คีย์ Turnstile บนเซิร์ฟเวอร์ (TURNSTILE_SITE_KEY และ TURNSTILE_SECRET_KEY) สมาชิกจะยืนยันไม่ได้จนกว่าจะใส่ หรือปิด captcha ไว้ก่อน</small>
-                        </Fields>
-                      )}
-                      {form.verifyEnabled && !form.memberRoleId && (
-                        <Fields><small className="bp-warn">เลือกยศสมาชิกก่อน ไม่งั้นการยืนยันผ่านเว็บจะไม่ทำงาน</small></Fields>
+                      {form.verifyEnabled && ((form.verifyCaptcha && data && !data.verifyCaptchaReady) || !form.memberRoleId) && (
+                        <div className="bp-notes" role="alert">
+                          {form.verifyCaptcha && data && !data.verifyCaptchaReady && (
+                            <p className="bp-note"><CircleAlert size={16} aria-hidden="true" />ยังไม่ได้ใส่คีย์ Turnstile บนเซิร์ฟเวอร์ (TURNSTILE_SITE_KEY และ TURNSTILE_SECRET_KEY) สมาชิกจะยืนยันไม่ได้จนกว่าจะใส่ หรือปิด captcha ไว้ก่อน</p>
+                          )}
+                          {!form.memberRoleId && <p className="bp-note"><CircleAlert size={16} aria-hidden="true" />เลือกยศสมาชิกก่อน ไม่งั้นการยืนยันผ่านเว็บจะไม่ทำงาน</p>}
+                        </div>
                       )}
                       {data && (
-                        <Fields><small>24 ชั่วโมงที่ผ่านมา: ผ่าน {data.verifyPassed24h} ครั้ง · ไม่ผ่าน {data.verifyFailed24h} ครั้ง</small></Fields>
+                        <div className="bp-stats" aria-label="ผลการยืนยันใน 24 ชั่วโมงที่ผ่านมา">
+                          <span>24 ชั่วโมงที่ผ่านมา</span>
+                          <b className="is-ok"><CircleCheck size={14} aria-hidden="true" />ผ่าน {data.verifyPassed24h}</b>
+                          <b className="is-bad"><X size={14} aria-hidden="true" />ไม่ผ่าน {data.verifyFailed24h}</b>
+                        </div>
                       )}
                     </>
                   )}
