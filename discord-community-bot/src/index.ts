@@ -19,6 +19,7 @@ import { checkRateLimit } from "./limits";
 import { attachLegacy, handleLegacy, legacyOwner, startLegacy } from "./legacy";
 import { communityCommandNames } from "./commands";
 import { onMemberJoin, onMemberLeave, onVerify } from "./members";
+import { startVerifyResults } from "./verifyweb";
 import { onMessageDeleted } from "./panels";
 import { onRoleCheckButton } from "./rolecheck";
 import { announceRestore, onAuditLogEntry, onSecurityJoin, onSecurityMessage, startSiteSecurityFeed } from "./security";
@@ -127,6 +128,7 @@ client.once(Events.ClientReady, async (ready) => {
   startStats(client);
   startBoost(client);
   startSiteSecurityFeed(client);
+  startVerifyResults(client);
   watchSettings(client);
   setInterval(() => void syncPresence(), 15000).unref();
   // The channel and role lists on the web page stay fresh even without changes here.

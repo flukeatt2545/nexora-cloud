@@ -26,6 +26,8 @@ export type Settings = {
   verifyChannelId: string;
   verifyMessage: string;
   memberRoleId: string;
+  // "button" gives the role on a click; the other levels send the member to the website first.
+  verifyLevel?: "button" | "standard" | "strict" | "lockdown";
   rolesChannelId: string;
   rolesMessage: string;
   selfRoleIds: string[];

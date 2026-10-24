@@ -45,6 +45,14 @@ type communitySettings struct {
 	VerifyMessage   string `json:"verifyMessage"`
 	// Given on verification. Leave verification off to give it as soon as someone joins.
 	MemberRoleID string `json:"memberRoleId"`
+	// How members verify: "button" gives the role on a click; the other levels (standard, strict,
+	// lockdown) send them to the website first. The level is a starting point set on the admin page,
+	// the checks below are what is enforced.
+	VerifyLevel string `json:"verifyLevel"`
+	// Website checks: a Cloudflare Turnstile captcha, the Discord account's age, and a profile picture.
+	VerifyCaptcha    bool `json:"verifyCaptcha"`
+	VerifyMinAgeDays int  `json:"verifyMinAgeDays"`
+	VerifyNeedAvatar bool `json:"verifyNeedAvatar"`
 
 	RolesChannelID string   `json:"rolesChannelId"`
 	RolesMessage   string   `json:"rolesMessage"`
@@ -195,6 +203,7 @@ func defaultCommunitySettings() communitySettings {
 		RoleCheckEnabled: true,
 		LeaveEnabled:     true, LeaveChannelID: "1563356943236473053", LeaveMessage: communityDefaultLeave, LeaveImage: true,
 		VerifyEnabled: true, VerifyMessage: communityDefaultVerify,
+		VerifyLevel: "button", VerifyCaptcha: true, VerifyMinAgeDays: 3,
 		RolesMessage: communityDefaultRoles, SelfRoleIDs: []string{},
 		ManagerRoleIDs: []string{}, StaffRoleIDs: []string{}, UsageRoleIDs: []string{},
 		TicketsEnabled: true, TicketMessage: communityDefaultTicket, TicketMaxOpen: 1,
@@ -292,6 +301,16 @@ func validateCommunitySettings(in communitySettings) (communitySettings, error) 
 		in.NameStyle = "frame"
 	default:
 		return in, errors.New("สไตล์ชื่อไม่ถูกต้อง")
+	}
+	switch in.VerifyLevel {
+	case "button", "standard", "strict", "lockdown":
+	case "":
+		in.VerifyLevel = "button"
+	default:
+		return in, errors.New("ระดับการยืนยันตัวตนไม่ถูกต้อง")
+	}
+	if in.VerifyMinAgeDays < 0 || in.VerifyMinAgeDays > 365 {
+		return in, errors.New("อายุบัญชี Discord ขั้นต่ำต้องอยู่ระหว่าง 0–365 วัน")
 	}
 	if in.NewAccountDays < 0 || in.NewAccountDays > 30 {
 		return in, errors.New("อายุบัญชีใหม่ต้องอยู่ระหว่าง 0–30 วัน")
@@ -899,7 +918,9 @@ func (s *server) adminDiscordCommunity(c *fiber.Ctx) error {
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	return c.JSON(fiber.Map{"settings": settings, "version": version, "guild": guild, "tickets": tickets, "openTickets": openTickets, "incidents": incidents})
+	passed, failed := s.verifyStats(c.Context())
+	return c.JSON(fiber.Map{"settings": settings, "version": version, "guild": guild, "tickets": tickets, "openTickets": openTickets, "incidents": incidents,
+		"verifyCaptchaReady": s.turnstileReady(), "verifyPassed24h": passed, "verifyFailed24h": failed})
 }
 
 func (s *server) updateAdminDiscordCommunity(c *fiber.Ctx) error {

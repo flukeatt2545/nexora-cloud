@@ -31,6 +31,8 @@ type oauthState struct {
 	UserID    int64  `json:"userId,omitempty"`
 	SessionID int64  `json:"sessionId,omitempty"`
 	Mode      string `json:"mode"`
+	// Set when the member came from the Discord server's verify page (mode "verify").
+	VerifyToken string `json:"verifyToken,omitempty"`
 }
 
 type oauthIdentity struct {
@@ -203,6 +205,11 @@ func normalizeOAuthMode(mode string) string {
 }
 
 func (s *server) oauthAuthorizeURL(ctx context.Context, provider, state, challenge string) string {
+	return s.oauthAuthorizeURLScoped(ctx, provider, state, challenge, "")
+}
+
+// oauthAuthorizeURLScoped asks for the given scope instead of the provider's usual one.
+func (s *server) oauthAuthorizeURLScoped(ctx context.Context, provider, state, challenge, scope string) string {
 	cfg := s.oauthProvider(ctx, provider)
 	redirectURI := s.cfg.oauthBaseURL + "/api/auth/oauth/" + provider + "/callback"
 	values := url.Values{
@@ -215,7 +222,10 @@ func (s *server) oauthAuthorizeURL(ctx context.Context, provider, state, challen
 	}
 	switch provider {
 	case "discord":
-		values.Set("scope", "identify email")
+		if scope == "" {
+			scope = "identify email"
+		}
+		values.Set("scope", scope)
 		return "https://discord.com/oauth2/authorize?" + values.Encode()
 	case "google":
 		values.Set("scope", "openid email profile")
@@ -241,6 +251,9 @@ func (s *server) oauthCallback(c *fiber.Ctx) error {
 	var stateData oauthState
 	if json.Unmarshal(value, &stateData) != nil || stateData.Provider != provider {
 		return c.Redirect(oauthErrorLocation("oauth_state", provider), fiber.StatusFound)
+	}
+	if stateData.Mode == "verify" {
+		return s.communityVerifyCallback(c, stateData, code)
 	}
 	if stateData.Mode == "connect" {
 		var sessionActive bool

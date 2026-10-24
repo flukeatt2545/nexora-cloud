@@ -59,6 +59,9 @@ type config struct {
 	s3UseSSL                 bool
 	jwtSecret                string
 	webhookKey               string
+	// Cloudflare Turnstile (the captcha on the Discord verify page). Both empty = not set up.
+	turnstileSiteKey         string
+	turnstileSecret          string
 	hostingEncryptionKey     string
 	tenantMySQLDSN           string
 	cfAPIToken               string
@@ -311,6 +314,10 @@ func main() {
 	auth.Post("/oauth/ticket/consume", s.rateLimit("oauth_consume", 30, 5*time.Minute), s.consumeOAuthTicket)
 	auth.Post("/workspace/ticket/consume", s.rateLimit("workspace_consume", 30, 5*time.Minute), s.consumeWorkspaceTicket)
 	auth.Get("/oauth/:provider/callback", s.oauthCallback)
+	verify := app.Group("/api/public/community-verify")
+	verify.Get("/:token", s.rateLimit("verify_info", 60, time.Minute), s.communityVerifyInfo)
+	verify.Post("/:token/discord", s.rateLimit("verify_discord", 20, 10*time.Minute), s.communityVerifyDiscord)
+	verify.Post("/:token/complete", s.rateLimit("verify_complete", 20, 10*time.Minute), s.communityVerifyComplete)
 	app.Get("/api/vps-uptime/start", s.startVPSUptimeAccess)
 	app.Get("/api/vps-uptime", s.vpsUptimePage)
 	app.Get("/api/vps-uptime/", s.vpsUptimePage)
@@ -676,6 +683,9 @@ func main() {
 	app.Post("/api/internal/bot/community/event", s.botCommunityEvent)
 	app.Get("/api/internal/bot/community/security-feed", s.botCommunitySecurityFeed)
 	app.Post("/api/internal/bot/community/security-feed/ack", s.botCommunitySecurityAck)
+	app.Post("/api/internal/bot/community/verify/start", s.botCommunityVerifyStart)
+	app.Get("/api/internal/bot/community/verify/results", s.botCommunityVerifyResults)
+	app.Post("/api/internal/bot/community/verify/results/ack", s.botCommunityVerifyAck)
 	app.Get("/api/internal/bot/presence/:botKey", s.botDiscordPresence)
 	app.Get("/api/internal/bot/access/:botKey", s.botDiscordAccess)
 	app.Post("/api/internal/bot/access/:botKey", s.updateBotDiscordAccess)
@@ -732,6 +742,8 @@ func loadConfig() config {
 		s3UseSSL:                 envBool("S3_USE_SSL", false),
 		jwtSecret:                env("JWT_SECRET", env("WEBHOOK_ENCRYPTION_KEY", "local-only-change-this-jwt-secret")),
 		webhookKey:               env("WEBHOOK_ENCRYPTION_KEY", "local-only-change-this-webhook-key"),
+		turnstileSiteKey:         env("TURNSTILE_SITE_KEY", ""),
+		turnstileSecret:          env("TURNSTILE_SECRET_KEY", ""),
 		hostingEncryptionKey:     env("HOSTING_ENCRYPTION_KEY", "local-only-change-this-hosting-encryption-key"),
 		tenantMySQLDSN:           env("TENANT_MYSQL_DSN", "root:change-this-mysql-password@tcp(tenant-db:3306)/?parseTime=true&multiStatements=false"),
 		cfAPIToken:               env("CLOUDFLARE_API_TOKEN", env("CF_API_TOKEN", "")),

@@ -32,7 +32,8 @@ function buildContentSecurityPolicy(nonce: string, request: NextRequest): string
     "base-uri 'self'",
     "object-src 'none'",
     "frame-ancestors 'none'",
-    "frame-src 'self' blob:",
+    // Cloudflare Turnstile (the captcha on /verify) draws its box in a frame.
+    "frame-src 'self' blob: https://challenges.cloudflare.com",
     formAction,
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${isDevelopment ? " 'unsafe-eval'" : ""}`,
     "script-src-attr 'none'",

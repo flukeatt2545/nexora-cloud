@@ -18,6 +18,17 @@ const NAME_STYLES: { value: NameStyle; label: string }[] = [
   { value: "plain", label: "เรียบ ๆ  👋・ยินดีต้อนรับ · 👑 Owner" },
 ];
 
+type VerifyLevel = "button" | "standard" | "strict" | "lockdown";
+
+// Each level fills in the checks below it; they can still be changed one by one afterwards.
+// "button" keeps the checks as they are (they are not used).
+const VERIFY_LEVELS: { value: VerifyLevel; label: string; text: string; checks?: { verifyCaptcha: boolean; verifyMinAgeDays: number; verifyNeedAvatar: boolean } }[] = [
+  { value: "button", label: "ปุ่มธรรมดา", text: "กดปุ่มใน Discord แล้วได้ยศทันที ไม่กันบอทเลย" },
+  { value: "standard", label: "มาตรฐาน", text: "ไปยืนยันที่เว็บ เข้าสู่ระบบ Discord + captcha + บัญชีอายุ 3 วันขึ้นไป", checks: { verifyCaptcha: true, verifyMinAgeDays: 3, verifyNeedAvatar: false } },
+  { value: "strict", label: "เข้ม", text: "มาตรฐาน + บัญชีอายุ 7 วันขึ้นไป + ต้องมีรูปโปรไฟล์", checks: { verifyCaptcha: true, verifyMinAgeDays: 7, verifyNeedAvatar: true } },
+  { value: "lockdown", label: "ล็อกดาวน์", text: "ใช้ตอนโดนบุกเซิร์ฟ บัญชีอายุ 30 วันขึ้นไป + ต้องมีรูปโปรไฟล์", checks: { verifyCaptcha: true, verifyMinAgeDays: 30, verifyNeedAvatar: true } },
+];
+
 type Settings = {
   guildId: string;
   nameStyle: NameStyle;
@@ -36,6 +47,10 @@ type Settings = {
   verifyChannelId: string;
   verifyMessage: string;
   memberRoleId: string;
+  verifyLevel: VerifyLevel;
+  verifyCaptcha: boolean;
+  verifyMinAgeDays: number;
+  verifyNeedAvatar: boolean;
   managerRoleIds: string[];
   staffRoleIds: string[];
   usageRoleIds: string[];
@@ -88,7 +103,11 @@ type Incident = { id: number; target: "web" | "api"; startedAt: string; endedAt:
 /** The tab of the server settings to show; the page's menu picks it. */
 export type CommunitySection = "general" | "members" | "rooms" | "security" | "history";
 
-type Data = { settings: Settings; version: number; guild: Guild | null; tickets: TicketItem[]; openTickets: number; incidents: Incident[] };
+type Data = {
+  settings: Settings; version: number; guild: Guild | null; tickets: TicketItem[]; openTickets: number; incidents: Incident[];
+  // Whether the API has its Cloudflare Turnstile keys, and how verifying on the website went in the last day.
+  verifyCaptchaReady: boolean; verifyPassed24h: number; verifyFailed24h: number;
+};
 
 type ChannelKind = "text" | "voice" | "category";
 
@@ -416,6 +435,44 @@ export function DiscordCommunity({ notify, section }: { notify: Notice; section:
                   <Fields>
                     <TextBox id="cm-verify-text" label="ข้อความบนแผงยืนยัน" value={form.verifyMessage} onChange={pick("verifyMessage")} disabled={off || !form.verifyEnabled} />
                   </Fields>
+                  <Fields>
+                    <div className="hv-field">
+                      <label htmlFor="cm-verify-level">ระดับการยืนยัน</label>
+                      <select id="cm-verify-level" className="hv-select" value={form.verifyLevel} disabled={off || !form.verifyEnabled}
+                        onChange={(event) => {
+                          const level = VERIFY_LEVELS.find((item) => item.value === event.target.value);
+                          if (level) set({ verifyLevel: level.value, ...level.checks });
+                        }}>
+                        {VERIFY_LEVELS.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
+                      </select>
+                      <small>{VERIFY_LEVELS.find((level) => level.value === form.verifyLevel)?.text}</small>
+                    </div>
+                  </Fields>
+                  {form.verifyLevel !== "button" && (
+                    <>
+                      <Rows>
+                        <SwitchRow title="ต้องผ่าน captcha" hint="Cloudflare Turnstile กันบอทที่คลิกเองไม่ได้" on={form.verifyCaptcha}
+                          onChange={(verifyCaptcha) => set({ verifyCaptcha })} disabled={off || !form.verifyEnabled} />
+                        <SwitchRow title="ต้องมีรูปโปรไฟล์ Discord" hint="บัญชีบอทสแปมมักไม่ตั้งรูป" on={form.verifyNeedAvatar}
+                          onChange={(verifyNeedAvatar) => set({ verifyNeedAvatar })} disabled={off || !form.verifyEnabled} />
+                      </Rows>
+                      <Fields>
+                        <NumberField id="cm-verify-age" label="อายุบัญชี Discord ขั้นต่ำ (วัน)" hint="0 = ไม่เช็ก ตั้งได้ถึง 365 วัน อายุบัญชีดูจากรหัสบัญชี ปลอมไม่ได้"
+                          value={form.verifyMinAgeDays} onChange={(verifyMinAgeDays) => set({ verifyMinAgeDays })} min={0} max={365} disabled={off || !form.verifyEnabled} />
+                      </Fields>
+                      {form.verifyEnabled && form.verifyCaptcha && data && !data.verifyCaptchaReady && (
+                        <Fields>
+                          <small className="bp-warn">ยังไม่ได้ใส่คีย์ Turnstile บนเซิร์ฟเวอร์ (TURNSTILE_SITE_KEY และ TURNSTILE_SECRET_KEY) สมาชิกจะยืนยันไม่ได้จนกว่าจะใส่ หรือปิด captcha ไว้ก่อน</small>
+                        </Fields>
+                      )}
+                      {form.verifyEnabled && !form.memberRoleId && (
+                        <Fields><small className="bp-warn">เลือกยศสมาชิกก่อน ไม่งั้นการยืนยันผ่านเว็บจะไม่ทำงาน</small></Fields>
+                      )}
+                      {data && (
+                        <Fields><small>24 ชั่วโมงที่ผ่านมา: ผ่าน {data.verifyPassed24h} ครั้ง · ไม่ผ่าน {data.verifyFailed24h} ครั้ง</small></Fields>
+                      )}
+                    </>
+                  )}
                 </Card>
 
                 <Card icon={ShieldCheck} title="เช็กยศของตัวเอง" text="ปุ่มให้สมาชิกดูยศของตัวเอง ดูของคนอื่นไม่ได้" flush

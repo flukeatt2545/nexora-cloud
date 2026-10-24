@@ -9,10 +9,10 @@ import {
   type TextChannel,
 } from "discord.js";
 import { assignable } from "./access";
-import { logBotError } from "./api";
+import { api, apiMessage, logBotError } from "./api";
 import { welcomeCard } from "./image";
 import { fillTemplate, settings } from "./settings";
-import { brandEmbed, COLOR, errorEmbed, okEmbed } from "./ui";
+import { brandEmbed, COLOR, errorEmbed, linkButton, okEmbed, row } from "./ui";
 
 const ephemeral = MessageFlags.Ephemeral as const;
 
@@ -83,6 +83,29 @@ export async function onMemberLeave(member: GuildMember | PartialGuildMember) {
   await (channel as TextChannel).send({ embeds: [embed], files }).catch((error) => logBotError("leave message", error));
 }
 
+// The website link lasts ten minutes (backend/discord_verify.go); the private message goes with it.
+const VERIFY_LINK_MS = 10 * 60 * 1000;
+
+/** Verify on the website: the member gets a one-time link in a private message. */
+async function sendVerifyLink(interaction: ButtonInteraction) {
+  try {
+    const res = await api(interaction.user).post<{ url: string }>("/api/internal/bot/community/verify/start", {
+      userId: interaction.user.id, username: interaction.user.username,
+    });
+    await interaction.reply({
+      embeds: [brandEmbed().setTitle("ยืนยันตัวตนผ่านเว็บ").setDescription(
+        "กดปุ่มด้านล่างเพื่อไปที่เว็บ ทำตามขั้นตอน (ไม่กี่วินาที) แล้วกลับมาที่ Discord ยศสมาชิกจะขึ้นให้เอง\n\nลิงก์ใช้ได้ครั้งเดียวภายใน 10 นาที ห้ามส่งให้คนอื่น",
+      )],
+      components: [row(linkButton(res.data.url, "ไปยืนยันที่เว็บ"))],
+      flags: ephemeral,
+    });
+    setTimeout(() => interaction.deleteReply().catch(() => undefined), VERIFY_LINK_MS).unref();
+  } catch (error) {
+    logBotError("verify link", error);
+    await interaction.reply({ embeds: [errorEmbed("ยังยืนยันไม่ได้", apiMessage(error, "ขอลิงก์ยืนยันไม่สำเร็จ ลองใหม่อีกครั้ง"))], flags: ephemeral });
+  }
+}
+
 export async function onVerify(interaction: ButtonInteraction) {
   const current = settings();
   const member = interaction.member as GuildMember;
@@ -99,6 +122,7 @@ export async function onVerify(interaction: ButtonInteraction) {
     await interaction.reply({ embeds: [errorEmbed("ยังยืนยันไม่ได้", "บอทให้ยศสมาชิกไม่ได้ (ยศอยู่สูงกว่ายศของบอท) ลองบอกทีมงานดูนะ")], flags: ephemeral });
     return;
   }
+  if (current.verifyLevel && current.verifyLevel !== "button") return sendVerifyLink(interaction);
   try {
     await member.roles.add(roleId, "กดยืนยันตัวตน");
   } catch (error) {

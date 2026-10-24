@@ -1,0 +1,114 @@
+/* The Discord verify page. It reuses the status-card look from app/c/oauth-ticket.css. */
+
+.verify-card {
+  width: min(100%, 480px);
+}
+
+.verify-mark svg {
+  width: 32px;
+  height: 32px;
+  color: var(--primary);
+}
+
+.verify-ok svg {
+  color: var(--success, var(--primary));
+}
+
+.verify-steps {
+  display: grid;
+  gap: 8px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.verify-steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--theme-line-soft);
+  border-radius: 12px;
+  background: var(--theme-input);
+  opacity: .72;
+}
+
+.verify-steps li.is-now,
+.verify-steps li.is-done {
+  opacity: 1;
+}
+
+.verify-steps li.is-now {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--theme-line-soft));
+}
+
+.verify-steps li > span {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.verify-steps li.is-done > span {
+  background: transparent;
+}
+
+.verify-steps li div {
+  display: grid;
+  gap: 2px;
+}
+
+.verify-steps b {
+  color: var(--theme-text-strong);
+  font-size: 14px;
+}
+
+.verify-steps small {
+  color: var(--theme-text-soft);
+  font-size: 12px;
+}
+
+.verify-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.verify-message svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.verify-captcha {
+  min-height: 65px;
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.verify-discord {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.verify-spin {
+  animation: social-ticket-spin 900ms linear infinite;
+}
