@@ -1,7 +1,7 @@
 "use client";
 
-import { Fragment, type KeyboardEvent, type ReactNode, useRef } from "react";
-import { AudioLines, Bot, Check, CircleAlert, Eye, Gamepad2, Headphones, Mail, PenLine, RotateCcw, Save, Trophy, Users, type LucideIcon } from "lucide-react";
+import { Fragment, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { AudioLines, Bot, Check, ChevronRight, CircleAlert, Eye, Gamepad2, Headphones, Mail, PenLine, RotateCcw, Save, Trophy, Users, type LucideIcon } from "lucide-react";
 import { BotConnectionStrip, type BotConnectionState, useBotConnection } from "./DiscordBotConnection";
 import { ACTIVITY_TEXT_MAX, type ActivityType, type BotKey, MailBotSelfServiceSettings, useBotPresence } from "./DiscordMailBotSettings";
 import { DiscordCommunity } from "./DiscordCommunity";
@@ -38,7 +38,7 @@ const BOT: BotConfig = {
   defaultText: "เซิร์ฟเวอร์",
 };
 
-type Module = { key: string; title: string; text: string; icon: LucideIcon; extras: BotExtra[] };
+type Module = { key: string; title: string; text: string; icon: LucideIcon; commands: string[]; extras: BotExtra[]; link?: { href: string; label: string } };
 
 const MODULES: Module[] = [
   {
@@ -46,6 +46,7 @@ const MODULES: Module[] = [
     title: "ดูแลเซิร์ฟ",
     text: "ต้อนรับ ยืนยันตัวตน Ticket ห้องเสียงชั่วคราว ห้องสถิติ บูสต์ เช็คยศ แจ้งเว็บล่ม และความปลอดภัย",
     icon: Users,
+    commands: ["/setup", "/create", "/ticket"],
     extras: [{ key: "settings", superadminOnly: true, render: (notify) => <DiscordCommunity notify={notify} /> }],
   },
   {
@@ -53,6 +54,7 @@ const MODULES: Module[] = [
     title: "ห้องเสียงมีรหัส",
     text: "ห้องเสียงแบบ Join to Create ห้องที่ต้องใส่รหัส ประวัติเข้าออก และปกป้องห้องกับ AutoMod",
     icon: AudioLines,
+    commands: ["/room", "/setup-join-to-create", "/setup-room-log", "/setup-voice-log", "/voice-history", "/setup-stop", "/setup-room-panel"],
     extras: [
       { key: "rooms", superadminOnly: true, render: (notify) => <DiscordVoiceRooms notify={notify} /> },
       { key: "protect", superadminOnly: true, render: (notify) => <DiscordProtect notify={notify} /> },
@@ -65,6 +67,7 @@ const MODULES: Module[] = [
     title: "เมล",
     text: "อ่านเมล สร้างเมล และแจ้งเมลใหม่ใน Discord (ใช้ /mail ได้ใน DM ด้วย)",
     icon: Mail,
+    commands: ["/mail", "/mail-admin", "/mail-bind", "/mail-unbind", "/setup-mail-panel", "/setup-mail-admin-panel"],
     extras: [{ key: "self-service", render: (notify) => <MailBotSelfServiceSettings notify={notify} /> }],
   },
   {
@@ -72,7 +75,9 @@ const MODULES: Module[] = [
     title: "NEXORA",
     text: "ฐานข้อมูลนักศึกษา อัปโหลดรูป แกลเลอรี และแผงความปลอดภัยในห้อง (/db /code /upload ...)",
     icon: Bot,
+    commands: ["/db", "/code", "/upload", "/my-uploads", "/gallery", "/lockdown", "/crowdsec", "/bot-control", "/bot-panel", "/setup-panel", "/admin-map"],
     extras: [],
+    link: { href: "/admin/bot-uploads", label: "ประวัติอัปโหลดจากบอท" },
   },
 ];
 
@@ -89,9 +94,33 @@ function activityOf(type: ActivityType) {
 }
 
 export default function DiscordBotView({ notify, isSuperadmin }: { notify: Notice; isSuperadmin: boolean }) {
-  const groups = MODULES
-    .map((module) => ({ module, extras: module.extras.filter((extra) => !extra.superadminOnly || isSuperadmin) }))
-    .filter((group) => group.extras.length > 0);
+  const [active, setActive] = useState(MODULES[0].key);
+
+  // A link like /admin/discord-bot#voice opens that part.
+  useEffect(() => {
+    const fromAddress = () => {
+      const wanted = window.location.hash.slice(1);
+      if (MODULES.some((item) => item.key === wanted)) setActive(wanted);
+    };
+    const timer = window.setTimeout(fromAddress, 0);
+    window.addEventListener("hashchange", fromAddress);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("hashchange", fromAddress);
+    };
+  }, []);
+
+  function choose(key: string) {
+    setActive(key);
+    try {
+      window.history.replaceState(null, "", `#${key}`);
+    } catch {
+      // The tab still switches without the address.
+    }
+  }
+
+  const current = MODULES.find((item) => item.key === active) ?? MODULES[0];
+  const extras = current.extras.filter((extra) => !extra.superadminOnly || isSuperadmin);
 
   return (
     <div className="aov hv dbx">
@@ -109,41 +138,51 @@ export default function DiscordBotView({ notify, isSuperadmin }: { notify: Notic
         <aside className="aov-panel dbx-modules" aria-labelledby="dbx-modules-title">
           <header className="dbx-section-head">
             <h2 id="dbx-modules-title">สิ่งที่บอทตัวนี้ทำ</h2>
-            <p>รวมจากบอทเดิมทั้งหมด ใช้ token และ Discord application เดียว</p>
+            <p>รวมจากบอทเดิมทั้งหมด ใช้ token และ Discord application เดียว · เลือกเพื่อดูการตั้งค่า</p>
           </header>
-          <ul className="dbx-module-list">
-            {MODULES.map((module) => (
-              <li key={module.key}>
-                <span className="dbx-extra-mark" aria-hidden="true"><module.icon size={16} /></span>
-                <div>
-                  <b>{module.title}</b>
-                  <small>{module.text}</small>
-                </div>
-              </li>
+          <div className="dbx-tiles" role="tablist" aria-label="ส่วนของบอท">
+            {MODULES.map((item) => (
+              <button key={item.key} type="button" role="tab" id={`dbx-tab-${item.key}`} aria-selected={item.key === active} aria-controls="dbx-panel"
+                className={`dbx-tile${item.key === active ? " is-active" : ""}`} onClick={() => choose(item.key)}>
+                <span className="dbx-extra-mark" aria-hidden="true"><item.icon size={17} /></span>
+                <span className="dbx-tile-copy">
+                  <b>{item.title}</b>
+                  <small>{item.text}</small>
+                </span>
+                <ChevronRight size={16} className="dbx-tile-go" aria-hidden="true" />
+              </button>
             ))}
-          </ul>
+          </div>
         </aside>
       </section>
 
-      {groups.length > 0 && (
-        <section className="dbx-extras" aria-labelledby="dbx-extras-title">
-          <header className="dbx-section-head">
-            <h2 id="dbx-extras-title">ตั้งค่าของบอท</h2>
-            <p>แยกเป็นหมวดตามสิ่งที่บอททำ</p>
-          </header>
-          {groups.map(({ module, extras }) => (
-            <section key={module.key} className="dbx-extra-group" aria-labelledby={`dbx-extra-${module.key}`}>
-              <h3 id={`dbx-extra-${module.key}`}>
-                <span className="dbx-extra-mark" aria-hidden="true"><module.icon size={15} /></span>
-                {module.title}
-              </h3>
-              <div className="dbot-grid">
-                {extras.map((extra) => <Fragment key={extra.key}>{extra.render(notify)}</Fragment>)}
-              </div>
-            </section>
-          ))}
-        </section>
-      )}
+      <section className="dbx-extras" id="dbx-panel" role="tabpanel" aria-labelledby={`dbx-tab-${current.key}`}>
+        <header className="dbx-module-head">
+          <span className="dbx-extra-mark is-large" aria-hidden="true"><current.icon size={20} /></span>
+          <div>
+            <h2>{current.title}</h2>
+            <p>{current.text}</p>
+          </div>
+        </header>
+        <div className="dbx-commands" aria-label={`คำสั่งของ${current.title}`}>
+          <span>คำสั่งใน Discord</span>
+          {current.commands.map((command) => <code key={command}>{command}</code>)}
+        </div>
+        {extras.length > 0 ? (
+          <div className="dbot-grid">
+            {extras.map((extra) => <Fragment key={extra.key}>{extra.render(notify)}</Fragment>)}
+          </div>
+        ) : (
+          <div className="aov-panel dbx-note">
+            <p>
+              {current.extras.length > 0
+                ? "การตั้งค่าส่วนนี้ดูและแก้ได้เฉพาะ superadmin"
+                : "ส่วนนี้ไม่มีหน้าตั้งค่า ใช้งานและตั้งสิทธิ์ผ่านคำสั่งใน Discord (เช่น /bot-control และแผง /bot-panel)"}
+            </p>
+            {current.link && <a className="hv-btn" href={current.link.href}>{current.link.label}</a>}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

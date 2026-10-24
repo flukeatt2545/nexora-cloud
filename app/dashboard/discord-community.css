@@ -33,3 +33,14 @@
   .cmb-feature { padding: 12px; }
   .cmb-steps { margin-inline: 14px; }
 }
+
+/* The settings split into tabs; the unused ones are hidden, not removed, so nothing typed is lost. */
+.cmb-pane[hidden], .cmb-body[hidden], .cmb-server[hidden], .dbot-body > div[hidden] { display: none; }
+.cmb-tabs { display: flex; gap: 4px; padding: 4px; margin-bottom: 14px; overflow-x: auto; border: 1px solid var(--theme-line-soft); border-radius: 12px; background: var(--theme-input); scrollbar-width: none; }
+.cmb-tabs::-webkit-scrollbar { display: none; }
+.cmb-tabs button { position: relative; display: inline-flex; align-items: center; gap: 6px; flex: 1 0 auto; justify-content: center; min-height: 38px; padding: 0 16px; border: 0; border-radius: 9px; background: transparent; color: var(--theme-text-soft); font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.cmb-tabs button:hover { color: var(--theme-text-strong); background: var(--theme-hover); }
+.cmb-tabs button.is-active { background: var(--primary-soft); color: var(--primary-ink); }
+.cmb-tabs button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.cmb-tab-count { min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; line-height: 18px; text-align: center; }
+.cmb-tab-count.is-warn { background: var(--warning-ink, var(--theme-text-soft)); }

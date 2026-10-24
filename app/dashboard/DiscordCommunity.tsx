@@ -80,6 +80,16 @@ type TicketItem = {
   claimedByName: string; closedByName: string; closeReason: string; messageCount: number; createdAt: string; closedAt: string | null;
 };
 type Incident = { id: number; target: "web" | "api"; startedAt: string; endedAt: string; detail: string };
+type Section = "general" | "members" | "rooms" | "security" | "history";
+
+const SECTIONS: { key: Section; label: string }[] = [
+  { key: "general", label: "ทั่วไป" },
+  { key: "members", label: "สมาชิก" },
+  { key: "rooms", label: "ห้องและระบบ" },
+  { key: "security", label: "ความปลอดภัย" },
+  { key: "history", label: "ประวัติ" },
+];
+
 type Data = { settings: Settings; version: number; guild: Guild | null; tickets: TicketItem[]; openTickets: number; incidents: Incident[] };
 
 type ChannelKind = "text" | "voice" | "category";
@@ -248,6 +258,7 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
   const [form, setForm] = useState<Settings | null>(null);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [section, setSection] = useState<Section>("general");
 
   const load = useCallback((resetForm: boolean) => {
     api<Data>("/api/admin/discord-community")
@@ -311,7 +322,18 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
 
   return (
     <>
-      <form className="aov-panel dbot-card dbot-wide" onSubmit={(event) => void save(event)} aria-busy={loading}>
+      <nav className="cmb-tabs" role="tablist" aria-label="หมวดตั้งค่าบอทดูแลเซิร์ฟ">
+        {SECTIONS.map((item) => (
+          <button key={item.key} type="button" role="tab" id={`cmb-tab-${item.key}`} aria-selected={section === item.key}
+            className={section === item.key ? "is-active" : ""} onClick={() => setSection(item.key)}>
+            {item.label}
+            {item.key === "history" && data && data.openTickets > 0 && <span className="cmb-tab-count">{data.openTickets}</span>}
+            {item.key === "general" && guild && guild.problems.length > 0 && <span className="cmb-tab-count is-warn" title="มีสิ่งที่ต้องแก้">!</span>}
+          </button>
+        ))}
+      </nav>
+
+      <form className="aov-panel dbot-card dbot-wide cmb-pane" hidden={section === "history"} onSubmit={(event) => void save(event)} aria-busy={loading}>
         <header className="dbot-card-head">
           <span className="dbot-mark" aria-hidden="true"><Settings2 size={18} /></span>
           <div>
@@ -321,46 +343,58 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
         </header>
         {form && (
           <div className="dbot-body">
-            <div className="cmb-server">
-              <div className="cmb-server-fields">
-                <div className="hv-field">
-                  <label htmlFor="cmb-guild">Server ID</label>
-                  <input id="cmb-guild" inputMode="numeric" maxLength={20} placeholder="1164629034248974418" value={form.guildId}
-                    onChange={(event) => set({ guildId: event.target.value.replace(/[^0-9]/g, "") })} disabled={off} />
-                  <small>เซิร์ฟเดียวที่บอทดูแล เปลี่ยนได้ที่นี่หรือด้วย /setup (บอทต้องถูกเชิญเข้าเซิร์ฟนั้นก่อน) ถ้าบอทถูกเชิญไปเซิร์ฟอื่นจะออกเองเมื่อเซิร์ฟที่ตั้งไว้มีบอทอยู่แล้ว</small>
+            <div hidden={section !== "general"}>
+              <div className="cmb-server">
+                <div className="cmb-server-fields">
+                  <div className="hv-field">
+                    <label htmlFor="cmb-guild">Server ID</label>
+                    <input id="cmb-guild" inputMode="numeric" maxLength={20} placeholder="1164629034248974418" value={form.guildId}
+                      onChange={(event) => set({ guildId: event.target.value.replace(/[^0-9]/g, "") })} disabled={off} />
+                    <small>เซิร์ฟเดียวที่บอทดูแล เปลี่ยนได้ที่นี่หรือด้วย /setup (บอทต้องถูกเชิญเข้าเซิร์ฟนั้นก่อน) ถ้าบอทถูกเชิญไปเซิร์ฟอื่นจะออกเองเมื่อเซิร์ฟที่ตั้งไว้มีบอทอยู่แล้ว</small>
+                  </div>
+                  <div className="hv-field">
+                    <label htmlFor="cmb-style">สไตล์ชื่อห้องและยศ</label>
+                    <select id="cmb-style" className="hv-select" value={form.nameStyle} onChange={(event) => set({ nameStyle: event.target.value as NameStyle })} disabled={off}>
+                      {NAME_STYLES.map((style) => <option key={style.value} value={style.value}>{style.label}</option>)}
+                    </select>
+                    <small>ใช้กับห้อง หมวด และยศที่บอทสร้าง · เปลี่ยนชื่อห้องและยศที่มีอยู่ด้วยปุ่ม 🎨 แต่งชื่อ ใน /setup</small>
+                    <Switch label="ใส่อีโมจิในชื่อ" hint="ปิด = กรอบกับอักษรพิเศษอย่างเดียว ไม่มีอีโมจิ" on={form.nameEmoji} onChange={(on) => set({ nameEmoji: on })} disabled={off} />
+                  </div>
                 </div>
-                <div className="hv-field">
-                  <label htmlFor="cmb-style">สไตล์ชื่อห้องและยศ</label>
-                  <select id="cmb-style" className="hv-select" value={form.nameStyle} onChange={(event) => set({ nameStyle: event.target.value as NameStyle })} disabled={off}>
-                    {NAME_STYLES.map((style) => <option key={style.value} value={style.value}>{style.label}</option>)}
-                  </select>
-                  <small>ใช้กับห้อง หมวด และยศที่บอทสร้าง · เปลี่ยนชื่อห้องและยศที่มีอยู่ด้วยปุ่ม 🎨 แต่งชื่อ ใน /setup</small>
-                  <Switch label="ใส่อีโมจิในชื่อ" hint="ปิด = กรอบกับอักษรพิเศษอย่างเดียว ไม่มีอีโมจิ" on={form.nameEmoji} onChange={(on) => set({ nameEmoji: on })} disabled={off} />
+                <div className={`cmb-guild${guild?.problems.length ? " is-warn" : ""}`} role="status">
+                  <span className="dpr-dot" aria-hidden="true">{guild && !guild.problems.length ? <CircleCheck size={16} /> : <CircleAlert size={16} />}</span>
+                  <div>
+                    {guild ? (
+                      <>
+                        <b>{guild.guildName || guild.guildId}</b>
+                        <small>
+                          {guild.memberCount.toLocaleString("th-TH")} สมาชิก · {guild.channels.length} ห้อง · {guild.roles.length} ยศ · รายงานล่าสุด {ago(guild.updatedAt)}
+                        </small>
+                        <small>{waiting ? "บอทกำลังใช้ค่าใหม่..." : guild.problems.length ? "ใช้งานได้บางส่วน" : "ใช้งานได้ครบ"}</small>
+                        {guild.problems.map((problem) => <small key={problem} className="dpr-problem">{problem}</small>)}
+                      </>
+                    ) : (
+                      <>
+                        <b>ยังไม่มีข้อมูลเซิร์ฟ</b>
+                        <small>ใส่ token ของบอทในการ์ดด้านบน แล้วเชิญบอทเข้าเซิร์ฟ รายชื่อห้องและยศจะขึ้นให้เลือกที่นี่</small>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className={`cmb-guild${guild?.problems.length ? " is-warn" : ""}`} role="status">
-                <span className="dpr-dot" aria-hidden="true">{guild && !guild.problems.length ? <CircleCheck size={16} /> : <CircleAlert size={16} />}</span>
-                <div>
-                  {guild ? (
-                    <>
-                      <b>{guild.guildName || guild.guildId}</b>
-                      <small>
-                        {guild.memberCount.toLocaleString("th-TH")} สมาชิก · {guild.channels.length} ห้อง · {guild.roles.length} ยศ · รายงานล่าสุด {ago(guild.updatedAt)}
-                      </small>
-                      <small>{waiting ? "บอทกำลังใช้ค่าใหม่..." : guild.problems.length ? "ใช้งานได้บางส่วน" : "ใช้งานได้ครบ"}</small>
-                      {guild.problems.map((problem) => <small key={problem} className="dpr-problem">{problem}</small>)}
-                    </>
-                  ) : (
-                    <>
-                      <b>ยังไม่มีข้อมูลเซิร์ฟ</b>
-                      <small>ใส่ token ของบอทในการ์ดด้านบน แล้วเชิญบอทเข้าเซิร์ฟ รายชื่อห้องและยศจะขึ้นให้เลือกที่นี่</small>
-                    </>
-                  )}
+              <div className="cmb-body">
+                <div className="cmb-wide">
+                <Feature title={<div className="cmb-title"><strong>สิทธิ์</strong><small>แอดมินเซิร์ฟ (Manage Server) ใช้ได้ทุกอย่างเสมอ</small></div>}>
+                  <div className="dbot-fields">
+                    <RolesPicker id="cmb-managers" label="ยศผู้ดูแลบอท" hint="ใช้ /setup และ /create ได้" value={form.managerRoleIds} onChange={(managerRoleIds) => set({ managerRoleIds })} guild={guild} disabled={off} max={10} />
+                    <RolesPicker id="cmb-usage" label="ยศที่ใช้ Ticket และห้องเสียงชั่วคราวได้" hint="ไม่เลือก = ทุกคน" value={form.usageRoleIds} onChange={(usageRoleIds) => set({ usageRoleIds })} guild={guild} disabled={off} max={10} />
+                  </div>
+                </Feature>
                 </div>
               </div>
             </div>
 
-            <div className="cmb-body">
+            <div className="cmb-body" hidden={section !== "members"}>
               <div className="dpr-col">
                 <Feature title={<Switch label="ต้อนรับสมาชิกใหม่" hint="ส่งข้อความเมื่อมีคนเข้าเซิร์ฟ" on={form.welcomeEnabled} onChange={(on) => set({ welcomeEnabled: on })} disabled={off} />}>
                   <ChannelPicker id="cmb-welcome" label="ห้องต้อนรับ" kind="text" value={form.welcomeChannelId} onChange={(welcomeChannelId) => set({ welcomeChannelId })} guild={guild} disabled={off || !form.welcomeEnabled} />
@@ -369,18 +403,15 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                   <Switch label="ภาพต้อนรับ" hint="แนบการ์ดต้อนรับพร้อมรูปโปรไฟล์ ชื่อ และลำดับสมาชิก" on={form.welcomeImage} onChange={(on) => set({ welcomeImage: on })} disabled={off || !form.welcomeEnabled} />
                 </Feature>
 
-                <Feature title={<Switch label="ห้องเช็คยศ" hint="แผงปุ่มเช็คยศของฉัน กดแล้วเห็นยศของตัวเองคนเดียว ดูยศของคนอื่นไม่ได้" on={form.roleCheckEnabled} onChange={(on) => set({ roleCheckEnabled: on })} disabled={off} />}>
-                  <ChannelPicker id="cmb-rolecheck" label="ห้องเช็คยศ" kind="text" value={form.roleCheckChannelId} onChange={(roleCheckChannelId) => set({ roleCheckChannelId })} guild={guild} disabled={off || !form.roleCheckEnabled}
-                    hint="ไม่มีห้อง? กด สร้างที่ขาดให้ ใน /setup บอทจะสร้างห้อง ROLES" />
-                </Feature>
-
                 <Feature title={<Switch label="แจ้งคนออก" hint="ส่งข้อความลาก่อนในห้องคนออกเมื่อมีคนออกจากเซิร์ฟ" on={form.leaveEnabled} onChange={(on) => set({ leaveEnabled: on })} disabled={off} />}>
                   <ChannelPicker id="cmb-leave" label="ห้องคนออก" kind="text" value={form.leaveChannelId} onChange={(leaveChannelId) => set({ leaveChannelId })} guild={guild} disabled={off || !form.leaveEnabled} />
                   <TextBox id="cmb-leave-text" label="ข้อความคนออก" value={form.leaveMessage} onChange={(leaveMessage) => set({ leaveMessage })} disabled={off || !form.leaveEnabled}
                     hint="{name} = ชื่อ · {server} = ชื่อเซิร์ฟ · {count} = จำนวนสมาชิกที่เหลือ" />
                   <Switch label="ภาพคนออก" hint="แนบการ์ดลาก่อนพร้อมรูปโปรไฟล์ (ขาวดำ) และจำนวนวันที่อยู่ด้วยกัน" on={form.leaveImage} onChange={(on) => set({ leaveImage: on })} disabled={off || !form.leaveEnabled} />
                 </Feature>
+              </div>
 
+              <div className="dpr-col">
                 <Feature title={<Switch label="ยืนยันตัวตน" hint="กดปุ่มแล้วได้ยศสมาชิก (ปิด = ได้ยศสมาชิกทันทีที่เข้า)" on={form.verifyEnabled} onChange={(on) => set({ verifyEnabled: on })} disabled={off} />}>
                   <div className="dbot-fields">
                     <ChannelPicker id="cmb-verify" label="ห้องยืนยันตัวตน" kind="text" value={form.verifyChannelId} onChange={(verifyChannelId) => set({ verifyChannelId })} guild={guild} disabled={off || !form.verifyEnabled} />
@@ -389,17 +420,14 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                   <TextBox id="cmb-verify-text" label="ข้อความแผงยืนยันตัวตน" value={form.verifyMessage} onChange={(verifyMessage) => set({ verifyMessage })} disabled={off || !form.verifyEnabled} />
                 </Feature>
 
-                <Feature title={<Switch label="ห้องบูสต์" hint="แผงบอกเลเวลและแถบความคืบหน้าบูสต์ สิทธิประโยชน์ และรายชื่อบูสเตอร์ (อัปเดตเอง) · มีห้องคุยเฉพาะคนบูสต์" on={form.boostEnabled} onChange={(on) => set({ boostEnabled: on })} disabled={off} />}>
-                  <div className="dbot-fields">
-                    <ChannelPicker id="cmb-boost" label="ห้องแผงบูสต์" kind="text" value={form.boostChannelId} onChange={(boostChannelId) => set({ boostChannelId })} guild={guild} disabled={off || !form.boostEnabled} />
-                    <ChannelPicker id="cmb-boost-lounge" label="ห้องบูสเตอร์" kind="text" value={form.boostLoungeChannelId} onChange={(boostLoungeChannelId) => set({ boostLoungeChannelId })} guild={guild} disabled={off || !form.boostEnabled}
-                      hint="เห็นเฉพาะคนที่มียศ Server Booster และทีมงาน" />
-                  </div>
-                  <TextBox id="cmb-boost-perks" label="สิทธิประโยชน์ของบูสเตอร์" value={form.boostPerks} onChange={(boostPerks) => set({ boostPerks })} disabled={off || !form.boostEnabled}
-                    hint="เขียนเป็นบรรทัด ๆ แสดงในแผงบูสต์" />
+                <Feature title={<Switch label="ห้องเช็คยศ" hint="แผงปุ่มเช็คยศของฉัน กดแล้วเห็นยศของตัวเองคนเดียว ดูยศของคนอื่นไม่ได้" on={form.roleCheckEnabled} onChange={(on) => set({ roleCheckEnabled: on })} disabled={off} />}>
+                  <ChannelPicker id="cmb-rolecheck" label="ห้องเช็คยศ" kind="text" value={form.roleCheckChannelId} onChange={(roleCheckChannelId) => set({ roleCheckChannelId })} guild={guild} disabled={off || !form.roleCheckEnabled}
+                    hint="ไม่มีห้อง? กด สร้างที่ขาดให้ ใน /setup บอทจะสร้างห้อง ROLES" />
                 </Feature>
               </div>
+            </div>
 
+            <div className="cmb-body" hidden={section !== "rooms"}>
               <div className="dpr-col">
                 <Feature title={<Switch label="Ticket" hint="ปุ่มเปิดห้องคุยส่วนตัวกับทีมงาน ปิดแล้วส่งประวัติไปห้อง log" on={form.ticketsEnabled} onChange={(on) => set({ ticketsEnabled: on })} disabled={off} />}>
                   <div className="dbot-fields">
@@ -427,15 +455,6 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                   </div>
                 </Feature>
 
-                <Feature title={<Switch label="ห้องสถิติ" hint="ชื่อห้องเสียงบอกจำนวนสมาชิก คนออนไลน์ และสถานะเว็บ (อัปเดตทุก 5–10 นาที)" on={form.statsEnabled} onChange={(on) => set({ statsEnabled: on })} disabled={off} />}>
-                  <div className="dbot-fields">
-                    <ChannelPicker id="cmb-stats-members" label="ห้องจำนวนสมาชิก" kind="voice" value={form.statsMembersChannelId} onChange={(statsMembersChannelId) => set({ statsMembersChannelId })} guild={guild} disabled={off || !form.statsEnabled} />
-                    <ChannelPicker id="cmb-stats-online" label="ห้องคนออนไลน์" kind="voice" value={form.statsOnlineChannelId} onChange={(statsOnlineChannelId) => set({ statsOnlineChannelId })} guild={guild} disabled={off || !form.statsEnabled} />
-                    <ChannelPicker id="cmb-stats-site" label="ห้องสถานะเว็บ" kind="voice" value={form.statsSiteChannelId} onChange={(statsSiteChannelId) => set({ statsSiteChannelId })} guild={guild} disabled={off || !form.statsEnabled} />
-                    <ChannelPicker id="cmb-stats-cat" label="หมวดสถิติ" kind="category" value={form.statsCategoryId} onChange={(statsCategoryId) => set({ statsCategoryId })} guild={guild} disabled={off || !form.statsEnabled} />
-                  </div>
-                </Feature>
-
                 <Feature title={<Switch label="แจ้งเว็บล่ม" hint="เช็กเว็บและ API ทุก 30 วินาที (ภาพสถานะอัปเดตทุกครั้ง) ล่มติดกัน 2 ครั้งจึงแจ้ง และแจ้งอีกครั้งเมื่อกลับมา" on={form.statusEnabled} onChange={(on) => set({ statusEnabled: on })} disabled={off} />}>
                   <div className="dbot-fields">
                     <ChannelPicker id="cmb-status" label="ห้องแจ้งสถานะ" kind="text" value={form.statusChannelId} onChange={(statusChannelId) => set({ statusChannelId })} guild={guild} disabled={off || !form.statusEnabled} />
@@ -445,6 +464,29 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                 </Feature>
               </div>
 
+              <div className="dpr-col">
+                <Feature title={<Switch label="ห้องบูสต์" hint="แผงบอกเลเวลและแถบความคืบหน้าบูสต์ สิทธิประโยชน์ และรายชื่อบูสเตอร์ (อัปเดตเอง) · มีห้องคุยเฉพาะคนบูสต์" on={form.boostEnabled} onChange={(on) => set({ boostEnabled: on })} disabled={off} />}>
+                  <div className="dbot-fields">
+                    <ChannelPicker id="cmb-boost" label="ห้องแผงบูสต์" kind="text" value={form.boostChannelId} onChange={(boostChannelId) => set({ boostChannelId })} guild={guild} disabled={off || !form.boostEnabled} />
+                    <ChannelPicker id="cmb-boost-lounge" label="ห้องบูสเตอร์" kind="text" value={form.boostLoungeChannelId} onChange={(boostLoungeChannelId) => set({ boostLoungeChannelId })} guild={guild} disabled={off || !form.boostEnabled}
+                      hint="เห็นเฉพาะคนที่มียศ Server Booster และทีมงาน" />
+                  </div>
+                  <TextBox id="cmb-boost-perks" label="สิทธิประโยชน์ของบูสเตอร์" value={form.boostPerks} onChange={(boostPerks) => set({ boostPerks })} disabled={off || !form.boostEnabled}
+                    hint="เขียนเป็นบรรทัด ๆ แสดงในแผงบูสต์" />
+                </Feature>
+
+                <Feature title={<Switch label="ห้องสถิติ" hint="ชื่อห้องเสียงบอกจำนวนสมาชิก คนออนไลน์ และสถานะเว็บ (อัปเดตทุก 5–10 นาที)" on={form.statsEnabled} onChange={(on) => set({ statsEnabled: on })} disabled={off} />}>
+                  <div className="dbot-fields">
+                    <ChannelPicker id="cmb-stats-members" label="ห้องจำนวนสมาชิก" kind="voice" value={form.statsMembersChannelId} onChange={(statsMembersChannelId) => set({ statsMembersChannelId })} guild={guild} disabled={off || !form.statsEnabled} />
+                    <ChannelPicker id="cmb-stats-online" label="ห้องคนออนไลน์" kind="voice" value={form.statsOnlineChannelId} onChange={(statsOnlineChannelId) => set({ statsOnlineChannelId })} guild={guild} disabled={off || !form.statsEnabled} />
+                    <ChannelPicker id="cmb-stats-site" label="ห้องสถานะเว็บ" kind="voice" value={form.statsSiteChannelId} onChange={(statsSiteChannelId) => set({ statsSiteChannelId })} guild={guild} disabled={off || !form.statsEnabled} />
+                    <ChannelPicker id="cmb-stats-cat" label="หมวดสถิติ" kind="category" value={form.statsCategoryId} onChange={(statsCategoryId) => set({ statsCategoryId })} guild={guild} disabled={off || !form.statsEnabled} />
+                  </div>
+                </Feature>
+              </div>
+            </div>
+
+            <div className="cmb-body" hidden={section !== "security"}>
               <div className="cmb-wide">
                 <Feature title={<Switch label="แจ้งเตือนความปลอดภัย" hint="ห้องที่เห็นเฉพาะทีมงาน: ใครเตะ แบน ลบห้อง/ยศ ให้ยศสิทธิ์สูง เชิญบอทหรือสร้าง webhook และบัญชีเพิ่งสร้างที่เข้าเซิร์ฟ" on={form.securityEnabled} onChange={(on) => set({ securityEnabled: on })} disabled={off} />}>
                   <div className="dbot-fields">
@@ -465,15 +507,6 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                     on={form.antiSpamEnabled} onChange={(on) => set({ antiSpamEnabled: on })} disabled={off} />
                 </Feature>
               </div>
-
-              <div className="cmb-wide">
-                <Feature title={<div className="cmb-title"><strong>สิทธิ์</strong><small>แอดมินเซิร์ฟ (Manage Server) ใช้ได้ทุกอย่างเสมอ</small></div>}>
-                  <div className="dbot-fields">
-                    <RolesPicker id="cmb-managers" label="ยศผู้ดูแลบอท" hint="ใช้ /setup และ /create ได้" value={form.managerRoleIds} onChange={(managerRoleIds) => set({ managerRoleIds })} guild={guild} disabled={off} max={10} />
-                    <RolesPicker id="cmb-usage" label="ยศที่ใช้ Ticket และห้องเสียงชั่วคราวได้" hint="ไม่เลือก = ทุกคน" value={form.usageRoleIds} onChange={(usageRoleIds) => set({ usageRoleIds })} guild={guild} disabled={off} max={10} />
-                  </div>
-                </Feature>
-              </div>
             </div>
           </div>
         )}
@@ -487,7 +520,7 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
         </footer>
       </form>
 
-      <section className="aov-panel dbot-card" aria-busy={loading}>
+      <section className="aov-panel dbot-card cmb-pane" hidden={section !== "history"} aria-busy={loading}>
         <header className="dbot-card-head">
           <span className="dbot-mark" aria-hidden="true"><Ticket size={18} /></span>
           <div>
@@ -518,7 +551,7 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
         )}
       </section>
 
-      <section className="aov-panel dbot-card" aria-busy={loading}>
+      <section className="aov-panel dbot-card cmb-pane" hidden={section !== "history"} aria-busy={loading}>
         <header className="dbot-card-head">
           <span className="dbot-mark" aria-hidden="true"><Activity size={18} /></span>
           <div>
