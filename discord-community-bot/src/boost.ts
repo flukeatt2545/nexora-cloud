@@ -11,12 +11,11 @@ import { BRAND, brandEmbed, when } from "./ui";
 // minutes and when a boost starts or the level changes. The lounge is a chat for boosters.
 
 const LEVELS = [
-  { level: 1, boosts: 2, perks: "อีโมจิ 100 ช่อง · สติกเกอร์ 15 อัน · เสียง 128 kbps · ไอคอนเซิร์ฟเคลื่อนไหว" },
-  { level: 2, boosts: 7, perks: "อีโมจิ 150 ช่อง · สติกเกอร์ 30 อัน · เสียง 256 kbps · แบนเนอร์เซิร์ฟ · ไอคอนยศ · อัปโหลด 50 MB" },
-  { level: 3, boosts: 14, perks: "อีโมจิ 250 ช่อง · สติกเกอร์ 60 อัน · เสียง 384 kbps · ลิงก์เชิญเฉพาะ · แบนเนอร์เคลื่อนไหว · อัปโหลด 100 MB" },
+  { level: 1, boosts: 2, perks: ["อีโมจิ 100 ช่อง", "สติกเกอร์ 15 อัน", "เสียง 128 kbps", "ไอคอนเซิร์ฟเคลื่อนไหว"] },
+  { level: 2, boosts: 7, perks: ["อีโมจิ 150 ช่อง", "สติกเกอร์ 30 อัน", "เสียง 256 kbps", "แบนเนอร์เซิร์ฟ", "ไอคอนยศ", "อัปโหลด 50 MB"] },
+  { level: 3, boosts: 14, perks: ["อีโมจิ 250 ช่อง", "สติกเกอร์ 60 อัน", "เสียง 384 kbps", "ลิงก์เชิญเฉพาะ", "แบนเนอร์เคลื่อนไหว", "อัปโหลด 100 MB"] },
 ];
 
-const BAR_CELLS = 14;
 const MAX_LISTED = 15;
 
 async function boosters(guild: Guild) {
@@ -24,11 +23,6 @@ async function boosters(guild: Guild) {
   if (guild.members.cache.size < guild.memberCount) await guild.members.fetch().catch(() => undefined);
   return [...guild.members.cache.values()].filter((member) => member.premiumSince)
     .sort((a, b) => a.premiumSinceTimestamp! - b.premiumSinceTimestamp!);
-}
-
-function bar(boosts: number) {
-  const filled = Math.min(BAR_CELLS, Math.round((boosts / LEVELS[LEVELS.length - 1].boosts) * BAR_CELLS));
-  return `${"▰".repeat(filled)}${"▱".repeat(BAR_CELLS - filled)}`;
 }
 
 /** Only boosters (and staff) see the lounge; Discord makes the booster role at the first boost. */
@@ -54,19 +48,26 @@ export async function refreshBoost(client: Client, repost = false) {
   const count = guild.premiumSubscriptionCount ?? list.length;
   const level = guild.premiumTier as number;
   const picture = await boostCard({ server: guild.name, level, boosts: count });
-  const levels = LEVELS.map((item) => `${level >= item.level ? "✅" : "🔒"} **เลเวล ${item.level}** (${item.boosts} บูสต์) · ${item.perks}`).join("\n");
-  const names = list.slice(0, MAX_LISTED).map((member) => `• ${member} · ตั้งแต่ ${when(member.premiumSince!, "D")}`).join("\n");
-  const lounge = current.boostLoungeChannelId ? `\nห้องของบูสเตอร์: <#${current.boostLoungeChannelId}>` : "";
+  // The picture shows the level and the bar; the text says what is left and what each level gives.
+  const next = LEVELS.find((item) => item.level > level);
+  const toNext = next ? `อีก **${Math.max(0, next.boosts - count)} บูสต์** ถึงเลเวล ${next.level}` : "ถึงเลเวลสูงสุดแล้ว 🎉";
+  const levelFields = LEVELS.map((item) => ({
+    name: `${level >= item.level ? "✅" : "🔒"} เลเวล ${item.level} · ${item.boosts} บูสต์`,
+    value: item.perks.map((perk) => `• ${perk}`).join("\n"),
+    inline: true,
+  }));
+  const names = list.slice(0, MAX_LISTED).map((member, index) => `${index + 1}. ${member} · ตั้งแต่ ${when(member.premiumSince!, "D")}`).join("\n");
+  const lounge = current.boostLoungeChannelId ? `\n\n💬 ห้องพักของบูสเตอร์ <#${current.boostLoungeChannelId}> (เห็นเฉพาะบูสเตอร์)` : "";
   const embed = brandEmbed()
     .setAuthor({ name: `${BRAND} · SERVER BOOST` })
     .setImage("attachment://boost.png")
-    .setDescription(`\`${bar(count)}\` **${count}** / ${LEVELS[LEVELS.length - 1].boosts} บูสต์`)
+    .setDescription(`เซิร์ฟมี **${count} บูสต์** · ${toNext}`)
     .addFields(
-      { name: "สิทธิประโยชน์ของบูสเตอร์", value: `${current.boostPerks}${lounge}`.slice(0, 1024) },
-      { name: "สิ่งที่เซิร์ฟได้ในแต่ละเลเวล", value: levels.slice(0, 1024) },
-      { name: `บูสเตอร์ (${list.length})`, value: (names || "_ยังไม่มีใครบูสต์ เป็นคนแรกเลย!_") + (list.length > MAX_LISTED ? `\n…และอีก ${list.length - MAX_LISTED} คน` : "") },
+      { name: "🎁 สิทธิประโยชน์ของบูสเตอร์", value: `${current.boostPerks}${lounge}`.slice(0, 1024) },
+      ...levelFields,
+      { name: `💎 บูสเตอร์ (${list.length})`, value: (names || "ยังไม่มีใครบูสต์ เป็นคนแรกเลย!") + (list.length > MAX_LISTED ? `\nและอีก ${list.length - MAX_LISTED} คน` : "") },
     )
-    .setFooter({ text: "อัปเดตอัตโนมัติ" })
+    .setFooter({ text: "อัปเดตอัตโนมัติทุก 10 นาที" })
     .setTimestamp();
   await postPanel(guild, "boost", current.boostChannelId, { embeds: [embed], files: [new AttachmentBuilder(picture, { name: "boost.png" })] }, repost);
 }
