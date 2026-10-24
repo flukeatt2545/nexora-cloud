@@ -91,19 +91,27 @@ export function closeModal(ticketId: number) {
 }
 
 /** The first message in a ticket's room: what it is about, and the buttons. */
-export function ticketHeader(ticket: { id: number; subject: string; openerId: string; claimedById: string }, detail: string) {
+export function ticketHeader(
+  ticket: { id: number; subject: string; openerId: string; claimedById: string; createdAt: string },
+  detail: string,
+  openerAvatar?: string,
+) {
   const embed = new EmbedBuilder()
     .setColor(ticket.claimedById ? COLOR.ok : COLOR.brand)
-    .setTitle(`Ticket #${ticket.id} · ${ticket.subject}`)
-    .setDescription(detail || "_ไม่มีรายละเอียด_")
+    .setTitle(`🎫 Ticket #${ticket.id} · ${ticket.subject}`.slice(0, 256))
     .addFields(
       { name: "เปิดโดย", value: `<@${ticket.openerId}>`, inline: true },
-      { name: "ผู้รับเรื่อง", value: ticket.claimedById ? `<@${ticket.claimedById}>` : "ยังไม่มี", inline: true },
+      { name: "สถานะ", value: ticket.claimedById ? `🟢 <@${ticket.claimedById}> กำลังดูให้` : "🟡 รอทีมงานรับเรื่อง", inline: true },
+      { name: "เปิดเมื่อ", value: when(new Date(ticket.createdAt), "t"), inline: true },
     )
-    .setFooter({ text: "ทีมงานกด รับเรื่อง เพื่อบอกว่ากำลังดูให้ · ปิดได้ทั้งคนเปิดและทีมงาน" });
+    .setFooter({ text: "ทีมงานกด ✋ รับเรื่อง เมื่อเริ่มดูให้ · ปิดได้ทั้งคนเปิดและทีมงาน" });
+  // The member's own words come first, quoted, so they read as the question and not as bot text.
+  if (detail) embed.setDescription(detail.split("\n").map((line) => `> ${line}`).join("\n").slice(0, 4000));
+  if (openerAvatar) embed.setThumbnail(openerAvatar);
   const buttons = row(
-    new ButtonBuilder().setCustomId(`cm:ticket:claim:${ticket.id}`).setStyle(ButtonStyle.Success).setLabel("รับเรื่อง").setDisabled(Boolean(ticket.claimedById)),
-    new ButtonBuilder().setCustomId(`cm:ticket:close:${ticket.id}`).setStyle(ButtonStyle.Danger).setLabel("ปิด Ticket"),
+    new ButtonBuilder().setCustomId(`cm:ticket:claim:${ticket.id}`).setStyle(ButtonStyle.Success)
+      .setLabel(ticket.claimedById ? "✅ รับเรื่องแล้ว" : "✋ รับเรื่อง").setDisabled(Boolean(ticket.claimedById)),
+    new ButtonBuilder().setCustomId(`cm:ticket:close:${ticket.id}`).setStyle(ButtonStyle.Danger).setLabel("🔒 ปิด Ticket"),
   );
   return { embeds: [embed], components: [buttons] };
 }

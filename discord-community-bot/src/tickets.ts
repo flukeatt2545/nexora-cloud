@@ -1,8 +1,10 @@
 import {
   AttachmentBuilder,
   ChannelType,
+  cleanContent,
   EmbedBuilder,
   MessageFlags,
+  MessageType,
   OverwriteType,
   PermissionFlagsBits,
   type ButtonInteraction,
@@ -19,7 +21,7 @@ import { canUse, isStaff } from "./access";
 import { api, apiMessage, apiStatus, logBotError } from "./api";
 import { homeGuild } from "./guild";
 import { settings } from "./settings";
-import { closeModal, COLOR, errorEmbed, idFrom, linkButton, okEmbed, row, channelUrl, ticketHeader, ticketModal, when } from "./ui";
+import { closeModal, COLOR, errorEmbed, idFrom, linkButton, minutesText, okEmbed, row, channelUrl, ticketHeader, ticketModal, when } from "./ui";
 
 const ephemeral = MessageFlags.Ephemeral as const;
 
@@ -142,9 +144,9 @@ export async function onTicketCreate(interaction: ModalSubmitInteraction) {
   const staff = (current.staffRoleIds ?? []).filter((id) => guild.roles.cache.has(id));
   await channel.send({
     content: [`<@${member.id}>`, ...staff.map((id) => `<@&${id}>`)].join(" "),
-    ...ticketHeader(ticket, detail),
+    ...ticketHeader(ticket, detail, member.displayAvatarURL({ size: 128 })),
     allowedMentions: { users: [member.id], roles: staff },
-  }).then((message) => message.pin().catch(() => undefined)).catch((error) => logBotError("ticket header", error));
+  }).catch((error) => logBotError("ticket header", error));
   await interaction.editReply({
     embeds: [okEmbed(`เปิด Ticket #${ticket.id} แล้ว`, "ไปคุยกับทีมงานในห้องของคุณได้เลย")],
     components: [row(linkButton(channelUrl(guild.id, channel.id), "ไปที่ห้อง Ticket"))],
@@ -172,8 +174,10 @@ export async function onTicketClaim(interaction: ButtonInteraction) {
       staffId: member.id, staffName: interaction.user.username,
     });
     open.set(ticket.channelId, res.data);
-    const detail = interaction.message.embeds[0]?.description ?? "";
-    await interaction.update(ticketHeader(res.data, detail === "_ไม่มีรายละเอียด_" ? "" : detail));
+    const first = interaction.message.embeds[0];
+    // The header quotes the member's words (every line starts with "> "); put them back as they were.
+    const detail = (first?.description ?? "").split("\n").map((line) => line.replace(/^> ?/, "")).join("\n");
+    await interaction.update(ticketHeader(res.data, detail, first?.thumbnail?.url));
     await (interaction.channel as TextChannel).send({ embeds: [okEmbed("รับเรื่องแล้ว", `<@${member.id}> กำลังดูเรื่องนี้ให้`)] });
   } catch (error) {
     logBotError("claim ticket", error);
@@ -205,32 +209,77 @@ export async function onTicketCloseSubmit(interaction: ModalSubmitInteraction) {
   await interaction.editReply({ embeds: [okEmbed("ปิด Ticket แล้ว", "ห้องนี้จะถูกลบใน 5 วินาที")] }).catch(() => undefined);
 }
 
-/** Every message in the room, oldest first (up to 2,000), as plain text. */
-async function transcript(channel: TextChannel, ticket: Ticket) {
-  const messages: Message[] = [];
+const stamp = (date: Date) => date.toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "short", timeStyle: "medium" });
+
+/** What a message says as plain text: mentions turned into names, embeds and files included. */
+function messageText(message: Message, names: Map<string, string>) {
+  const parts = [
+    cleanContent(message.content, message.channel),
+    ...message.embeds.map((embed) => cleanContent([embed.title, embed.description, ...embed.fields.map((field) => `${field.name}: ${field.value}`)].filter(Boolean).join(" — "), message.channel)),
+    ...message.attachments.map((file) => `📎 ${file.name} ${file.url}`),
+  ].filter(Boolean);
+  // Members the bot does not have cached stay as <@id>; the ones in this ticket are named.
+  return parts.join("\n").replace(/<@!?(\d+)>/g, (whole, id: string) => (names.has(id) ? `@${names.get(id)}` : whole));
+}
+
+/**
+ * The chat as a text file: a summary on top, then every message oldest first (up to 2,000).
+ * The bot's opening card is left out (its details are in the summary) and so are Discord's own
+ * notices such as pins; mentions show as names.
+ */
+async function transcript(channel: TextChannel, ticket: Ticket, by: GuildMember, reason: string) {
+  const all: Message[] = [];
   let before: string | undefined;
-  while (messages.length < 2000) {
+  while (all.length < 2000) {
     const batch = await channel.messages.fetch({ limit: 100, before });
     if (batch.size === 0) break;
-    messages.push(...batch.values());
+    all.push(...batch.values());
     before = batch.last()!.id;
     if (batch.size < 100) break;
   }
-  messages.reverse();
-  const stamp = (date: Date) => date.toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "short", timeStyle: "medium" });
+  all.reverse();
+  const me = channel.client.user.id;
+  const header = all.find((message) => message.author.id === me && message.embeds[0]?.title?.includes(`Ticket #${ticket.id} ·`));
+  const detail = header?.embeds[0]?.description?.split("\n").map((line) => line.replace(/^> ?/, "")).join("\n") ?? "";
+  const messages = all.filter((message) => message !== header && (message.type === MessageType.Default || message.type === MessageType.Reply));
+  const names = new Map<string, string>([[ticket.openerId, ticket.openerName], [by.id, by.displayName]]);
+  if (ticket.claimedById) names.set(ticket.claimedById, ticket.claimedByName);
+  const line = "─".repeat(46);
   const lines = [
     `Ticket #${ticket.id} · ${ticket.subject}`,
-    `เปิดโดย ${ticket.openerName} (${ticket.openerId})`,
-    `ห้อง #${channel.name} · ${messages.length} ข้อความ`,
+    "═".repeat(46),
+    `เปิดโดย      ${ticket.openerName} (${ticket.openerId})`,
+    `ผู้รับเรื่อง    ${ticket.claimedByName || "ไม่มี"}`,
+    `เปิดเมื่อ      ${stamp(new Date(ticket.createdAt))}`,
+    `ปิดเมื่อ       ${stamp(new Date())}`,
+    `ปิดโดย       ${by.displayName}${reason ? ` · ${reason}` : ""}`,
+    `ข้อความ      ${messages.length}`,
+    ...(detail ? ["", "รายละเอียดตอนเปิด", ...detail.split("\n").map((text) => `  ${text}`)] : []),
+    line,
     "",
   ];
   for (const message of messages) {
-    const text = [message.content, ...message.embeds.map((embed) => [embed.title, embed.description].filter(Boolean).join(" — "))]
-      .filter(Boolean).join("\n  ");
-    const files = message.attachments.map((file) => file.url).join(" ");
-    lines.push(`[${stamp(message.createdAt)}] ${message.author.username}: ${text}${files ? ` ${files}` : ""}`);
+    const name = message.member?.displayName ?? message.author.username;
+    lines.push(`[${stamp(message.createdAt)}] ${name}${message.author.bot ? " (บอท)" : ""}`, `  ${messageText(message, names).replace(/\n/g, "\n  ")}`, "");
   }
   return { text: lines.join("\n"), count: messages.length };
+}
+
+/** The card shared by the log room and the member's copy. */
+function closedEmbed(ticket: Ticket, by: GuildMember, reason: string, count: number) {
+  const embed = new EmbedBuilder()
+    .setColor(COLOR.warn)
+    .setTitle(`🔒 ปิด Ticket #${ticket.id} · ${ticket.subject}`.slice(0, 256))
+    .addFields(
+      { name: "เปิดโดย", value: `<@${ticket.openerId}>`, inline: true },
+      { name: "ปิดโดย", value: `<@${by.id}>`, inline: true },
+      { name: "ผู้รับเรื่อง", value: ticket.claimedById ? `<@${ticket.claimedById}>` : "—", inline: true },
+      { name: "เปิดเมื่อ", value: when(new Date(ticket.createdAt)), inline: true },
+      { name: "ใช้เวลา", value: minutesText(Date.now() - new Date(ticket.createdAt).getTime()), inline: true },
+      { name: "ข้อความ", value: count.toLocaleString("th-TH"), inline: true },
+    );
+  if (reason) embed.setDescription(`**เหตุผล** ${reason}`);
+  return embed;
 }
 
 async function closeTicket(guild: Guild, ticket: Ticket, by: GuildMember, reason: string) {
@@ -241,7 +290,7 @@ async function closeTicket(guild: Guild, ticket: Ticket, by: GuildMember, reason
   let count = 0;
   if (channel) {
     try {
-      const result = await transcript(channel, ticket);
+      const result = await transcript(channel, ticket, by, reason);
       count = result.count;
       file = new AttachmentBuilder(Buffer.from(result.text, "utf8"), { name: `ticket-${String(ticket.id).padStart(4, "0")}.txt` });
     } catch (error) {
@@ -250,21 +299,11 @@ async function closeTicket(guild: Guild, ticket: Ticket, by: GuildMember, reason
   }
   await closeRecord(ticket.id, by.id, by.user.username, reason, count);
   open.delete(ticket.channelId);
-  const embed = new EmbedBuilder()
-    .setColor(COLOR.warn)
-    .setTitle(`ปิด Ticket #${ticket.id} · ${ticket.subject}`)
-    .addFields(
-      { name: "เปิดโดย", value: `<@${ticket.openerId}>`, inline: true },
-      { name: "ปิดโดย", value: `<@${by.id}>`, inline: true },
-      { name: "ผู้รับเรื่อง", value: ticket.claimedById ? `<@${ticket.claimedById}>` : "ไม่มี", inline: true },
-      { name: "เปิดเมื่อ", value: when(new Date(ticket.createdAt)), inline: true },
-      { name: "ข้อความ", value: count.toLocaleString("th-TH"), inline: true },
-    );
-  if (reason) embed.setDescription(`เหตุผล: ${reason}`);
+  const embed = closedEmbed(ticket, by, reason, count);
   const logId = settings()?.ticketLogChannelId;
   const log = logId ? guild.channels.cache.get(logId) : undefined;
   if (log?.type === ChannelType.GuildText) {
-    await (log as TextChannel).send({ embeds: [embed], files: file ? [file] : [] }).catch((error) => logBotError("ticket log", error));
+    await (log as TextChannel).send({ embeds: [embed], files: file ? [file] : [], allowedMentions: { parse: [] } }).catch((error) => logBotError("ticket log", error));
   }
   // The member gets a copy too, when their DMs are open.
   const opener = await guild.members.fetch(ticket.openerId).catch(() => null);
