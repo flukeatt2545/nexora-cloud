@@ -38,10 +38,14 @@ export function linkRow(guildId: string, channelId: string, label = "ไปท�
 export function roomPanel(roomId: number, name: string, ownerId: string) {
   const embed = new EmbedBuilder()
     .setColor(COLOR.brand)
-    .setTitle(name)
-    .setDescription(`ห้องของ <@${ownerId}>\nเจ้าของกด "จัดการห้อง" เพื่อตั้งรหัส หรือเปิดให้ทุกคนเข้าได้`);
+    .setTitle(`🔊 ${name}`.slice(0, 256))
+    .setDescription([
+      `**เจ้าของห้อง** <@${ownerId}>`,
+      "",
+      "เจ้าของกด **จัดการห้อง** เพื่อตั้งรหัส ล็อก เปิดให้ทุกคนเข้า หรือเตะคนออก",
+    ].join("\n"));
   const row = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`vr:manage:${roomId}`).setStyle(ButtonStyle.Secondary).setLabel("จัดการห้อง"),
+    new ButtonBuilder().setCustomId(`vr:manage:${roomId}`).setStyle(ButtonStyle.Primary).setLabel("⚙️ จัดการห้อง"),
   );
   return { embeds: [embed], components: [row] };
 }
@@ -120,28 +124,35 @@ export function editModal(room: VoiceRoom) {
 
 /** The owner's private controls for one room. */
 export function managePanel(room: VoiceRoom, emptyMinutes: number) {
+  // One line for the state, then three short facts side by side (long values wrap badly in columns).
+  const status = !room.locked
+    ? "🌐 **เปิด** · ใครก็เข้าได้"
+    : room.hasPassword
+      ? "🔐 **ล็อก** · ต้องใส่รหัสก่อนเข้า"
+      : "🔒 **ปิด** · ตอนนี้เข้าได้แค่คุณ";
   const embed = new EmbedBuilder()
-    .setColor(room.locked ? COLOR.brand : COLOR.warn)
-    .setTitle(`${room.name}`)
+    .setColor(!room.locked ? COLOR.ok : room.hasPassword ? COLOR.brand : COLOR.warn)
+    .setTitle(`🔊 ${room.name}`.slice(0, 256))
+    .setDescription(status)
     .addFields(
-      { name: "สถานะ", value: room.locked ? (room.hasPassword ? "ล็อก ต้องใส่รหัส" : "ปิด เข้าได้แค่คุณ") : "เปิด ใครก็เข้าได้", inline: true },
-      { name: "ใส่รหัสแล้ว", value: `${room.accessCount} คน`, inline: true },
-      { name: "รับได้", value: room.userLimit ? `${room.userLimit} คน` : "ไม่จำกัด", inline: true },
+      { name: "🔑 รหัส", value: room.hasPassword ? "ตั้งแล้ว" : "ยังไม่ตั้ง", inline: true },
+      { name: "👥 ใส่รหัสแล้ว", value: `${room.accessCount} คน`, inline: true },
+      { name: "🎚️ รับได้", value: room.userLimit ? `${room.userLimit} คน` : "ไม่จำกัด", inline: true },
     )
-    .setFooter({ text: `ถ้าไม่มีใครอยู่ ${emptyMinutes} นาที ห้องจะหายไปเอง` });
+    .setFooter({ text: `ห้องว่าง ${emptyMinutes} นาที จะหายไปเอง` });
   const actions = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
     room.hasPassword
-      ? new ButtonBuilder().setCustomId(`vr:newpw:${room.id}`).setStyle(ButtonStyle.Secondary).setLabel("เปลี่ยนรหัส")
-      : new ButtonBuilder().setCustomId(`vr:lockpw:${room.id}`).setStyle(ButtonStyle.Primary).setLabel("ตั้งรหัส"),
+      ? new ButtonBuilder().setCustomId(`vr:newpw:${room.id}`).setStyle(ButtonStyle.Secondary).setLabel("🔑 เปลี่ยนรหัส")
+      : new ButtonBuilder().setCustomId(`vr:lockpw:${room.id}`).setStyle(ButtonStyle.Primary).setLabel("🔑 ตั้งรหัส"),
     new ButtonBuilder()
       .setCustomId(`vr:lock:${room.id}`)
-      .setStyle(room.locked ? ButtonStyle.Secondary : ButtonStyle.Primary)
-      .setLabel(room.locked ? "เปิดให้ทุกคนเข้า" : room.hasPassword ? "ล็อก" : "ปิดห้อง"),
-    new ButtonBuilder().setCustomId(`vr:edit:${room.id}`).setStyle(ButtonStyle.Secondary).setLabel("แก้ชื่อ/จำนวนคน"),
-    new ButtonBuilder().setCustomId(`vr:del:${room.id}`).setStyle(ButtonStyle.Danger).setLabel("ลบห้อง"),
+      .setStyle(room.locked ? ButtonStyle.Success : ButtonStyle.Secondary)
+      .setLabel(room.locked ? "🌐 เปิดให้ทุกคน" : room.hasPassword ? "🔐 ล็อกห้อง" : "🔒 ปิดห้อง"),
+    new ButtonBuilder().setCustomId(`vr:edit:${room.id}`).setStyle(ButtonStyle.Secondary).setLabel("✏️ แก้ไข"),
+    new ButtonBuilder().setCustomId(`vr:del:${room.id}`).setStyle(ButtonStyle.Danger).setLabel("🗑️ ลบห้อง"),
   );
   const kick = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    new UserSelectMenuBuilder().setCustomId(`vr:kick:${room.id}`).setPlaceholder("เลือกคนที่จะเตะ").setMinValues(1).setMaxValues(5),
+    new UserSelectMenuBuilder().setCustomId(`vr:kick:${room.id}`).setPlaceholder("👢 เลือกคนที่จะเตะออกจากห้อง").setMinValues(1).setMaxValues(5),
   );
   return { embeds: [embed], components: [actions, kick] };
 }

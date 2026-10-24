@@ -214,13 +214,13 @@ function confirmPayload(token: string, job: Job) {
 export async function onPurgeCommand(interaction: ChatInputCommandInteraction) {
   const member = interaction.member as GuildMember;
   const guild = interaction.guild!;
-  const everywhere = interaction.options.getBoolean("everywhere") ?? false;
+  const everywhere = interaction.options.getString("scope") === "all";
   const count = interaction.options.getInteger("count") ?? 0;
   const from = interaction.options.getUser("member")?.id ?? "";
   const picked = interaction.options.getChannel("room");
   const reject = (title: string, text: string) => interaction.reply({ embeds: [errorEmbed(title, text)], flags: ephemeral });
   if (running) return void (await reject("กำลังลบอยู่", "รอให้รอบที่แล้วเสร็จก่อน"));
-  if (everywhere && (picked || count)) return void (await reject("เลือกซ้อนกัน", "\"ทุกห้อง\" ใช้ร่วมกับ \"ห้อง\" หรือ \"จำนวน\" ไม่ได้ (ลบทุกข้อความในทุกห้อง)"));
+  if (everywhere && (picked || count)) return void (await reject("เลือกซ้อนกัน", "ขอบเขต \"ทุกห้อง\" ใช้ร่วมกับ \"ห้อง\" หรือ \"จำนวน\" ไม่ได้ (จะลบทุกข้อความในทุกห้อง) เลือกอย่างใดอย่างหนึ่ง"));
   if (everywhere) {
     // Clearing the whole server is the owner's and Administrators' call, like wiping channels.
     if (!mayWipe(member)) return void (await reject("ใช้ไม่ได้", "ลบข้อความทุกห้องได้เฉพาะเจ้าของเซิร์ฟและคนที่มีสิทธิ์ Administrator"));
