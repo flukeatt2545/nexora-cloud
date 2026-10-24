@@ -114,3 +114,13 @@
   .dbx-dirty { flex-basis: 100%; }
   .dbx-foot .hv-btn { flex: 1; }
 }
+
+/* One bot: its card, and next to it what the bot does. */
+.dbx-grid-one { grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); }
+.dbx-modules { display: grid; align-content: start; gap: 4px; padding-bottom: 8px; }
+.dbx-modules .dbx-section-head { padding: 16px 16px 6px; }
+.dbx-module-list { list-style: none; margin: 0; padding: 4px 16px 12px; display: grid; gap: 4px; }
+.dbx-module-list li { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--theme-line-soft); }
+.dbx-module-list li:first-child { border-top: 0; }
+.dbx-module-list b { display: block; font-size: 14px; color: var(--theme-text-strong); }
+.dbx-module-list small { display: block; margin-top: 2px; color: var(--theme-text-soft); line-height: 1.5; }

@@ -314,6 +314,8 @@ services:
     build:
       context: ./discord-bot
     restart: unless-stopped
+    profiles:
+      - legacy
     environment:
       DISCORD_BOT_TOKEN: ${DISCORD_SECURITY_BOT_TOKEN:-}
       DISCORD_CLIENT_ID: ${DISCORD_SECURITY_CLIENT_ID:-}
@@ -333,6 +335,8 @@ services:
     build:
       context: ./discord-mail-bot
     restart: unless-stopped
+    profiles:
+      - legacy
     environment:
       MAIL_DISCORD_BOT_TOKEN: ${MAIL_DISCORD_BOT_TOKEN:-}
       MAIL_DISCORD_CLIENT_ID: ${MAIL_DISCORD_CLIENT_ID:-}
@@ -351,6 +355,8 @@ services:
     build:
       context: ./discord-voice-bot
     restart: unless-stopped
+    profiles:
+      - legacy
     environment:
       VOICE_DISCORD_BOT_TOKEN: ${VOICE_DISCORD_BOT_TOKEN:-}
       VOICE_DISCORD_CATEGORY_ID: ${VOICE_DISCORD_CATEGORY_ID:-}
@@ -372,6 +378,14 @@ services:
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://nkn02.com}
       COMMUNITY_STATUS_WEB_URL: ${COMMUNITY_STATUS_WEB_URL:-}
       COMMUNITY_STATUS_API_URL: ${COMMUNITY_STATUS_API_URL:-}
+      # The voice-room, mail and NEXORA modules (they used to be bots of their own).
+      DISCORD_ADMIN_IDS: ${DISCORD_ADMIN_IDS:-}
+      MAIL_DISCORD_ADMIN_IDS: ${MAIL_DISCORD_ADMIN_IDS:-${DISCORD_ADMIN_IDS:-}}
+      VOICE_DISCORD_CATEGORY_ID: ${VOICE_DISCORD_CATEGORY_ID:-}
+      DEFAULT_SSO_DOMAIN: ${DEFAULT_PHPMYADMIN_URL:-https://db.nkn02.com}
+      CROWDSEC_LAPI_URL: ${CROWDSEC_LAPI_URL:-}
+      CROWDSEC_MACHINE_USER: ${CROWDSEC_MACHINE_USER:-}
+      CROWDSEC_MACHINE_PASSWORD: ${CROWDSEC_MACHINE_PASSWORD:-}
     depends_on:
       - api
 

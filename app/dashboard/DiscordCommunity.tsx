@@ -325,8 +325,9 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
               <div className="cmb-server-fields">
                 <div className="hv-field">
                   <label htmlFor="cmb-guild">Server ID</label>
-                  <input id="cmb-guild" value={form.guildId || "1164629034248974418"} readOnly disabled />
-                  <small>บอทนี้ล็อกไว้ที่เซิร์ฟนี้เซิร์ฟเดียว ถ้าถูกเชิญไปเซิร์ฟอื่นจะออกเอง</small>
+                  <input id="cmb-guild" inputMode="numeric" maxLength={20} placeholder="1164629034248974418" value={form.guildId}
+                    onChange={(event) => set({ guildId: event.target.value.replace(/[^0-9]/g, "") })} disabled={off} />
+                  <small>เซิร์ฟเดียวที่บอทดูแล เปลี่ยนได้ที่นี่หรือด้วย /setup (บอทต้องถูกเชิญเข้าเซิร์ฟนั้นก่อน) ถ้าบอทถูกเชิญไปเซิร์ฟอื่นจะออกเองเมื่อเซิร์ฟที่ตั้งไว้มีบอทอยู่แล้ว</small>
                 </div>
                 <div className="hv-field">
                   <label htmlFor="cmb-style">สไตล์ชื่อห้องและยศ</label>

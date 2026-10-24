@@ -4,11 +4,12 @@ import { api, logBotError } from "./api";
 import { GUILD_ID } from "./config";
 import { settings, settingsVersion } from "./settings";
 
-// The bot looks after one server (GUILD_ID). In any other server it answers only with a note,
-// and it leaves such a server as soon as it notices (see index.ts).
+// The bot looks after one server: the Server ID set on the admin page or with /setup, or
+// GUILD_ID until one is set. In any other server it answers only with a note, and it leaves such
+// a server once the one it looks after is among its servers (see apply.ts).
 
 export function homeGuildId(_client?: Client) {
-  return GUILD_ID;
+  return settings()?.guildId || GUILD_ID;
 }
 
 export function homeGuild(client: Client): Guild | undefined {

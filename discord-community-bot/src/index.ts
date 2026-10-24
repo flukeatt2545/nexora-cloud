@@ -16,6 +16,8 @@ import { API_URL, BOT_SECRET, ENV_TOKEN } from "./config";
 import { ensureSetupChannel } from "./build";
 import { isHome, reportGuild, reportSoon } from "./guild";
 import { checkRateLimit } from "./limits";
+import { attachLegacy, handleLegacy, legacyOwner, startLegacy } from "./legacy";
+import { communityCommandNames } from "./commands";
 import { onMemberJoin, onMemberLeave, onVerify } from "./members";
 import { onMessageDeleted } from "./panels";
 import { onRoleCheckButton } from "./rolecheck";
@@ -48,9 +50,16 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     // Bans and audit log entries for the security room (not a privileged intent).
     GatewayIntentBits.GuildModeration,
+    // The voice-room protection logs what AutoMod stopped; the NEXORA module answers !code and
+    // !db in DMs, which also needs the Channel partial.
+    GatewayIntentBits.AutoModerationExecution,
+    GatewayIntentBits.DirectMessages,
   ],
-  partials: [Partials.Message],
+  partials: [Partials.Message, Partials.Channel],
 });
+
+// The voice-room, mail and NEXORA modules listen on this same connection.
+attachLegacy(client);
 
 const ephemeral = MessageFlags.Ephemeral as const;
 
@@ -97,6 +106,8 @@ client.once(Events.ClientReady, async (ready) => {
   setInterval(() => void syncPresence(), 15000).unref();
   // The channel and role lists on the web page stay fresh even without changes here.
   setInterval(() => void reportGuild(client), 60000).unref();
+  // Last: the caches and loops of the voice-room, mail and NEXORA modules.
+  await startLegacy();
 });
 
 // Added to a server: the one it looks after gets set up; any other is left (apply.ts).
@@ -174,6 +185,13 @@ client.on(Events.MessageDelete, (message) => {
 });
 
 async function route(interaction: Interaction) {
+  // The voice-room, mail and NEXORA modules answer their own commands, buttons and forms (some
+  // of them also in DMs); everything else here is the community bot's.
+  const owner = legacyOwner(interaction, communityCommandNames);
+  if (owner) {
+    await handleLegacy(owner, interaction);
+    return;
+  }
   if (!interaction.inGuild() || !interaction.isRepliable()) return;
   if (!isHome(interaction.guild)) {
     await interaction.reply({ embeds: [errorEmbed("ใช้ในเซิร์ฟนี้ไม่ได้", "บอทนี้ดูแลเฉพาะเซิร์ฟที่แอดมิน NEXORA ตั้งไว้")], flags: ephemeral });

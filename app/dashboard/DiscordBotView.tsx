@@ -25,37 +25,34 @@ type BotConfig = {
   previewName: string;
   /** What the preview shows while the text box is empty. */
   defaultText: string;
-  /** Settings only this bot has, shown under the cards. */
-  extras: BotExtra[];
 };
 
-// Add a bot here and it gets a card (and its own settings group) with nothing else to change.
-const BOTS: BotConfig[] = [
+// One bot does everything now. Its card is the status and the connection; the groups below it
+// are what it does, each with its own settings.
+const BOT: BotConfig = {
+  key: "community",
+  name: "บอทดูแลเซิร์ฟ",
+  description: "บอทตัวเดียวที่ดูแลเซิร์ฟ ห้องเสียง เมล และระบบ NEXORA ในเซิร์ฟที่ตั้งไว้",
+  icon: Users,
+  previewName: "บอทดูแลเซิร์ฟ",
+  defaultText: "เซิร์ฟเวอร์",
+};
+
+type Module = { key: string; title: string; text: string; icon: LucideIcon; extras: BotExtra[] };
+
+const MODULES: Module[] = [
   {
-    key: "nexora",
-    name: "บอท NEXORA",
-    description: "ฐานข้อมูลนักศึกษา อัปโหลดรูป และคำสั่งในห้อง",
-    icon: Bot,
-    previewName: "NEXORA",
-    defaultText: "NEXORA",
-    extras: [],
-  },
-  {
-    key: "mail",
-    name: "บอทเมล",
-    description: "อ่านเมล สร้างเมล และแจ้งเมลใหม่ใน Discord",
-    icon: Mail,
-    previewName: "บอทเมล",
-    defaultText: "เมลของคุณ",
-    extras: [{ key: "self-service", render: (notify) => <MailBotSelfServiceSettings notify={notify} /> }],
+    key: "server",
+    title: "ดูแลเซิร์ฟ",
+    text: "ต้อนรับ ยืนยันตัวตน Ticket ห้องเสียงชั่วคราว ห้องสถิติ บูสต์ เช็คยศ แจ้งเว็บล่ม และความปลอดภัย",
+    icon: Users,
+    extras: [{ key: "settings", superadminOnly: true, render: (notify) => <DiscordCommunity notify={notify} /> }],
   },
   {
     key: "voice",
-    name: "บอทห้องเสียง",
-    description: "ห้องเสียงแบบ Join to Create ห้องที่ต้องใส่รหัส และประวัติเข้าออก ใช้ได้ทุกเซิร์ฟเวอร์ที่บอทอยู่",
+    title: "ห้องเสียงมีรหัส",
+    text: "ห้องเสียงแบบ Join to Create ห้องที่ต้องใส่รหัส ประวัติเข้าออก และปกป้องห้องกับ AutoMod",
     icon: AudioLines,
-    previewName: "บอทห้องเสียง",
-    defaultText: "ห้องเสียง",
     extras: [
       { key: "rooms", superadminOnly: true, render: (notify) => <DiscordVoiceRooms notify={notify} /> },
       { key: "protect", superadminOnly: true, render: (notify) => <DiscordProtect notify={notify} /> },
@@ -64,13 +61,18 @@ const BOTS: BotConfig[] = [
     ],
   },
   {
-    key: "community",
-    name: "บอทดูแลเซิร์ฟ",
-    description: "ต้อนรับ ยืนยันตัวตน เลือกยศ Ticket ห้องเสียงชั่วคราว ห้องสถิติ และแจ้งเว็บล่ม ในเซิร์ฟเดียวที่ตั้งไว้",
-    icon: Users,
-    previewName: "บอทดูแลเซิร์ฟ",
-    defaultText: "เซิร์ฟเวอร์",
-    extras: [{ key: "settings", superadminOnly: true, render: (notify) => <DiscordCommunity notify={notify} /> }],
+    key: "mail",
+    title: "เมล",
+    text: "อ่านเมล สร้างเมล และแจ้งเมลใหม่ใน Discord (ใช้ /mail ได้ใน DM ด้วย)",
+    icon: Mail,
+    extras: [{ key: "self-service", render: (notify) => <MailBotSelfServiceSettings notify={notify} /> }],
+  },
+  {
+    key: "nexora",
+    title: "NEXORA",
+    text: "ฐานข้อมูลนักศึกษา อัปโหลดรูป แกลเลอรี และแผงความปลอดภัยในห้อง (/db /code /upload ...)",
+    icon: Bot,
+    extras: [],
   },
 ];
 
@@ -87,8 +89,8 @@ function activityOf(type: ActivityType) {
 }
 
 export default function DiscordBotView({ notify, isSuperadmin }: { notify: Notice; isSuperadmin: boolean }) {
-  const groups = BOTS
-    .map((bot) => ({ bot, extras: bot.extras.filter((extra) => !extra.superadminOnly || isSuperadmin) }))
+  const groups = MODULES
+    .map((module) => ({ module, extras: module.extras.filter((extra) => !extra.superadminOnly || isSuperadmin) }))
     .filter((group) => group.extras.length > 0);
 
   return (
@@ -97,26 +99,43 @@ export default function DiscordBotView({ notify, isSuperadmin }: { notify: Notic
         <div>
           <h1>บอท Discord</h1>
           <p className="aov-sub">
-            ตั้งสถานะใต้ชื่อบอท{isSuperadmin ? " ดูการเชื่อมต่อ token" : ""} และการตั้งค่าของบอททั้ง {BOTS.length} ตัว
+            บอทตัวเดียวทำครบทุกอย่าง · ตั้งสถานะใต้ชื่อบอท{isSuperadmin ? " ดูการเชื่อมต่อ token และเปลี่ยนเซิร์ฟที่บอทดูแล" : ""}
           </p>
         </div>
       </header>
 
-      <section className="dbx-grid" aria-label="บอททั้งหมด">
-        {BOTS.map((bot) => <BotCard key={bot.key} bot={bot} notify={notify} canManage={isSuperadmin} />)}
+      <section className="dbx-grid dbx-grid-one" aria-label="บอท">
+        <BotCard bot={BOT} notify={notify} canManage={isSuperadmin} />
+        <aside className="aov-panel dbx-modules" aria-labelledby="dbx-modules-title">
+          <header className="dbx-section-head">
+            <h2 id="dbx-modules-title">สิ่งที่บอทตัวนี้ทำ</h2>
+            <p>รวมจากบอทเดิมทั้งหมด ใช้ token และ Discord application เดียว</p>
+          </header>
+          <ul className="dbx-module-list">
+            {MODULES.map((module) => (
+              <li key={module.key}>
+                <span className="dbx-extra-mark" aria-hidden="true"><module.icon size={16} /></span>
+                <div>
+                  <b>{module.title}</b>
+                  <small>{module.text}</small>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </aside>
       </section>
 
       {groups.length > 0 && (
         <section className="dbx-extras" aria-labelledby="dbx-extras-title">
           <header className="dbx-section-head">
-            <h2 id="dbx-extras-title">ตั้งค่าเฉพาะบอท</h2>
-            <p>ความสามารถที่บอทแต่ละตัวมีไม่เหมือนกัน</p>
+            <h2 id="dbx-extras-title">ตั้งค่าของบอท</h2>
+            <p>แยกเป็นหมวดตามสิ่งที่บอททำ</p>
           </header>
-          {groups.map(({ bot, extras }) => (
-            <section key={bot.key} className="dbx-extra-group" aria-labelledby={`dbx-extra-${bot.key}`}>
-              <h3 id={`dbx-extra-${bot.key}`}>
-                <span className="dbx-extra-mark" aria-hidden="true"><bot.icon size={15} /></span>
-                {bot.name}
+          {groups.map(({ module, extras }) => (
+            <section key={module.key} className="dbx-extra-group" aria-labelledby={`dbx-extra-${module.key}`}>
+              <h3 id={`dbx-extra-${module.key}`}>
+                <span className="dbx-extra-mark" aria-hidden="true"><module.icon size={15} /></span>
+                {module.title}
               </h3>
               <div className="dbot-grid">
                 {extras.map((extra) => <Fragment key={extra.key}>{extra.render(notify)}</Fragment>)}

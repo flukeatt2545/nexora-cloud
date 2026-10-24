@@ -89,6 +89,7 @@ const FEATURES: { key: keyof Settings; label: string; description: string }[] = 
 ];
 
 const TEXTS: { key: keyof Settings; label: string; hint: string; max: number; long: boolean }[] = [
+  { key: "guildId", label: "Server ID ที่บอทดูแล (เจ้าของเซิร์ฟ/ผู้ดูแลระบบเท่านั้น)", hint: "ตัวเลข 17–20 หลัก บอทต้องอยู่ในเซิร์ฟนั้นแล้ว", max: 20, long: false },
   { key: "welcomeMessage", label: "ข้อความต้อนรับ", hint: "{user} = แท็กคนเข้า, {name} = ชื่อ, {server} = ชื่อเซิร์ฟ, {count} = ลำดับสมาชิก", max: 1500, long: true },
   { key: "leaveMessage", label: "ข้อความคนออก", hint: "{name} = ชื่อ, {server} = ชื่อเซิร์ฟ, {count} = จำนวนสมาชิกที่เหลือ", max: 1500, long: true },
   { key: "verifyMessage", label: "ข้อความแผงยืนยันตัวตน", hint: "", max: 1500, long: true },
@@ -361,6 +362,17 @@ export async function onSetupText(interaction: ModalSubmitInteraction) {
   const item = TEXTS.find((text) => text.key === key);
   if (!item) return;
   const raw = interaction.fields.getTextInputValue("value").trim();
+  if (key === "guildId") {
+    // Moving the bot to another server is the owner's call, not every manager's.
+    if (!mayWipe(interaction.member as GuildMember)) {
+      await interaction.reply({ embeds: [errorEmbed("เปลี่ยนไม่ได้", "เปลี่ยนเซิร์ฟที่บอทดูแลได้เฉพาะเจ้าของเซิร์ฟและคนที่มีสิทธิ์ Administrator")], flags: ephemeral });
+      return;
+    }
+    if (!/^[0-9]{17,20}$/.test(raw) || !interaction.client.guilds.cache.has(raw)) {
+      await interaction.reply({ embeds: [errorEmbed("Server ID ไม่ถูก", "ใส่เลข ID ของเซิร์ฟที่บอทอยู่แล้ว (คลิกขวาที่เซิร์ฟ > คัดลอก ID)")], flags: ephemeral });
+      return;
+    }
+  }
   if (key === "ticketMaxOpen" || key === "newAccountDays") {
     const value = Number(raw);
     const [min, max] = key === "ticketMaxOpen" ? [1, 5] : [0, 30];

@@ -4,6 +4,7 @@ import { refreshBoost } from "./boost";
 import { refreshRoleCheck } from "./rolecheck";
 import { ensureSetupChannel } from "./build";
 import { commands } from "./commands";
+import { duplicateCommandNames, legacyGlobalCommands, legacyGuildCommands } from "./legacy";
 import { homeGuild, homeGuildId, markApplied, reportGuild } from "./guild";
 import { removePanel, syncPanels, textChannel } from "./panels";
 import { loadSettings, panels, settings, settingsVersion, updateSettings } from "./settings";
@@ -20,17 +21,29 @@ let applying: Promise<void> | null = null;
 async function registerCommands(client: Client) {
   const home = homeGuildId(client);
   if (!client.application || home === registeredIn) return;
+  // A Server ID the bot is not in (yet): leave the commands where they are.
+  if (!client.guilds.cache.has(home)) {
+    console.warn(`[WARN] The bot is not in server ${home}; commands stay as they are`);
+    return;
+  }
   const rest = new REST({ version: "10" }).setToken(client.token ?? "");
+  const duplicates = duplicateCommandNames(commands.map((command) => command.name));
+  if (duplicates.length) console.warn(`[WARN] Two modules use the same command name: ${duplicates.join(", ")}`);
+  const guildBody = [...commands, ...legacyGuildCommands].map((command) => command.toJSON());
   for (const id of client.guilds.cache.keys()) {
-    await rest.put(Routes.applicationGuildCommands(client.application.id, id), { body: id === home ? commands.map((command) => command.toJSON()) : [] })
+    await rest.put(Routes.applicationGuildCommands(client.application.id, id), { body: id === home ? guildBody : [] })
       .catch((error) => logBotError(`register commands ${id}`, error));
   }
+  // Mail's commands are global, so /mail also works in DMs.
+  await rest.put(Routes.applicationCommands(client.application.id), { body: legacyGlobalCommands.map((command) => command.toJSON()) })
+    .catch((error) => logBotError("register global commands", error));
   registeredIn = home;
   console.log(`[INFO] Community bot commands registered in ${home || "no server"}`);
 }
 
-/** Any server other than the one it looks after: leave it. */
+/** Any server other than the one it looks after: leave it (only once the one it looks after is here). */
 async function leaveOtherServers(client: Client) {
+  if (!client.guilds.cache.has(homeGuildId())) return;
   for (const guild of client.guilds.cache.values()) {
     if (guild.id === homeGuildId()) continue;
     console.log(`[INFO] Leaving server ${guild.id}: this bot only works in ${homeGuildId()}`);
@@ -61,9 +74,9 @@ export function forgetRegistration() {
 }
 
 async function run(client: Client, repost: boolean) {
-  // The web page shows which server the bot is locked to.
+  // The web page shows which server the bot looks after: fill it in until someone sets it.
   const current = settings();
-  if (current && current.guildId !== homeGuildId()) {
+  if (current && !current.guildId) {
     await updateSettings("", { guildId: homeGuildId() }).catch((error) => logBotError("save guild", error));
   }
   await leaveOtherServers(client);

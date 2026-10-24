@@ -32,8 +32,10 @@ var webTokenBots = map[string]string{
 	// Manage channels and roles (/setup and /create, ticket rooms, roles picked from the panel,
 	// stats channel names), view, send, embed links, attach files (ticket transcripts), read
 	// history (panels posted earlier), connect and move members (temporary voice rooms), view
-	// audit log, kick, timeout and manage messages (security room and automatic protection).
-	"community": "1099798015122",
+	// audit log, kick, timeout and manage messages (security room and automatic protection);
+	// plus manage server (AutoMod rules of the voice-room protection). Everything the NEXORA, mail
+	// and voice bots asked for, since this one bot does it all now.
+	"community": "1099798015154",
 }
 
 type discordBotStatus struct {

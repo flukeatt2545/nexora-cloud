@@ -69,3 +69,6 @@ export const commands = [
       .setNameLocalizations({ th: "ปิด" })
       .setDescription("ปิด Ticket นี้")),
 ];
+
+/** The names above, so the host can tell which module an interaction belongs to. */
+export const communityCommandNames = new Set(commands.map((command) => command.name));
