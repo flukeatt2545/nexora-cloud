@@ -93,13 +93,8 @@ export function facts(items: [string, string][]) {
   return items.map(([label, value]) => `${label}  **${value}**`).join("\n");
 }
 
-export function errorEmbed(title: string, description: string) {
-  return new EmbedBuilder().setTitle(title).setColor(COLOR.danger).setDescription(description);
-}
-
-export function row(...components: MessageActionRowComponentBuilder[]) {
-  return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(components);
-}
+// The error card and the button row are the bot's shared ones (src/ui.ts).
+export { errorEmbed, row } from "../../ui";
 
 export function linkButton(label: string, url: string) {
   return new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url);
