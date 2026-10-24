@@ -10,7 +10,7 @@ import {
   type VoiceState,
 } from "discord.js";
 import { api, apiMessage, logBotError, type Actor, type VoiceRoom, type VoiceSettings } from "./api";
-import { CATEGORY_ID, CATEGORY_NAME } from "./config";
+import { CATEGORY_ID, CATEGORY_NAME, PRIVATE_CATEGORY_NAME, PUBLIC_CATEGORY_NAME } from "./config";
 import { roomPanel } from "./ui";
 
 // What the bot knows about each room channel, refreshed from the API every sync.
@@ -25,6 +25,7 @@ const emptyTimers = new Map<string, NodeJS.Timeout>();
 // Channels the bot is deleting itself, so the channelDelete event does not report them again.
 const deleting = new Set<string>();
 const categoryByGuild = new Map<string, string>();
+const stateCategories = new Map<string, string>();
 // A short pause between rooms made from a hub, so hopping in and out cannot spam channels.
 const lastHubRoom = new Map<string, number>();
 
@@ -120,6 +121,37 @@ export async function roomCategory(guild: Guild): Promise<string | undefined> {
   }
 }
 
+/**
+ * The category for a room that is open to everyone (public) or closed (private), made when
+ * missing. Undefined if the bot cannot make it; the room then stays where it is.
+ */
+export async function stateCategory(guild: Guild, open: boolean): Promise<string | undefined> {
+  const name = open ? PUBLIC_CATEGORY_NAME : PRIVATE_CATEGORY_NAME;
+  const key = `${guild.id}:${name}`;
+  const known = stateCategories.get(key);
+  if (known && guild.channels.cache.has(known)) return known;
+  const existing = guild.channels.cache.find((channel) => channel.type === ChannelType.GuildCategory && channel.name === name);
+  if (existing) {
+    stateCategories.set(key, existing.id);
+    return existing.id;
+  }
+  try {
+    const made = await guild.channels.create({ name, type: ChannelType.GuildCategory, reason: "หมวดห้องเสียง" });
+    stateCategories.set(key, made.id);
+    return made.id;
+  } catch (error) {
+    logBotError("create state category", error);
+    return undefined;
+  }
+}
+
+/** Moves a room into the public or private category to match its state. Keeps the room's own permissions. */
+export async function moveToStateCategory(channel: VoiceChannel, open: boolean) {
+  const parent = await stateCategory(channel.guild, open);
+  if (!parent || channel.parentId === parent) return;
+  await channel.setParent(parent, { lockPermissions: false, reason: open ? "เปิดห้องให้ทุกคน" : "ห้องไม่เปิดให้ทุกคน" }).catch((error) => logBotError("move room", error));
+}
+
 type Overwrite = { id: string; type: OverwriteType; allow: bigint; deny: bigint };
 
 const NONE = BigInt(0);
@@ -151,7 +183,8 @@ const SEE_AND_JOIN = PermissionFlagsBits.ViewChannel | PermissionFlagsBits.Conne
  * Discord shows such a room as "not synced" with its category; that is the lock, not a mistake.
  */
 export async function createRoomChannel(guild: Guild, owner: GuildMember, name: string, userLimit: number, options: { parent?: string | null } = {}) {
-  const parent = options.parent ?? (await roomCategory(guild));
+  // A new room is closed, so it starts in the private category.
+  const parent = options.parent ?? (await stateCategory(guild, false)) ?? (await roomCategory(guild));
   const me = guild.members.me ?? (await guild.members.fetchMe());
   const overwrites = categoryOverwrites(guild, parent);
   addOverwrite(overwrites, guild.roles.everyone.id, OverwriteType.Role, NONE, PermissionFlagsBits.Connect);
@@ -211,6 +244,8 @@ export async function setLocked(channel: VoiceChannel, locked: boolean, hasPassw
     cached.locked = locked;
     if (hasPassword !== undefined) cached.hasPassword = hasPassword;
   }
+  // Open rooms sit with the public ones, closed or locked rooms with the private ones.
+  await moveToStateCategory(channel, !locked);
 }
 
 /** Disconnects everyone in the room who may not be there any more (after a new password, or a kick). */
@@ -325,7 +360,7 @@ async function openRoomFromHub(member: GuildMember, hub: VoiceChannel) {
   }
   let channel: VoiceChannel;
   try {
-    channel = await createRoomChannel(guild, member, roomName, 0, { parent: hub.parentId });
+    channel = await createRoomChannel(guild, member, roomName, 0, { parent: (await stateCategory(guild, false)) ?? hub.parentId });
     await api(member.user).put(`/api/internal/bot/voice/rooms/${roomId}/channel`, { channelId: channel.id });
   } catch (error) {
     logBotError("hub channel", error);
