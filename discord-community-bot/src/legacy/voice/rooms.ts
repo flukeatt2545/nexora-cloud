@@ -9,6 +9,9 @@ import {
   type VoiceChannel,
   type VoiceState,
 } from "discord.js";
+import { canUse } from "../../access";
+import { isHome } from "../../guild";
+import { fillTemplate, settings as communitySettings } from "../../settings";
 import { api, apiMessage, logBotError, type Actor, type VoiceRoom, type VoiceSettings } from "./api";
 import { CATEGORY_ID, CATEGORY_NAME, PRIVATE_CATEGORY_NAME, PUBLIC_CATEGORY_NAME } from "./config";
 import { roomPanel } from "./ui";
@@ -50,8 +53,14 @@ export function roomsOwnedBy(userId: string, guild: Guild) {
     .map(([channelId, room]) => ({ channelId, ...room }));
 }
 
+/** The ➕ room set on the community side (ห้องเสียงชั่วคราว): joining it makes a password room like any other hub. */
+function communityHubId() {
+  const current = communitySettings();
+  return current?.tempVoiceEnabled ? current.tempHubChannelId : "";
+}
+
 export function isHub(channelId: string) {
-  return hubs.has(channelId);
+  return hubs.has(channelId) || (channelId !== "" && channelId === communityHubId());
 }
 
 /**
@@ -331,6 +340,13 @@ async function passOwnership(channel: VoiceChannel, leaver: GuildMember) {
 /** Someone joined a Join to Create channel: make them a room and move them into it. */
 async function openRoomFromHub(member: GuildMember, hub: VoiceChannel) {
   const guild = hub.guild;
+  const community = hub.id === communityHubId();
+  if (community && !isHome(guild)) return;
+  // The community hub follows its "who can make rooms" roles.
+  if (community && !canUse(member)) {
+    await member.voice.disconnect("ไม่มียศที่สร้างห้องเสียงได้").catch(() => undefined);
+    return;
+  }
   // Already has a room here: go back to it instead of making another.
   const own = roomsOwnedBy(member.id, guild)[0];
   if (own) {
@@ -343,7 +359,8 @@ async function openRoomFromHub(member: GuildMember, hub: VoiceChannel) {
     return;
   }
   lastHubRoom.set(member.id, Date.now());
-  const name = `ห้องของ ${member.displayName}`.slice(0, 100);
+  const template = community ? communitySettings()?.tempNameTemplate : "";
+  const name = (template ? fillTemplate(template, { user: member.displayName, name: member.displayName }) : `ห้องของ ${member.displayName}`).slice(0, 100);
   let roomId: number;
   let roomName: string;
   try {
@@ -387,7 +404,7 @@ export async function onVoiceState(oldState: VoiceState, newState: VoiceState) {
   const channel = newState.channel;
   const member = newState.member;
   if (!channel || channel.type !== ChannelType.GuildVoice || !member || member.user.bot) return;
-  if (hubs.has(channel.id)) {
+  if (isHub(channel.id)) {
     await openRoomFromHub(member, channel);
     return;
   }
