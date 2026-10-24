@@ -273,6 +273,10 @@ export default function VerifyClient({ token }: { token: string }) {
     : view === "blocked" ? "ยังไม่ผ่าน"
     : view === "off" ? "ปิดอยู่"
     : "ไม่สำเร็จ";
+  // Thai has no spaces, so a one-word title would break in the middle of the phrase. Short single words are
+  // shrunk to fit on one line instead; vowels and tone marks sit above or below a letter and take no width.
+  const baseLen = title.replace(/[ัิ-ฺ็-๎]/g, "").length;
+  const fitLen = !/\s/.test(title) && baseLen <= 14 ? baseLen : 0;
 
   // What is checked, in order. Numbered steps are the ones the member does; the rest happen by themselves.
   const steps: { key: string; title: string; text: string; state: "done" | "now" | "todo"; auto?: boolean }[] = [];
@@ -315,7 +319,7 @@ export default function VerifyClient({ token }: { token: string }) {
           <div className="vf-body">
             <div className="vf-copy">
               <p className="vf-kicker vf-in" style={step(1)}>{kicker}</p>
-              <h1 className={`vf-title${title.length > 12 ? " is-long" : ""}`} key={`${view}-${title}`} data-text={title}><span>{title}</span></h1>
+              <h1 className={`vf-title${title.length > 12 ? " is-long" : ""}${fitLen ? " is-fit" : ""}`} style={fitLen ? ({ "--vf-n": fitLen } as CSSProperties) : undefined} key={`${view}-${title}`} data-text={title}><span>{title}</span></h1>
               <i className="vf-bar vf-in" style={step(3)} aria-hidden="true" />
               {asking && info && (
                 <dl className="vf-facts vf-in" style={step(4)}>

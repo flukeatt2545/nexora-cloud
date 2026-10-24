@@ -111,6 +111,9 @@
 .vf-kicker { margin: 0; color: var(--vf-red-soft); font-family: var(--font-gaming, inherit); font-size: clamp(1.05rem, 2.4vw, 1.5rem); font-weight: 600; }
 .vf-title { margin: 0; max-width: 100%; color: #fff; font-family: var(--font-gaming, inherit); font-size: clamp(2.5rem, 8.4vw, 4.9rem); font-weight: 800; line-height: 1.04; overflow-wrap: anywhere; }
 .vf-title.is-long { font-size: clamp(1.9rem, 6vw, 3.3rem); }
+/* One word with no spaces: keep it on one line, smaller if the column is narrow (--vf-n = letters that take width) */
+.vf-copy { container-type: inline-size; width: 100%; } /* width: containment stops it sizing to its text, so a centred grid would shrink it to nothing */
+.vf .vf-title.is-fit { white-space: nowrap; font-size: min(clamp(2.5rem, 8.4vw, 4.9rem), calc(100cqi / (var(--vf-n, 8) * .64))); }
 .vf-title span { display: inline-block; animation: vf-reveal .95s cubic-bezier(.2, .8, .2, 1) .22s both; }
 .vf-bar { display: block; width: clamp(96px, 16vw, 150px); height: 5px; border-radius: 3px; background: linear-gradient(90deg, var(--vf-red), var(--vf-orange)); transform-origin: left center; }
 .vf-bar.vf-in { animation-name: vf-grow; }

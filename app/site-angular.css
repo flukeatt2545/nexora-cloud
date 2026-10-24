@@ -56,3 +56,11 @@ html[data-site-theme] .vf .vf-btn { clip-path: polygon(0 0, calc(100% - 16px) 0,
 /* ── Details that go with it ──────────────────────────────────────────── */
 html[data-site-theme] ::-webkit-scrollbar-thumb { border-radius: 0; }
 html[data-site-theme] :is(.msp-card, .bp-card) { border-left-width: 3px; }
+
+/* ── Corners that are set inline, and the error pages ─────────────────── */
+/* The square corners of every stylesheet rule come from scripts/postcss-site-angular.mjs; this is for the few set in a style attribute. */
+html[data-site-theme] [style*="border-radius"]:not([style*="50%"], [style*="999"], [style*="9999"]) { border-radius: 0 !important; }
+html[data-site-theme] .nexora-error-screen :is(nav a, button) {
+  clip-path: polygon(0 0, calc(100% - var(--ang-cut-small)) 0, 100% var(--ang-cut-small), 100% 100%, var(--ang-cut-small) 100%, 0 calc(100% - var(--ang-cut-small)));
+}
+html[data-site-theme] .nexora-error-screen :is(nav a, button):focus-visible { clip-path: none; }

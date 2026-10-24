@@ -46,6 +46,22 @@ html[data-site-theme="halloween"][data-theme="dark"] {
   --control-muted: #a99dbd;
 }
 
+/* The error and not-found pages carry their own navy palette, so they are recoloured here to match. */
+html[data-site-theme="halloween"] .nexora-error-screen { color: #f4e9d0; }
+html[data-site-theme="halloween"] .nexora-error-screen .error-brand { color: #f4e9d0; letter-spacing: .24em; }
+html[data-site-theme="halloween"] .nexora-error-screen .error-brand::before { width: 10px; height: 10px; border-radius: 0; background: #f08a2c; transform: rotate(45deg); }
+html[data-site-theme="halloween"] .nexora-error-screen .error-status { color: #f08a2c; font-family: "UnifrakturCook", inherit; font-weight: 700; letter-spacing: 0; text-shadow: 0 3px 0 #7a3a0c, 0 8px 20px rgba(0, 0, 0, .55); }
+html[data-site-theme="halloween"] .nexora-error-screen .error-lock { color: #f4e9d0; }
+html[data-site-theme="halloween"] .nexora-error-screen h1 { color: #f4e9d0; text-shadow: 0 2px 0 rgba(0, 0, 0, .5); }
+html[data-site-theme="halloween"] .nexora-error-screen p { color: #cbbfdc; }
+html[data-site-theme="halloween"] .nexora-error-screen nav a,
+html[data-site-theme="halloween"] .nexora-error-screen nav button { border-color: rgba(244, 233, 208, .28); background: rgba(21, 13, 34, .82); color: #f4e9d0; }
+html[data-site-theme="halloween"] .nexora-error-screen nav a:hover,
+html[data-site-theme="halloween"] .nexora-error-screen nav button:hover { border-color: #f08a2c; background: rgba(240, 138, 44, .16); }
+html[data-site-theme="halloween"] .nexora-error-screen a:focus-visible,
+html[data-site-theme="halloween"] .nexora-error-screen button:focus-visible { outline-color: #f08a2c; }
+@media (min-width: 900px) { html[data-site-theme="halloween"] .nexora-error-screen nav { border-left-color: rgba(244, 233, 208, .2); } }
+
 /* ── The two layers SiteScene draws ───────────────────────────────────── */
 .st-layer { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
 .st-top { inset: 0 0 auto 0; height: 48px; }
