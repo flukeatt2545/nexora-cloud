@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { applyThemeColor } from "./themeColor";
+import { applySiteTheme, siteThemeInfo } from "./siteThemes";
 import { getDocumentTitle, type SiteTitleMode } from "./pageTitle";
 import { API_BASE } from "./runtime";
 
@@ -18,6 +19,8 @@ type PublicSettings = {
   ogColor?: string;
   primaryColor?: string;
   themeMode?: "light" | "dark";
+  // The look that is on today (halloween, christmas...); "default" is the plain look from the colour and mode.
+  theme?: string;
   logoUrl?: string;
   faviconUrl?: string;
 };
@@ -57,13 +60,20 @@ function normalizeAssetUrl(urlStr?: string): string {
   return urlStr;
 }
 
+/** ?theme=halloween on any address shows that theme for a look, without saving it for anyone. */
+function previewedTheme(): string | null {
+  const wanted = new URLSearchParams(window.location.search).get("theme");
+  return wanted && (wanted === "default" || siteThemeInfo(wanted)) ? wanted : null;
+}
+
 export default function ThemeLoader() {
   const pathname = usePathname();
   const [settings, setSettings] = useState<PublicSettings | null>(null);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("nexora-theme");
-    if (savedTheme === "light" || savedTheme === "dark") {
+    // A theme that was on at the last visit already set its own mode before the first paint.
+    if ((savedTheme === "light" || savedTheme === "dark") && !document.documentElement.dataset.siteTheme) {
       document.documentElement.dataset.theme = savedTheme;
     }
     const savedPrimary = window.localStorage.getItem("nexora-primary");
@@ -75,11 +85,12 @@ export default function ThemeLoader() {
         const res = await fetch(`${API_BASE}/api/settings/public`, { credentials: "include" });
         if (!res.ok) return;
         const data = await res.json();
-        if (data?.themeMode) {
-          document.documentElement.dataset.theme = data.themeMode;
-          window.localStorage.setItem("nexora-theme", data.themeMode);
-        }
+        // The admin's own mode and colour are kept even while a theme is on, for when it ends.
+        if (data?.themeMode) window.localStorage.setItem("nexora-theme", data.themeMode);
         if (data?.primaryColor) applyThemeColor(data.primaryColor);
+        const shown = previewedTheme() ?? data?.theme;
+        if (data?.themeMode && !siteThemeInfo(shown)) document.documentElement.dataset.theme = data.themeMode;
+        applySiteTheme(shown, !previewedTheme());
         setSettings(data);
 
         // Dynamic Icon & Meta sync
@@ -129,6 +140,27 @@ export default function ThemeLoader() {
     updateMetaTag("property", "og:title", ogTitle);
     updateMetaTag("name", "twitter:title", ogTitle);
   }, [pathname, settings]);
+
+  // A theme set for certain dates changes by itself, so a page left open picks it up too.
+  useEffect(() => {
+    const check = async () => {
+      if (previewedTheme()) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/settings/public`, { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json();
+        const next = siteThemeInfo(data?.theme)?.id ?? "default";
+        if (next !== (siteThemeInfo(document.documentElement.dataset.siteTheme)?.id ?? "default")) {
+          if (next === "default" && data?.themeMode) document.documentElement.dataset.theme = data.themeMode;
+          applySiteTheme(next);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    const timer = window.setInterval(check, 10 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   return null;
 }

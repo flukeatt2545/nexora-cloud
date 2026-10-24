@@ -12,6 +12,7 @@ import { useEscape, useScrollLock } from "./useScrollLock";
 import "./profile-view.css";
 import { getCroppedImg } from "./cropImage";
 import { applyThemeColor } from "../themeColor";
+import { SiteThemeCard } from "./SiteThemeCard";
 import HostingView from "./HostingView";
 import DatabaseAdminView from "./DatabaseAdminView";
 import FileUpload from "../components/FileUpload";
@@ -4456,6 +4457,8 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                       </div>
                     </div>
                   </section>
+
+                  <SiteThemeCard notify={notify} />
 
                   <section className="msp-card" id="store-switch">
                     <header className="msp-head">

@@ -44,15 +44,22 @@
   -webkit-mask-image: linear-gradient(to left, #000 0%, transparent 72%);
   mask-image: linear-gradient(to left, #000 0%, transparent 72%);
 }
+/* The big outlined name behind the card: three rows that each drift sideways on their own (the page's script picks where to and how long, VerifyClient.tsx) */
 .vf-mark {
-  position: absolute; left: 50%; top: 50%;
-  font-family: var(--font-gaming, inherit); font-weight: 900; line-height: .8; white-space: nowrap;
-  font-size: clamp(150px, 34vw, 540px); letter-spacing: -.02em;
-  color: transparent; -webkit-text-stroke: 2px rgb(var(--vf-rgb) / .13);
-  transform: translate(-50%, -50%);
+  position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: clamp(0px, .8vw, 12px); overflow: hidden;
+  color: transparent; -webkit-text-stroke: 2px rgb(var(--vf-rgb) / .15);
   user-select: none;
-  animation: vf-slide 46s ease-in-out infinite alternate;
 }
+.vf-mark span {
+  --x: 0px; --dur: 8s;
+  display: block; width: max-content; justify-self: center; white-space: nowrap;
+  font-family: var(--font-gaming, inherit); font-weight: 900; line-height: .86; letter-spacing: -.02em;
+  font-size: clamp(88px, 18vw, 300px);
+  transform: translateX(var(--x)); transition: transform var(--dur) cubic-bezier(.45, .05, .3, 1);
+}
+.vf-mark span:nth-child(1) { --x: -9vw; }
+.vf-mark span:nth-child(2) { --x: 7vw; }
+.vf-mark span:nth-child(3) { --x: -3vw; }
 
 /* The card: a thin red edge (the frame) around a dark body, both with cut corners */
 .vf-frame {
@@ -248,11 +255,10 @@
 
 @keyframes vf-rise { from { opacity: 0; transform: translateY(26px) scale(.985); } }
 @keyframes vf-in { from { opacity: 0; transform: translateY(14px); } }
-@keyframes vf-reveal { from { clip-path: inset(0 100% 0 0); opacity: 0; transform: translateX(-14px); } to { clip-path: inset(0 0 0 0); opacity: 1; transform: none; } }
+@keyframes vf-reveal { from { clip-path: inset(0 100% 0 0); opacity: 0; transform: translateX(-14px); } to { clip-path: inset(-40px -60px -40px -40px); opacity: 1; transform: none; } }
 @keyframes vf-grow { from { opacity: 0; transform: scaleX(0); } }
 @keyframes vf-turn { to { transform: rotate(360deg); } }
 @keyframes vf-drift { from { transform: translate3d(-3%, -2%, 0) scale(1); } to { transform: translate3d(3%, 3%, 0) scale(1.08); } }
-@keyframes vf-slide { from { transform: translate(-54%, -50%); } to { transform: translate(-46%, -50%); } }
 @keyframes vf-edge { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
 @keyframes vf-scan { 0% { transform: translateY(-100%); } 55%, 100% { transform: translateY(1500%); } }
 @keyframes vf-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
@@ -299,7 +305,7 @@
 .vf-frame { animation: vf-rise .8s cubic-bezier(.2, .75, .2, 1) both, vf-edge 9s ease-in-out infinite alternate, vf-g-card var(--vf-glitch); }
 .vf-glow { animation: vf-drift 18s ease-in-out infinite alternate, vf-g-bg var(--vf-glitch); }
 .vf-lines { animation: vf-g-bg var(--vf-glitch); }
-.vf-mark { animation: vf-slide 46s ease-in-out infinite alternate, vf-g-mark var(--vf-glitch); }
+.vf-mark { animation: vf-g-mark var(--vf-glitch); }
 
 /* Outside the card: bars across the whole screen and scan lines over everything while it stutters */
 .vf-bg .vf-wslice {

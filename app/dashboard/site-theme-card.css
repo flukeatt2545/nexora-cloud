@@ -1,0 +1,70 @@
+/* Site theme card on the admin settings page (SiteThemeCard.tsx). Uses the mail-settings-panel look (msp-). */
+.stc-section { display: grid; gap: 14px; padding: 18px 20px; }
+.stc-section + .stc-section { border-top: 1px solid var(--theme-line-soft); }
+.stc-title { display: grid; gap: 3px; }
+.stc-title strong { color: var(--theme-text-strong); font-size: 15px; font-weight: 700; }
+.stc-title span { color: var(--theme-text-soft); font-size: 13.5px; line-height: 1.55; }
+
+.stc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.stc-tile { display: grid; align-content: start; gap: 6px; min-width: 0; padding: 10px 10px 12px; border: 1px solid var(--control-line); border-radius: 12px; background: var(--control-surface); color: var(--theme-text-strong); text-align: left; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.stc-tile:hover:not(:disabled) { border-color: var(--primary-border); transform: translateY(-2px); }
+.stc-tile:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-soft); }
+.stc-tile.is-on { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; background: var(--primary-soft); }
+.stc-tile:disabled { opacity: .6; cursor: wait; }
+.stc-tile strong { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 700; }
+.stc-tile strong em { padding: 1px 8px; border-radius: 999px; background: var(--theme-hover); color: var(--theme-text-soft); font-size: 11.5px; font-style: normal; font-weight: 600; }
+.stc-tile small { color: var(--theme-text-soft); font-size: 12.5px; line-height: 1.5; }
+
+/* A small picture of each theme, painted with gradients */
+.stc-preview { position: relative; display: block; height: 78px; overflow: hidden; border-radius: 8px; background: var(--control-surface-strong); }
+.stc-preview b, .stc-preview u { position: absolute; display: block; text-decoration: none; }
+.stc-prev-default { background: linear-gradient(135deg, var(--control-surface-strong), var(--control-surface)); }
+.stc-prev-default b { left: 12px; top: 14px; width: 54px; height: 10px; border-radius: 5px; background: var(--primary); }
+.stc-prev-default u { left: 12px; top: 34px; right: 12px; height: 28px; border-radius: 6px; background: var(--theme-hover); }
+.stc-prev-halloween { background: linear-gradient(180deg, #17102f 0%, #4a2145 62%, #c8692f 100%); }
+.stc-prev-halloween b { right: 14px; top: 10px; width: 22px; height: 22px; border-radius: 50%; background: #f1e1a6; }
+.stc-prev-halloween u { left: 0; right: 0; bottom: 0; height: 22px; background: #07030d; clip-path: polygon(0 60%, 18% 30%, 30% 60%, 44% 20%, 58% 56%, 74% 28%, 100% 62%, 100% 100%, 0 100%); }
+.stc-prev-christmas { background: linear-gradient(180deg, #06142a 0%, #123a52 70%, #1c5a58 100%); }
+.stc-prev-christmas b { left: 0; right: 0; bottom: 0; height: 24px; background: #eef6fd; clip-path: ellipse(70% 100% at 40% 100%); } /* theme-ok: the theme's own palette */
+.stc-prev-christmas u { left: 18px; bottom: 14px; width: 0; height: 0; border: 12px solid transparent; border-bottom: 30px solid #0a2a22; border-top: 0; }
+.stc-prev-songkran { background: linear-gradient(180deg, #5cc1f4 0%, #d9f2fb 70%, #fff3d2 100%); } /* theme-ok: the theme's own palette */
+.stc-prev-songkran b { left: 12px; top: 10px; width: 20px; height: 20px; border-radius: 50%; background: #ffe36a; box-shadow: 0 0 12px #ffe36a; }
+.stc-prev-songkran u { left: 0; right: 0; bottom: 0; height: 26px; background: #0b88d6; clip-path: polygon(0 40%, 14% 20%, 30% 40%, 46% 18%, 62% 40%, 78% 20%, 100% 42%, 100% 100%, 0 100%); } /* theme-ok: the theme's own palette */
+.stc-prev-cyberpunk { background: linear-gradient(180deg, #0a0420 0%, #3a0f5e 55%, #ff2bd6 100%); }
+.stc-prev-cyberpunk b { left: 50%; bottom: 18px; width: 34px; height: 34px; margin-left: -17px; border-radius: 50%; background: linear-gradient(#fff48a, #ff4fb8); }
+.stc-prev-cyberpunk u { left: 0; right: 0; bottom: 0; height: 24px; background: repeating-linear-gradient(90deg, #00f0ff 0 1px, transparent 1px 12px), #12062a; }
+
+.stc-note { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 9px; background: var(--primary-soft); color: var(--theme-text-strong); font-size: 13.5px; line-height: 1.55; }
+.stc-note svg { flex: none; color: var(--primary-ink); }
+
+.stc-rules { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.stc-rules li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px; border: 1px solid var(--control-line); border-radius: 10px; background: var(--control-surface); }
+.stc-rules li.is-now { border-color: var(--primary); }
+.stc-input { height: 38px; padding: 0 10px; border: 1px solid var(--control-line); border-radius: 8px; background: var(--theme-input); color: var(--theme-text-strong); font: inherit; font-size: 14px; }
+.stc-input:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.stc-input:disabled { opacity: .6; }
+.stc-label { flex: 1 1 150px; min-width: 120px; }
+.stc-dates { display: inline-flex; align-items: center; gap: 8px; color: var(--theme-text-soft); font-size: 13.5px; }
+.stc-yearly { display: inline-flex; align-items: center; gap: 6px; color: var(--theme-text-soft); font-size: 13.5px; white-space: nowrap; }
+.stc-icon { display: grid; place-items: center; width: 34px; height: 34px; margin-left: auto; border: 0; border-radius: 8px; background: none; color: var(--theme-text-soft); cursor: pointer; }
+.stc-icon:hover:not(:disabled) { background: rgb(var(--danger-rgb) / .12); color: var(--danger); }
+.stc-add { display: flex; flex-wrap: wrap; gap: 8px; }
+.stc-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px dashed var(--primary-border); border-radius: 999px; background: var(--primary-soft); color: var(--primary-ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.stc-chip.is-plain { border-color: var(--control-line); background: transparent; color: var(--theme-text-soft); }
+.stc-chip:hover:not(:disabled) { border-style: solid; }
+.stc-chip:disabled { opacity: .5; cursor: not-allowed; }
+.stc-hint { margin: 0; color: var(--theme-text-soft); font-size: 12.5px; line-height: 1.65; }
+.stc-hint code { padding: 1px 6px; border-radius: 5px; background: var(--theme-hover); font-size: 12px; }
+
+.stc-bar { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 10px; margin: 0 20px 18px; padding: 10px 10px 10px 16px; border: 1px solid var(--primary-border); border-radius: 12px; background: var(--control-surface); box-shadow: 0 10px 28px var(--theme-shadow); }
+.stc-bar > span { flex: 1; display: inline-flex; align-items: center; gap: 9px; color: var(--theme-text-strong); font-size: 14px; font-weight: 600; }
+.stc-bar > span i { width: 8px; height: 8px; border-radius: 50%; background: var(--warning-ink, var(--primary)); }
+.stc-btn { height: 38px; padding: 0 16px; border: 1px solid var(--control-line); border-radius: 9px; background: var(--control-surface-strong); color: var(--theme-text-strong); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.stc-btn.is-primary { border-color: transparent; background: var(--primary); color: #fff; }
+.stc-btn:disabled { opacity: .6; cursor: wait; }
+
+@media (max-width: 640px) {
+  .stc-section { padding: 16px; }
+  .stc-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .stc-bar { margin: 0 16px 16px; }
+}

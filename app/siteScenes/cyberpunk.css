@@ -1,0 +1,47 @@
+/* Cyberpunk scene. The cyan and the yellow are the theme's own accent colours. */
+
+.cy-sky { position: absolute; inset: 0; background: linear-gradient(180deg, #05020d 0%, #120632 32%, #3a0f5e 56%, #8a1a86 70%, #ff2bd6 86%, #ff7ac6 100%); }
+.cy-stars { position: absolute; inset: 0; }
+.cy-stars i { position: absolute; width: var(--s); height: var(--s); border-radius: 50%; background: #c9f6ff; animation: cy-twinkle 3.4s ease-in-out var(--d) infinite; } /* theme-ok: the theme's own palette */
+.cy-sun {
+  position: absolute; left: 50%; top: 24%; width: clamp(200px, 30vw, 480px); aspect-ratio: 1; border-radius: 50%; translate: -50% 0;
+  background: linear-gradient(180deg, #fff48a 0%, #ffb23d 38%, #ff4fb8 78%, #ff2bd6 100%);
+  box-shadow: 0 0 90px 24px rgba(255, 61, 190, .35);
+  -webkit-mask-image: linear-gradient(#000 0 42%, transparent 42% 46%, #000 46% 60%, transparent 60% 65%, #000 65% 75%, transparent 75% 82%, #000 82% 89%, transparent 89% 94%, #000 94%);
+  mask-image: linear-gradient(#000 0 42%, transparent 42% 46%, #000 46% 60%, transparent 60% 65%, #000 65% 75%, transparent 75% 82%, #000 82% 89%, transparent 89% 94%, #000 94%);
+}
+.cy-city { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cy-sign { animation: cy-flicker 6s steps(1) infinite; filter: drop-shadow(0 0 6px currentColor); }
+.cy-blink { animation: cy-blink 1.8s steps(1) infinite; }
+.cy-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 36%; perspective: 460px; overflow: hidden; background: linear-gradient(180deg, #14052b, #07030f); }
+.cy-grid {
+  position: absolute; left: -50%; right: -50%; top: 0; bottom: -120%; transform-origin: 50% 0; transform: rotateX(62deg);
+  background:
+    linear-gradient(rgba(0, 240, 255, .7) 2px, transparent 2px) 0 0 / 90px 90px,
+    linear-gradient(90deg, rgba(255, 43, 214, .65) 2px, transparent 2px) 0 0 / 90px 90px;
+  -webkit-mask-image: linear-gradient(transparent, #000 35%); mask-image: linear-gradient(transparent, #000 35%);
+  animation: cy-grid 2.4s linear infinite;
+}
+
+/* Over the pages: scan lines, a light band that travels down, and corner brackets. Nothing here takes a click. */
+.cy-scanlines { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .09) 0 1px, transparent 1px 3px); }
+.cy-sweep { position: absolute; left: 0; right: 0; top: 0; height: 140px; background: linear-gradient(180deg, transparent, rgba(0, 240, 255, .07), transparent); animation: cy-sweep 9s linear infinite; }
+.cy-corner { position: absolute; width: 26px; height: 26px; border: 0 solid #00f0ff; opacity: .75; }
+.cy-corner-tl { left: 10px; top: 10px; border-width: 2px 0 0 2px; }
+.cy-corner-tr { right: 10px; top: 10px; border-width: 2px 2px 0 0; }
+.cy-corner-bl { left: 10px; bottom: 10px; border-width: 0 0 2px 2px; border-color: #ff2bd6; }
+.cy-corner-br { right: 10px; bottom: 10px; border-width: 0 2px 2px 0; border-color: #ff2bd6; }
+
+@keyframes cy-twinkle { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@keyframes cy-flicker { 0%, 100% { opacity: 1; } 8% { opacity: .35; } 10% { opacity: 1; } 11% { opacity: .5; } 13% { opacity: 1; } 62% { opacity: .85; } 64% { opacity: 1; } }
+@keyframes cy-blink { 0%, 100% { opacity: 1; } 50% { opacity: .15; } }
+@keyframes cy-grid { from { background-position: 0 0, 0 0; } to { background-position: 0 90px, 0 0; } }
+@keyframes cy-sweep { from { transform: translateY(-160px); } to { transform: translateY(105vh); } }
+
+@media (max-width: 700px) {
+  .cy-corner { width: 16px; height: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cy-sweep { display: none; }
+  .cy-grid { animation: none; }
+}
