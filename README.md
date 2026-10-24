@@ -161,6 +161,7 @@ nkn-v6-new-ui/
 | Auth OAuth | Discord / Google / GitHub client id+secret |
 | Top-up | `CHECKSLIPS_*` · `TOPUP_RECEIVER_*` |
 | phpMyAdmin | `PMA_INTERNAL_SECRET` · `PMA_CONTROL_PASSWORD` |
+| Discord bots | `INTERNAL_BOT_SECRET` (ต้องไม่ซ้ำกับ `PMA_INTERNAL_SECRET`) |
 
 ---
 

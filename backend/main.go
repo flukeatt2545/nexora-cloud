@@ -69,6 +69,7 @@ type config struct {
 	cfDomain                 string
 	hostingServerIP          string
 	phpMyAdminInternalSecret string
+	botInternalSecret        string // Discord bots on /api/internal/bot/*; must differ from phpMyAdminInternalSecret
 	phpMyAdminPublicURL      string
 	checkSlipsAPIBaseURL     string
 	checkSlipsAPIToken       string
@@ -752,6 +753,7 @@ func loadConfig() config {
 		cfDomain:                 env("CF_HOSTING_DOMAIN", "nkn02.com"),
 		hostingServerIP:          env("HOSTING_SERVER_IP", "165.101.65.23"),
 		phpMyAdminInternalSecret: env("PMA_INTERNAL_SECRET", "local-only-change-this-pma-internal-secret"),
+		botInternalSecret:        env("INTERNAL_BOT_SECRET", "local-only-change-this-bot-internal-secret"),
 		phpMyAdminPublicURL:      strings.TrimRight(env("PMA_PUBLIC_URL", "http://db.localhost:8088"), "/"),
 		checkSlipsAPIBaseURL:     strings.TrimRight(env("CHECKSLIPS_API_BASE_URL", "https://api.checkslips.com"), "/"),
 		checkSlipsAPIToken:       env("CHECKSLIPS_API_TOKEN", ""),
@@ -795,12 +797,16 @@ func validateConfig(cfg config) error {
 		"WEBHOOK_ENCRYPTION_KEY": cfg.webhookKey,
 		"HOSTING_ENCRYPTION_KEY": cfg.hostingEncryptionKey,
 		"PMA_INTERNAL_SECRET":    cfg.phpMyAdminInternalSecret,
+		"INTERNAL_BOT_SECRET":    cfg.botInternalSecret,
 	}
 	for name, value := range secrets {
 		lower := strings.ToLower(value)
 		if len(value) < 32 || strings.Contains(lower, "change-this") || strings.Contains(lower, "local-only") || strings.Contains(lower, "replace-with") {
 			return fmt.Errorf("%s must be a unique secret of at least 32 characters in production", name)
 		}
+	}
+	if cfg.botInternalSecret == cfg.phpMyAdminInternalSecret {
+		return fmt.Errorf("INTERNAL_BOT_SECRET must differ from PMA_INTERNAL_SECRET")
 	}
 	return nil
 }

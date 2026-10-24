@@ -8,7 +8,7 @@ import (
 
 func TestDelegatedMappingEndpointsFailClosed(t *testing.T) {
 	s := &server{}
-	s.cfg.phpMyAdminInternalSecret = "test-secret"
+	s.cfg.botInternalSecret = "test-secret"
 	app := fiber.New()
 	app.Get("/list", s.botListStudentMappings)
 	app.Post("/set", s.botSaveStudentMapping)

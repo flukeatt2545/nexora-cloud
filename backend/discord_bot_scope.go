@@ -7,15 +7,14 @@ import (
 )
 
 // Actor and roles are asserted only by the authenticated internal bot, never by public clients.
+// Admin status comes from DISCORD_ADMIN_IDS or the access-rule table, never from a request
+// header: a header claiming admin would hand every scope to whoever holds the bot secret.
 func (s *server) hasDiscordBotScope(c *fiber.Ctx, scope string) bool {
 	actor := strings.TrimSpace(c.Get("X-Bot-Actor-Discord-Id"))
 	if !validDiscordSnowflake(actor) || !botCommandScopes[scope] {
 		return false
 	}
 	if s.isDiscordStudentAdmin(actor) {
-		return true
-	}
-	if c.Get("X-Bot-Actor-Is-Admin") == "true" {
 		return true
 	}
 	if s.db == nil {

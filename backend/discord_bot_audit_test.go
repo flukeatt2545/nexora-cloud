@@ -9,7 +9,7 @@ import (
 
 func TestBotActivityRejectsUnauthorizedAndInvalid(t *testing.T) {
 	s := &server{}
-	s.cfg.phpMyAdminInternalSecret = "test-secret"
+	s.cfg.botInternalSecret = "test-secret"
 	app := fiber.New()
 	app.Post("/activity", s.botActivity)
 	for _, secret := range []string{"", "wrong", "test-secret"} {
@@ -59,7 +59,7 @@ func TestBotActivityUsesReadableThaiCopy(t *testing.T) {
 
 func TestBotAccessStopsAfterUnauthorizedResponse(t *testing.T) {
 	s := &server{}
-	s.cfg.phpMyAdminInternalSecret = "test-secret"
+	s.cfg.botInternalSecret = "test-secret"
 	app := fiber.New()
 	app.Get("/access/:botKey", s.botDiscordAccess)
 	app.Post("/access/:botKey", s.updateBotDiscordAccess)
@@ -92,7 +92,7 @@ func TestBotCommandScopesRequireExplicitPermissionAdministration(t *testing.T) {
 		t.Fatal("only explicit supported scopes may be delegated")
 	}
 	s := &server{}
-	s.cfg.phpMyAdminInternalSecret = "test-secret"
+	s.cfg.botInternalSecret = "test-secret"
 	app := fiber.New()
 	app.Post("/access/:botKey", s.updateBotDiscordAccess)
 	request := httptest.NewRequest("POST", "/access/nexora", strings.NewReader(`{"action":"allow","scope":"bot.permissions","subjectType":"user","discordId":"1546900952940937237"}`))

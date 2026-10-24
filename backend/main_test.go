@@ -55,6 +55,7 @@ func TestProductionConfigValidation(t *testing.T) {
 		webhookKey:               strings.Repeat("b", 32),
 		hostingEncryptionKey:     strings.Repeat("c", 32),
 		phpMyAdminInternalSecret: strings.Repeat("d", 32),
+		botInternalSecret:        strings.Repeat("e", 32),
 	}
 	if err := validateConfig(valid); err != nil {
 		t.Fatalf("valid production config rejected: %v", err)
@@ -73,6 +74,16 @@ func TestProductionConfigValidation(t *testing.T) {
 	invalid.webhookKey = "local-only-change-this-webhook-key"
 	if err := validateConfig(invalid); err == nil {
 		t.Fatal("default production secret was accepted")
+	}
+	invalid = valid
+	invalid.botInternalSecret = ""
+	if err := validateConfig(invalid); err == nil {
+		t.Fatal("missing production bot secret was accepted")
+	}
+	invalid = valid
+	invalid.botInternalSecret = invalid.phpMyAdminInternalSecret
+	if err := validateConfig(invalid); err == nil {
+		t.Fatal("bot secret equal to the phpMyAdmin secret was accepted")
 	}
 }
 

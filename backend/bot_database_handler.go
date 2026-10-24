@@ -423,14 +423,13 @@ func (s *server) applyUnboundStudentAccessCutoff(ctx context.Context) {
 }
 
 // verifyBotSecret verifies that the request has a valid X-Bot-Internal-Secret header.
+// Only the bot secret is accepted: the phpMyAdmin secret opens nothing here, and a bot secret
+// equal to it is refused so a misconfiguration fails closed.
 // It returns an error so callers stop; writing the 403 body and returning nil let handlers carry on.
 func (s *server) verifyBotSecret(c *fiber.Ctx) error {
 	secret := strings.TrimSpace(c.Get("X-Bot-Internal-Secret"))
-	if secret == "" {
-		secret = strings.TrimSpace(c.Get("X-PMA-Internal-Secret"))
-	}
-	expected := s.cfg.phpMyAdminInternalSecret
-	if secret == "" || expected == "" || subtle.ConstantTimeCompare([]byte(secret), []byte(expected)) != 1 {
+	expected := s.cfg.botInternalSecret
+	if secret == "" || expected == "" || expected == s.cfg.phpMyAdminInternalSecret || subtle.ConstantTimeCompare([]byte(secret), []byte(expected)) != 1 {
 		return fiber.NewError(fiber.StatusForbidden, "บอทไม่ได้รับอนุญาตให้เรียกใช้ API นี้")
 	}
 	return nil

@@ -17,9 +17,10 @@ export const lockdownCommand = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName("disable").setDescription("ปลดล็อกเว็บไซต์"))
   .addSubcommand(sub => sub.setName("access").setDescription("รับลิงก์เข้าหน้าควบคุมฉุกเฉิน"));
 
+// The API decides who is an admin (DISCORD_ADMIN_IDS or the bot access rules); it no longer
+// trusts an admin flag sent by the bot.
 function requestHeaders(interaction:ChatInputCommandInteraction) {
-  const isAdmin = interaction.guild?.ownerId === interaction.user.id || Boolean(interaction.memberPermissions?.has?.(PermissionFlagsBits.Administrator));
-  return { "Content-Type":"application/json", "X-Bot-Internal-Secret":BOT_SECRET, "X-Bot-Actor-Discord-Id":String(interaction.user.id), "X-Bot-Actor-Discord-Roles":botMemberRoleIds(interaction).join(","), "X-Bot-Actor-Is-Admin":isAdmin ? "true" : "false" };
+  return { "Content-Type":"application/json", "X-Bot-Internal-Secret":BOT_SECRET, "X-Bot-Actor-Discord-Id":String(interaction.user.id), "X-Bot-Actor-Discord-Roles":botMemberRoleIds(interaction).join(",") };
 }
 
 export function parseLockdownDuration(raw?:string|null):number {
