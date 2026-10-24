@@ -22,13 +22,17 @@ type communitySettings struct {
 	GuildID string `json:"guildId"`
 	// How the bot decorates the names it makes: plain, frame 『』, line ┊ or cute ꒰꒱.
 	NameStyle string `json:"nameStyle"`
+	// Put an emoji in the names the bot makes (『👋』ยินดีต้อนรับ). Off = frame and letters only.
+	NameEmoji bool `json:"nameEmoji"`
 
 	WelcomeEnabled   bool   `json:"welcomeEnabled"`
 	WelcomeChannelID string `json:"welcomeChannelId"`
 	WelcomeMessage   string `json:"welcomeMessage"`
-	VerifyEnabled    bool   `json:"verifyEnabled"`
-	VerifyChannelID  string `json:"verifyChannelId"`
-	VerifyMessage    string `json:"verifyMessage"`
+	// A picture with the member's avatar and name goes with the welcome message.
+	WelcomeImage    bool   `json:"welcomeImage"`
+	VerifyEnabled   bool   `json:"verifyEnabled"`
+	VerifyChannelID string `json:"verifyChannelId"`
+	VerifyMessage   string `json:"verifyMessage"`
 	// Given on verification. Leave verification off to give it as soon as someone joins.
 	MemberRoleID string `json:"memberRoleId"`
 
@@ -62,6 +66,15 @@ type communitySettings struct {
 	StatusEnabled       bool   `json:"statusEnabled"`
 	StatusChannelID     string `json:"statusChannelId"`
 	StatusMentionRoleID string `json:"statusMentionRoleId"`
+	// A status picture (website, API, bot) the bot keeps up to date in the status room.
+	StatusImage bool `json:"statusImage"`
+
+	// Boost room: server boost level and progress to the next one, perks and who boosts. The
+	// lounge is a chat only boosters (and staff) see.
+	BoostEnabled         bool   `json:"boostEnabled"`
+	BoostChannelID       string `json:"boostChannelId"`
+	BoostLoungeChannelID string `json:"boostLoungeChannelId"`
+	BoostPerks           string `json:"boostPerks"`
 
 	// Security room (staff only): what happens in the server, the website's security events,
 	// and what the automatic protection stopped.
@@ -85,6 +98,8 @@ type communityPanels struct {
 	Verify communityPanel `json:"verify"`
 	Roles  communityPanel `json:"roles"`
 	Ticket communityPanel `json:"ticket"`
+	Status communityPanel `json:"status"`
+	Boost  communityPanel `json:"boost"`
 }
 
 type communityChannel struct {
@@ -147,18 +162,20 @@ const (
 	communityDefaultRoles   = "เลือกยศที่อยากได้จากเมนูด้านล่าง เลือกซ้ำเพื่อเอาออก"
 	communityDefaultTicket  = "มีปัญหาหรืออยากติดต่อทีมงาน กดปุ่ม **เปิด Ticket** แล้วเล่าเรื่องสั้น ๆ\nจะได้ห้องส่วนตัวที่เห็นแค่คุณกับทีมงาน"
 	communityDefaultTemp    = "ห้องของ {user}"
+	communityDefaultBoost   = "ยศ Server Booster พิเศษในรายชื่อสมาชิก\nห้องส่วนตัวเฉพาะบูสเตอร์\nชื่อของคุณบนแผงนี้ และคำขอบคุณจากทีมงาน"
 )
 
 func defaultCommunitySettings() communitySettings {
 	return communitySettings{
-		NameStyle:      "frame",
-		WelcomeEnabled: true, WelcomeMessage: communityDefaultWelcome,
+		NameStyle: "frame", NameEmoji: true,
+		WelcomeEnabled: true, WelcomeMessage: communityDefaultWelcome, WelcomeImage: true,
 		VerifyEnabled: true, VerifyMessage: communityDefaultVerify,
 		RolesMessage: communityDefaultRoles, SelfRoleIDs: []string{},
 		ManagerRoleIDs: []string{}, StaffRoleIDs: []string{}, UsageRoleIDs: []string{},
 		TicketsEnabled: true, TicketMessage: communityDefaultTicket, TicketMaxOpen: 1,
 		TempVoiceEnabled: true, TempNameTemplate: communityDefaultTemp,
-		StatsEnabled: true, StatusEnabled: true,
+		StatsEnabled: true, StatusEnabled: true, StatusImage: true,
+		BoostEnabled: true, BoostPerks: communityDefaultBoost,
 		SecurityEnabled: true, SecuritySiteEvents: true, AntiNukeEnabled: true, AntiSpamEnabled: true, NewAccountDays: 7,
 	}
 }
@@ -193,7 +210,7 @@ func validateCommunitySettings(in communitySettings) (communitySettings, error) 
 		"หมวด Ticket": &in.TicketCategoryID, "ห้อง log Ticket": &in.TicketLogChannelID, "ห้องสร้างห้องเสียง": &in.TempHubChannelID,
 		"หมวดสถิติ": &in.StatsCategoryID, "ห้องจำนวนสมาชิก": &in.StatsMembersChannelID, "ห้องคนออนไลน์": &in.StatsOnlineChannelID,
 		"ห้องสถานะเว็บ": &in.StatsSiteChannelID, "ห้องแจ้งสถานะ": &in.StatusChannelID, "ยศที่แท็กตอนเว็บล่ม": &in.StatusMentionRoleID,
-		"ห้องแจ้งเตือนความปลอดภัย": &in.SecurityChannelID,
+		"ห้องแจ้งเตือนความปลอดภัย": &in.SecurityChannelID, "ห้องบูสต์": &in.BoostChannelID, "ห้องบูสเตอร์": &in.BoostLoungeChannelID,
 	}
 	for label, value := range single {
 		*value = strings.TrimSpace(*value)
@@ -224,6 +241,7 @@ func validateCommunitySettings(in communitySettings) (communitySettings, error) 
 		{&in.VerifyMessage, communityDefaultVerify, 1500, "ข้อความยืนยันตัวตน"},
 		{&in.RolesMessage, communityDefaultRoles, 1500, "ข้อความเลือกยศ"},
 		{&in.TicketMessage, communityDefaultTicket, 1500, "ข้อความ Ticket"},
+		{&in.BoostPerks, communityDefaultBoost, 1000, "สิทธิประโยชน์ของบูสเตอร์"},
 		{&in.TempNameTemplate, communityDefaultTemp, 60, "ชื่อห้องเสียง"},
 	}
 	for _, text := range texts {

@@ -49,7 +49,8 @@ function problems(guild: Guild): string[] {
   };
   channel(current.welcomeChannelId, "ห้องต้อนรับ", current.welcomeEnabled);
   channel(current.verifyChannelId, "ห้องยืนยันตัวตน", current.verifyEnabled);
-  channel(current.rolesChannelId, "ห้องเลือกยศ", true);
+  channel(current.boostChannelId, "ห้องบูสต์", current.boostEnabled);
+  channel(current.boostLoungeChannelId, "ห้องบูสเตอร์", current.boostEnabled);
   channel(current.ticketChannelId, "ห้อง Ticket", current.ticketsEnabled);
   channel(current.ticketCategoryId, "หมวด Ticket", current.ticketsEnabled);
   channel(current.ticketLogChannelId, "ห้อง log Ticket", current.ticketsEnabled);
@@ -62,8 +63,6 @@ function problems(guild: Guild): string[] {
   if (current.memberRoleId && !assignable(guild, current.memberRoleId)) {
     out.push("ยศสมาชิกอยู่สูงกว่ายศของบอท (หรือหายไป) ลากยศของบอทให้อยู่เหนือยศสมาชิกในตั้งค่าเซิร์ฟ");
   }
-  const blocked = current.selfRoleIds.filter((id) => !assignable(guild, id));
-  if (blocked.length) out.push(`ยศให้เลือก ${blocked.length} ยศอยู่สูงกว่ายศของบอท (หรือหายไป) บอทให้ยศนั้นไม่ได้`);
   if (current.verifyEnabled && !current.memberRoleId) out.push("เปิดยืนยันตัวตนแล้ว แต่ยังไม่ได้เลือกยศสมาชิก");
   if (current.ticketsEnabled && !current.ticketCategoryId) out.push("เปิด Ticket แล้ว แต่ยังไม่ได้เลือกหมวดที่จะสร้างห้อง Ticket");
   return out;

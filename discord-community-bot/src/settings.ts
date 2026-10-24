@@ -11,9 +11,11 @@ import type { NameStyle } from "./style";
 export type Settings = {
   guildId: string;
   nameStyle: NameStyle;
+  nameEmoji: boolean;
   welcomeEnabled: boolean;
   welcomeChannelId: string;
   welcomeMessage: string;
+  welcomeImage: boolean;
   verifyEnabled: boolean;
   verifyChannelId: string;
   verifyMessage: string;
@@ -41,6 +43,11 @@ export type Settings = {
   statusEnabled: boolean;
   statusChannelId: string;
   statusMentionRoleId: string;
+  statusImage: boolean;
+  boostEnabled: boolean;
+  boostChannelId: string;
+  boostLoungeChannelId: string;
+  boostPerks: string;
   securityEnabled: boolean;
   securityChannelId: string;
   securitySiteEvents: boolean;
@@ -50,7 +57,7 @@ export type Settings = {
 };
 
 export type Panel = { channelId: string; messageId: string };
-export type Panels = { verify: Panel; roles: Panel; ticket: Panel };
+export type Panels = { verify: Panel; roles: Panel; ticket: Panel; status: Panel; boost: Panel };
 export type PanelKey = keyof Panels;
 
 type Snapshot = { settings: Settings; panels: Panels; version: number };
@@ -84,8 +91,14 @@ export function nameStyle(): NameStyle {
   return snapshot?.settings.nameStyle ?? "frame";
 }
 
+/** Whether names get an emoji (on until the site says otherwise). */
+export function nameEmoji(): boolean {
+  return snapshot?.settings.nameEmoji ?? true;
+}
+
 export function panels(): Panels {
-  return snapshot?.panels ?? { verify: { channelId: "", messageId: "" }, roles: { channelId: "", messageId: "" }, ticket: { channelId: "", messageId: "" } };
+  const none = { channelId: "", messageId: "" };
+  return { verify: none, roles: none, ticket: none, status: none, boost: none, ...snapshot?.panels };
 }
 
 export function settingsVersion() {

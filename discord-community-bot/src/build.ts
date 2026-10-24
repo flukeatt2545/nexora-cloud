@@ -18,7 +18,7 @@ import { logBotError } from "./api";
 import { nameStyle, settings, type Settings } from "./settings";
 import { statsNames } from "./stats";
 import { siteUp } from "./status";
-import { categoryName, channelName, fancy, nameWords, restyle, restyleRole, roleName } from "./style";
+import { categoryName, channelName, fancy, iconOf, nameWords, restyle, restyleRole, roleName } from "./style";
 import { COLOR, row } from "./ui";
 
 // "Make what is missing": a tidy server in one go. Roles in the usual order (owner, admin,
@@ -35,8 +35,8 @@ const botAllow = [view, send, PermissionFlagsBits.ReadMessageHistory, Permission
 
 type Plan = { change: Partial<Settings>; created: string[] };
 
-/** Who sees a channel: everyone (read only or not), members only, staff only, or only before verifying. */
-type Audience = "everyone-read" | "everyone" | "members" | "members-read" | "staff" | "unverified";
+/** Who sees a channel: everyone (read only or not), members only, staff only, boosters (and staff), or only before verifying. */
+type Audience = "everyone-read" | "everyone" | "members" | "members-read" | "staff" | "unverified" | "boosters";
 
 function overwrites(guild: Guild, audience: Audience, memberRoleId: string, staffRoleIds: string[], voice = false): OverwriteResolvable[] {
   const everyone = guild.id;
@@ -63,6 +63,12 @@ function overwrites(guild: Guild, audience: Audience, memberRoleId: string, staf
     }
     case "staff":
       return [{ id: everyone, type: OverwriteType.Role, deny: [view] }, bot, ...staff];
+    case "boosters": {
+      // Discord makes the Server Booster role when the first boost arrives (see boost.ts).
+      const booster = guild.roles.premiumSubscriberRole;
+      return [{ id: everyone, type: OverwriteType.Role, deny: [view] }, bot, ...staff,
+        ...(booster ? [{ id: booster.id, type: OverwriteType.Role, allow: [view, send] }] : [])];
+    }
   }
 }
 
@@ -110,16 +116,6 @@ const ROLES: RoleSpec[] = [
   { id: "bots", english: "Bots", aliases: ["บอท", "bot", "bots"], color: 0x95a5a6, hoist: true, permissions: [] },
 ];
 
-// Roles members pick for themselves on the roles panel, made when none are set yet.
-const SELF_ROLES: RoleSpec[] = [
-  { id: "gamer", english: "Gamer", aliases: ["เกมเมอร์", "gamer"], color: 0x5865f2, hoist: false, permissions: [] },
-  { id: "music", english: "Music", aliases: ["ฟังเพลง", "music"], color: 0x1abc9c, hoist: false, permissions: [] },
-  { id: "coder", english: "Coder", aliases: ["โปรแกรมเมอร์", "coder", "dev"], color: 0x3498db, hoist: false, permissions: [] },
-  { id: "artist", english: "Artist", aliases: ["ศิลปิน", "artist"], color: 0xe91e63, hoist: false, permissions: [] },
-  { id: "student", english: "Student", aliases: ["นักเรียน", "นักศึกษา", "student"], color: 0xf39c12, hoist: false, permissions: [] },
-  { id: "updates", english: "Updates", aliases: ["แจ้งเตือน", "updates", "แจ้งเตือนประกาศ"], color: 0x95a5a6, hoist: false, permissions: [] },
-];
-
 function findRole(guild: Guild, spec: RoleSpec, preferId: string) {
   const known = preferId ? guild.roles.cache.get(preferId) : undefined;
   if (known) return known;
@@ -130,7 +126,7 @@ function findRole(guild: Guild, spec: RoleSpec, preferId: string) {
 async function ensureRole(guild: Guild, plan: Plan, spec: RoleSpec, preferId = ""): Promise<Role> {
   const found = findRole(guild, spec, preferId);
   if (found) return found;
-  const name = roleName(nameStyle(), spec.english);
+  const name = roleName(nameStyle(), spec.english, iconOf(spec.english));
   const base = { name, color: spec.color, hoist: spec.hoist, mentionable: false, reason: "/setup: สร้างยศที่ขาด" };
   // Without Administrator the bot cannot hand out permissions it lacks; make the role plain then.
   const role = await guild.roles.create({ ...base, permissions: spec.permissions })
@@ -162,19 +158,6 @@ async function buildRoles(guild: Guild, plan: Plan, problems: string[]) {
   }
   if (admin && !current.managerRoleIds.some((id) => guild.roles.cache.has(id))) plan.change.managerRoleIds = [admin.id];
 
-  if (!current.selfRoleIds.some((id) => guild.roles.cache.has(id))) {
-    const picks: Role[] = [];
-    for (const spec of SELF_ROLES) {
-      try {
-        picks.push(await ensureRole(guild, plan, spec));
-      } catch (error) {
-        logBotError(`self role ${spec.id}`, error);
-      }
-    }
-    if (picks.length) plan.change.selfRoleIds = picks.map((role) => role.id);
-    picks.forEach((role, index) => made.set(`self-${index}`, role));
-  }
-
   // Top to bottom, right under the bot's own role. Roles the bot cannot move stay where they are.
   const me = guild.members.me;
   if (me) {
@@ -205,7 +188,7 @@ async function ensureCategory(guild: Guild, plan: Plan, english: string, thai: s
   const current = settings()!;
   const found = exists(guild, idHint, [ChannelType.GuildCategory]) ?? byWords(guild, [thai, english, `${english} ${thai}`], [ChannelType.GuildCategory]);
   if (found) return found as CategoryChannel;
-  const name = categoryName(nameStyle(), english, thai);
+  const name = categoryName(nameStyle(), english, thai, iconOf(english) || iconOf(thai));
   const category = await guild.channels.create({
     name, type: ChannelType.GuildCategory, reason: "/setup: สร้างหมวดที่ขาด",
     permissionOverwrites: overwrites(guild, audience, plan.change.memberRoleId ?? current.memberRoleId, plan.change.staffRoleIds ?? current.staffRoleIds),
@@ -232,7 +215,7 @@ async function ensureChannel(guild: Guild, plan: Plan, parent: CategoryChannel, 
     if (spec.key && found.id !== id) (plan.change as Record<string, unknown>)[spec.key] = found.id;
     return found;
   }
-  const name = exactName ?? channelName(nameStyle(), spec.type === ChannelType.GuildText ? spec.name.replace(/\s+/g, "-") : spec.name);
+  const name = exactName ?? channelName(nameStyle(), spec.type === ChannelType.GuildText ? spec.name.replace(/\s+/g, "-") : spec.name, iconOf(spec.name));
   const channel = await guild.channels.create({
     name, type: spec.type, parent: parent.id, reason: "/setup: สร้างห้องที่ขาด",
     permissionOverwrites: overwrites(guild, spec.audience, plan.change.memberRoleId ?? current.memberRoleId,
@@ -287,7 +270,6 @@ export async function buildMissing(guild: Guild): Promise<Plan & { problems: str
     if (current.verifyEnabled) await ensureChannel(guild, plan, category, { key: "verifyChannelId", name: "ยืนยันตัวตน", type: text, audience: "unverified", aliases: ["verify"] });
     await ensureChannel(guild, plan, category, { name: "กฎ", type: text, audience: "everyone-read", aliases: ["กฎเซิร์ฟ", "rules"] });
     await ensureChannel(guild, plan, category, { name: "ประกาศ", type: text, audience: "members-read", aliases: ["announcements", "news"] });
-    await ensureChannel(guild, plan, category, { key: "rolesChannelId", name: "เลือกยศ", type: text, audience: "members-read", aliases: ["roles"] });
     if (current.statusEnabled) await ensureChannel(guild, plan, category, { key: "statusChannelId", name: "สถานะระบบ", type: text, audience: "members-read", aliases: ["status"] });
   });
 
@@ -305,6 +287,15 @@ export async function buildMissing(guild: Guild): Promise<Plan & { problems: str
     if (current.tempVoiceEnabled) await ensureChannel(guild, plan, category, { key: "tempHubChannelId", name: "สร้างห้องเสียง", type: voice, audience: "members" });
     await ensureChannel(guild, plan, category, { name: "นั่งเล่น", type: voice, audience: "members", aliases: ["lounge", "general"] });
   });
+
+  if (current.boostEnabled) {
+    await step("ห้องบูสต์", async () => {
+      const hint = exists(guild, current.boostChannelId, [text]);
+      const category = await ensureCategory(guild, plan, "Boost", "บูสเตอร์", "members", hint && "parentId" in hint ? hint.parentId ?? "" : "");
+      await ensureChannel(guild, plan, category, { key: "boostChannelId", name: "บูสต์", type: text, audience: "members-read", aliases: ["boost", "boosts"] });
+      await ensureChannel(guild, plan, category, { key: "boostLoungeChannelId", name: "ห้องบูสเตอร์", type: text, audience: "boosters", aliases: ["booster lounge", "boosters"] });
+    });
+  }
 
   if (current.ticketsEnabled) {
     await step("หมวด Ticket", async () => {
@@ -328,8 +319,8 @@ export async function buildMissing(guild: Guild): Promise<Plan & { problems: str
 }
 
 /**
- * Renames every channel, category and role to the chosen style: emoji and old frames come off,
- * the words stay. What the bot cannot manage (roles above its own, Discord's own roles) is
+ * Renames every channel, category and role to the chosen style: old frames come off, the words
+ * stay, and the emoji is kept, added or taken off as the setting says. What the bot cannot manage (roles above its own, Discord's own roles) is
  * skipped; the stats channels get their numbers at the next update.
  */
 export async function decorateAll(guild: Guild) {
@@ -412,7 +403,7 @@ export async function ensureSetupChannel(guild: Guild, note?: string): Promise<T
     const managers = (settings()?.managerRoleIds ?? []).filter((id) => guild.roles.cache.has(id));
     const existing = textChannels.find((channel) => key(channel.name) === "ตั้งค่าบอท") as TextChannel | undefined;
     const channel = existing ?? await guild.channels.create({
-      name: channelName(nameStyle(), "ตั้งค่าบอท"),
+      name: channelName(nameStyle(), "ตั้งค่าบอท", iconOf("ตั้งค่าบอท")),
       type: ChannelType.GuildText,
       reason: "เซิร์ฟยังไม่มีห้องพิมพ์ สร้างห้องไว้ตั้งค่าบอท",
       permissionOverwrites: [

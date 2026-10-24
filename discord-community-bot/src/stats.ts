@@ -25,9 +25,9 @@ async function rename(channel: GuildBasedChannel | undefined, name: string) {
 }
 
 export const statsNames = {
-  members: (count: number) => channelName(nameStyle(), `สมาชิก: ${count.toLocaleString("th-TH")}`),
-  online: (count: number) => channelName(nameStyle(), `ออนไลน์: ${count.toLocaleString("th-TH")}`),
-  site: (up: boolean) => (up ? channelName(nameStyle(), "เว็บ: ใช้งานได้") : channelName(nameStyle(), "เว็บ: ล่ม")),
+  members: (count: number) => channelName(nameStyle(), `สมาชิก: ${count.toLocaleString("th-TH")}`, "👥"),
+  online: (count: number) => channelName(nameStyle(), `ออนไลน์: ${count.toLocaleString("th-TH")}`, "🟢"),
+  site: (up: boolean) => (up ? channelName(nameStyle(), "เว็บ: ใช้งานได้", "🌐") : channelName(nameStyle(), "เว็บ: ล่ม", "🔴")),
 };
 
 export async function updateStats(client: Client) {

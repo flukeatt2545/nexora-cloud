@@ -1,8 +1,10 @@
 import axios from "axios";
-import { ChannelType, EmbedBuilder, type Client, type Message, type TextChannel } from "discord.js";
+import { AttachmentBuilder, ChannelType, EmbedBuilder, type Client, type Message, type TextChannel } from "discord.js";
 import { api, logBotError } from "./api";
 import { STATUS_API_URL, STATUS_WEB_URL } from "./config";
 import { homeGuild } from "./guild";
+import { statusCard, type StatusRow } from "./image";
+import { postPanel, removePanel } from "./panels";
 import { settings } from "./settings";
 import { COLOR, minutesText, when } from "./ui";
 
@@ -12,7 +14,11 @@ import { COLOR, minutesText, when } from "./ui";
 
 type Target = "web" | "api";
 
-type State = { up: boolean; failures: number; downSince: Date | null; detail: string; alert: Message | null };
+type State = {
+  up: boolean; failures: number; downSince: Date | null; detail: string; alert: Message | null;
+  /** Result of each check (about a day of them), and how long the last one took. */
+  history: boolean[]; latencyMs: number | null;
+};
 
 const targets: { key: Target; name: string; url: string }[] = [
   { key: "web", name: "เว็บไซต์", url: STATUS_WEB_URL },
@@ -20,9 +26,11 @@ const targets: { key: Target; name: string; url: string }[] = [
 ];
 
 const state: Record<Target, State> = {
-  web: { up: true, failures: 0, downSince: null, detail: "", alert: null },
-  api: { up: true, failures: 0, downSince: null, detail: "", alert: null },
+  web: { up: true, failures: 0, downSince: null, detail: "", alert: null, history: [], latencyMs: null },
+  api: { up: true, failures: 0, downSince: null, detail: "", alert: null, history: [], latencyMs: null },
 };
+const botHistory: boolean[] = [];
+const HISTORY_LIMIT = 1440;
 
 const FAILURES_FOR_DOWN = 2;
 
@@ -33,15 +41,65 @@ export function siteUp() {
   return state.web.up && state.api.up;
 }
 
-async function check(url: string): Promise<string> {
+async function check(url: string): Promise<{ problem: string; ms: number }> {
+  const started = Date.now();
   try {
     const res = await axios.get(url, { timeout: 10000, maxRedirects: 3, validateStatus: () => true, headers: { "User-Agent": "NexoraStatusBot/1.0" } });
     // A 4xx still means the site is up and answering (a login page, the lockdown page).
-    return res.status >= 500 ? `HTTP ${res.status}` : "";
+    return { problem: res.status >= 500 ? `HTTP ${res.status}` : "", ms: Date.now() - started };
   } catch (error) {
-    if (axios.isAxiosError(error)) return error.code === "ECONNABORTED" || error.code === "ETIMEDOUT" ? "ไม่ตอบภายใน 10 วินาที" : `เชื่อมต่อไม่ได้ (${error.code ?? "network"})`;
-    return "เชื่อมต่อไม่ได้";
+    const problem = axios.isAxiosError(error)
+      ? (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT" ? "ไม่ตอบภายใน 10 วินาที" : `เชื่อมต่อไม่ได้ (${error.code ?? "network"})`)
+      : "เชื่อมต่อไม่ได้";
+    return { problem, ms: Date.now() - started };
   }
+}
+
+const TARGET_HOSTS: Record<Target, string> = { web: hostOf(STATUS_WEB_URL), api: hostOf(STATUS_API_URL) };
+
+function hostOf(url: string) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+function push(history: boolean[], up: boolean) {
+  history.push(up);
+  if (history.length > HISTORY_LIMIT) history.shift();
+}
+
+const uptimeOf = (history: boolean[]) => (history.length ? (history.filter(Boolean).length / history.length) * 100 : 100);
+
+// The status picture: one message in the status room, edited with a fresh picture whenever
+// something changes and at least every 5 minutes.
+
+let lastPictureAt = 0;
+let lastPictureKey = "";
+
+export async function refreshStatusPicture(client: Client, force = false) {
+  const current = settings();
+  const guild = homeGuild(client);
+  if (!guild) return;
+  if (!current?.statusEnabled || !current.statusImage || !current.statusChannelId) {
+    await removePanel(guild, "status").catch(() => undefined);
+    lastPictureKey = "";
+    return;
+  }
+  const rows: StatusRow[] = [
+    ...targets.map((target) => {
+      const s = state[target.key];
+      return { label: target.name, up: s.up, detail: s.up ? TARGET_HOSTS[target.key] : s.detail, latencyMs: s.up ? s.latencyMs : null, uptime: uptimeOf(s.history), history: s.history };
+    }),
+    { label: "บอท Discord", up: client.isReady(), detail: "ออนไลน์", latencyMs: client.ws.ping >= 0 ? Math.round(client.ws.ping) : null, uptime: uptimeOf(botHistory), history: botHistory },
+  ];
+  const key = rows.map((row) => `${row.label}:${row.up}`).join("|");
+  if (!force && key === lastPictureKey && Date.now() - lastPictureAt < 5 * 60 * 1000) return;
+  const picture = await statusCard(rows, "NEXORA CLOUD");
+  await postPanel(guild, "status", current.statusChannelId, { files: [new AttachmentBuilder(picture, { name: "status.png" })] }, false);
+  lastPictureKey = key;
+  lastPictureAt = Date.now();
 }
 
 function statusChannel(client: Client) {
@@ -87,7 +145,9 @@ async function cameBack(client: Client, target: (typeof targets)[number], s: Sta
 async function checkAll(client: Client) {
   for (const target of targets) {
     const s = state[target.key];
-    const problem = await check(target.url);
+    const { problem, ms } = await check(target.url);
+    s.latencyMs = ms;
+    push(s.history, !problem);
     if (problem) {
       s.failures += 1;
       s.detail = problem;
@@ -111,6 +171,8 @@ async function checkAll(client: Client) {
       }
     }
   }
+  push(botHistory, client.isReady());
+  await refreshStatusPicture(client).catch((error) => logBotError("status picture", error));
 }
 
 export function startStatusChecks(client: Client, changed: () => void) {

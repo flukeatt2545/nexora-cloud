@@ -33,7 +33,7 @@ export function linkButton(url: string, label: string) {
 }
 
 /** Discord time tags show each reader their own local time. */
-export function when(date: Date, style: "t" | "f" | "R" = "f") {
+export function when(date: Date, style: "t" | "f" | "R" | "D" = "f") {
   return `<t:${Math.floor(date.getTime() / 1000)}:${style}>`;
 }
 
@@ -50,14 +50,6 @@ export function verifyPanel(text: string) {
   return {
     embeds: [new EmbedBuilder().setColor(COLOR.brand).setTitle("ยืนยันตัวตน").setDescription(text)],
     components: [row(new ButtonBuilder().setCustomId("cm:verify").setStyle(ButtonStyle.Success).setLabel("ยืนยันตัวตน").setEmoji("✅"))],
-  };
-}
-
-export function rolesPanel(text: string, roleNames: string[]) {
-  const list = roleNames.length ? roleNames.map((name) => `• ${name}`).join("\n") : "_ยังไม่มียศให้เลือก_";
-  return {
-    embeds: [new EmbedBuilder().setColor(COLOR.brand).setTitle("เลือกยศ").setDescription(`${text}\n\n${list}`)],
-    components: [row(new ButtonBuilder().setCustomId("cm:roles:open").setStyle(ButtonStyle.Primary).setLabel("เลือกยศ").setEmoji("🎭"))],
   };
 }
 

@@ -1,11 +1,13 @@
-import { REST, Routes, type Client } from "discord.js";
+import { REST, Routes, type Client, type Guild } from "discord.js";
 import { logBotError } from "./api";
+import { refreshBoost } from "./boost";
 import { ensureSetupChannel } from "./build";
 import { commands } from "./commands";
 import { homeGuild, homeGuildId, markApplied, reportGuild } from "./guild";
-import { syncPanels } from "./panels";
-import { loadSettings, settings, settingsVersion, updateSettings } from "./settings";
+import { removePanel, syncPanels, textChannel } from "./panels";
+import { loadSettings, panels, settings, settingsVersion, updateSettings } from "./settings";
 import { updateStats } from "./stats";
+import { refreshStatusPicture } from "./status";
 
 // Applying the settings: commands in the right server, panels where they belong, stats names,
 // then telling the site which version is in place and what did not work.
@@ -35,6 +37,24 @@ async function leaveOtherServers(client: Client) {
   }
 }
 
+/**
+ * The "pick roles" room is gone from the bot: its panel is deleted, and so is the room when the
+ * panel was all that was in it. The roles themselves stay.
+ */
+async function removeRolesRoom(guild: Guild) {
+  const current = settings();
+  if (!current || !(current.rolesChannelId || current.selfRoleIds.length || panels().roles.messageId)) return;
+  await removePanel(guild, "roles");
+  const channel = textChannel(guild, current.rolesChannelId);
+  if (channel) {
+    const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
+    if (messages && messages.every((message) => message.author.id === guild.client.user.id)) {
+      await channel.delete("เอาห้องเลือกยศออก").catch((error) => logBotError("delete roles room", error));
+    }
+  }
+  await updateSettings("", { rolesChannelId: "", selfRoleIds: [] }).catch((error) => logBotError("clear roles settings", error));
+}
+
 export function forgetRegistration() {
   registeredIn = "";
 }
@@ -53,7 +73,10 @@ async function run(client: Client, repost: boolean) {
     return;
   }
   await ensureSetupChannel(guild);
+  await removeRolesRoom(guild);
   await syncPanels(guild, repost);
+  await refreshBoost(client, repost).catch((error) => logBotError("boost panel", error));
+  await refreshStatusPicture(client, true).catch((error) => logBotError("status picture", error));
   await updateStats(client);
   markApplied(settingsVersion());
   await reportGuild(client);

@@ -11,11 +11,12 @@ import {
 import { api, logBotError } from "./api";
 import { applySettings, forgetRegistration, watchSettings } from "./apply";
 import { startBot } from "./bot-token";
+import { onMemberUpdate as onBoostMemberUpdate, refreshBoost, startBoost } from "./boost";
 import { API_URL, BOT_SECRET, ENV_TOKEN } from "./config";
 import { ensureSetupChannel } from "./build";
 import { isHome, reportGuild, reportSoon } from "./guild";
 import { checkRateLimit } from "./limits";
-import { onMemberJoin, onRolesOpen, onRolesSet, onVerify } from "./members";
+import { onMemberJoin, onVerify } from "./members";
 import { onMessageDeleted } from "./panels";
 import { onAuditLogEntry, onSecurityJoin, onSecurityMessage, startSiteSecurityFeed } from "./security";
 import { loadSettings } from "./settings";
@@ -89,6 +90,7 @@ client.once(Events.ClientReady, async (ready) => {
   await syncTempRooms(client);
   startStatusChecks(client, () => void updateStats(client));
   startStats(client);
+  startBoost(client);
   startSiteSecurityFeed(client);
   watchSettings(client);
   setInterval(() => void syncPresence(), 15000).unref();
@@ -112,6 +114,17 @@ client.on(Events.GuildMemberAdd, (member) => {
   onSecurityJoin(member)
     .then((kicked) => (kicked ? undefined : onMemberJoin(member)))
     .catch((error) => logBotError("member join", error));
+});
+
+// Someone starts boosting, or the server's boost level changes: the boost panel follows.
+client.on(Events.GuildMemberUpdate, (before, after) => {
+  if (!isHome(after.guild)) return;
+  onBoostMemberUpdate(before, after).catch((error) => logBotError("boost member", error));
+});
+
+client.on(Events.GuildUpdate, (before, after) => {
+  if (!isHome(after) || (before.premiumTier === after.premiumTier && before.premiumSubscriptionCount === after.premiumSubscriptionCount)) return;
+  refreshBoost(client).catch((error) => logBotError("boost panel", error));
 });
 
 client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => {
@@ -184,12 +197,10 @@ async function route(interaction: Interaction) {
   const id = interaction.customId;
   if (interaction.isButton()) {
     if (id === "cm:verify") return onVerify(interaction);
-    if (id === "cm:roles:open") return onRolesOpen(interaction);
     if (id === "cm:ticket:open") return onTicketButton(interaction);
     if (id.startsWith("cm:ticket:claim:")) return onTicketClaim(interaction);
     if (id.startsWith("cm:ticket:close:")) return onTicketCloseButton(interaction);
   }
-  if (interaction.isStringSelectMenu() && id === "cm:roles:set") return onRolesSet(interaction);
   if (id.startsWith("cm:setup:") || id.startsWith("cm:set:") || id.startsWith("cm:clear:")) {
     if (interaction.isButton() || interaction.isStringSelectMenu() || interaction.isChannelSelectMenu() || interaction.isRoleSelectMenu()) {
       await onSetupComponent(interaction);

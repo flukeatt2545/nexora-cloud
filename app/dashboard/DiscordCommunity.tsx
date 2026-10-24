@@ -12,25 +12,24 @@ type NameStyle = "plain" | "frame" | "line" | "cute";
 
 // The same examples as STYLE_LABELS in discord-community-bot/src/style.ts.
 const NAME_STYLES: { value: NameStyle; label: string }[] = [
-  { value: "frame", label: "กรอบ  『ยินดีต้อนรับ』 · 『𝐎𝐰𝐧𝐞𝐫』" },
-  { value: "line", label: "เส้นคั่น  ┊・ยินดีต้อนรับ · ┊ 𝗢𝘄𝗻𝗲𝗿" },
-  { value: "cute", label: "น่ารัก  ꒰ยินดีต้อนรับ꒱ · ꒰ᴏᴡɴᴇʀ꒱" },
-  { value: "plain", label: "เรียบ ๆ  ยินดีต้อนรับ · Owner" },
+  { value: "frame", label: "กรอบ  『👋』ยินดีต้อนรับ · 『👑』𝐎𝐰𝐧𝐞𝐫" },
+  { value: "line", label: "เส้นคั่น  ┊👋┊ยินดีต้อนรับ · ┊👑┊𝗢𝘄𝗻𝗲𝗿" },
+  { value: "cute", label: "น่ารัก  ꒰👋꒱・ยินดีต้อนรับ · ꒰👑꒱ ᴏᴡɴᴇʀ" },
+  { value: "plain", label: "เรียบ ๆ  👋・ยินดีต้อนรับ · 👑 Owner" },
 ];
 
 type Settings = {
   guildId: string;
   nameStyle: NameStyle;
+  nameEmoji: boolean;
   welcomeEnabled: boolean;
   welcomeChannelId: string;
   welcomeMessage: string;
+  welcomeImage: boolean;
   verifyEnabled: boolean;
   verifyChannelId: string;
   verifyMessage: string;
   memberRoleId: string;
-  rolesChannelId: string;
-  rolesMessage: string;
-  selfRoleIds: string[];
   managerRoleIds: string[];
   staffRoleIds: string[];
   usageRoleIds: string[];
@@ -51,6 +50,11 @@ type Settings = {
   statusEnabled: boolean;
   statusChannelId: string;
   statusMentionRoleId: string;
+  statusImage: boolean;
+  boostEnabled: boolean;
+  boostChannelId: string;
+  boostLoungeChannelId: string;
+  boostPerks: string;
   securityEnabled: boolean;
   securityChannelId: string;
   securitySiteEvents: boolean;
@@ -229,8 +233,8 @@ function Feature({ title, children }: { title: ReactNode; children: ReactNode })
 }
 
 /**
- * The community bot (one server: welcome, verification, roles, tickets, voice rooms, stats,
- * site status). The same settings can be changed with /setup in Discord; the bot applies a save
+ * The community bot (one server: welcome, verification, tickets, voice rooms, stats,
+ * boost room, site status). The same settings can be changed with /setup in Discord; the bot applies a save
  * within about 15 seconds and reports what it could not do.
  */
 export function DiscordCommunity({ notify }: { notify: Notice }) {
@@ -323,7 +327,8 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                   <select id="cmb-style" className="hv-select" value={form.nameStyle} onChange={(event) => set({ nameStyle: event.target.value as NameStyle })} disabled={off}>
                     {NAME_STYLES.map((style) => <option key={style.value} value={style.value}>{style.label}</option>)}
                   </select>
-                  <small>ใช้กับห้อง หมวด และยศที่บอทสร้าง (ไม่มีอีโมจิ) · เปลี่ยนชื่อห้องและยศที่มีอยู่ด้วยปุ่ม 🎨 แต่งชื่อ ใน /setup</small>
+                  <small>ใช้กับห้อง หมวด และยศที่บอทสร้าง · เปลี่ยนชื่อห้องและยศที่มีอยู่ด้วยปุ่ม 🎨 แต่งชื่อ ใน /setup</small>
+                  <Switch label="ใส่อีโมจิในชื่อ" hint="ปิด = กรอบกับอักษรพิเศษอย่างเดียว ไม่มีอีโมจิ" on={form.nameEmoji} onChange={(on) => set({ nameEmoji: on })} disabled={off} />
                 </div>
               </div>
               <div className={`cmb-guild${guild?.problems.length ? " is-warn" : ""}`} role="status">
@@ -354,6 +359,7 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                   <ChannelPicker id="cmb-welcome" label="ห้องต้อนรับ" kind="text" value={form.welcomeChannelId} onChange={(welcomeChannelId) => set({ welcomeChannelId })} guild={guild} disabled={off || !form.welcomeEnabled} />
                   <TextBox id="cmb-welcome-text" label="ข้อความต้อนรับ" value={form.welcomeMessage} onChange={(welcomeMessage) => set({ welcomeMessage })} disabled={off || !form.welcomeEnabled}
                     hint="{user} = แท็กคนเข้า · {name} = ชื่อ · {server} = ชื่อเซิร์ฟ · {count} = ลำดับสมาชิก" />
+                  <Switch label="ภาพต้อนรับ" hint="แนบการ์ดต้อนรับพร้อมรูปโปรไฟล์ ชื่อ และลำดับสมาชิก" on={form.welcomeImage} onChange={(on) => set({ welcomeImage: on })} disabled={off || !form.welcomeEnabled} />
                 </Feature>
 
                 <Feature title={<Switch label="ยืนยันตัวตน" hint="กดปุ่มแล้วได้ยศสมาชิก (ปิด = ได้ยศสมาชิกทันทีที่เข้า)" on={form.verifyEnabled} onChange={(on) => set({ verifyEnabled: on })} disabled={off} />}>
@@ -364,10 +370,14 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                   <TextBox id="cmb-verify-text" label="ข้อความแผงยืนยันตัวตน" value={form.verifyMessage} onChange={(verifyMessage) => set({ verifyMessage })} disabled={off || !form.verifyEnabled} />
                 </Feature>
 
-                <Feature title={<div className="cmb-title"><strong>เลือกยศเอง</strong><small>แผงที่สมาชิกกดเลือกยศได้เอง (ไม่เลือกยศ = ไม่มีแผง)</small></div>}>
-                  <ChannelPicker id="cmb-roles" label="ห้องเลือกยศ" kind="text" value={form.rolesChannelId} onChange={(rolesChannelId) => set({ rolesChannelId })} guild={guild} disabled={off} />
-                  <RolesPicker id="cmb-self" label="ยศที่ให้เลือก" hint="เฉพาะยศที่อยู่ต่ำกว่ายศของบอท" value={form.selfRoleIds} onChange={(selfRoleIds) => set({ selfRoleIds })} guild={guild} disabled={off} max={25} giveable />
-                  <TextBox id="cmb-roles-text" label="ข้อความแผงเลือกยศ" value={form.rolesMessage} onChange={(rolesMessage) => set({ rolesMessage })} disabled={off} />
+                <Feature title={<Switch label="ห้องบูสต์" hint="แผงบอกเลเวลและแถบความคืบหน้าบูสต์ สิทธิประโยชน์ และรายชื่อบูสเตอร์ (อัปเดตเอง) · มีห้องคุยเฉพาะคนบูสต์" on={form.boostEnabled} onChange={(on) => set({ boostEnabled: on })} disabled={off} />}>
+                  <div className="dbot-fields">
+                    <ChannelPicker id="cmb-boost" label="ห้องแผงบูสต์" kind="text" value={form.boostChannelId} onChange={(boostChannelId) => set({ boostChannelId })} guild={guild} disabled={off || !form.boostEnabled} />
+                    <ChannelPicker id="cmb-boost-lounge" label="ห้องบูสเตอร์" kind="text" value={form.boostLoungeChannelId} onChange={(boostLoungeChannelId) => set({ boostLoungeChannelId })} guild={guild} disabled={off || !form.boostEnabled}
+                      hint="เห็นเฉพาะคนที่มียศ Server Booster และทีมงาน" />
+                  </div>
+                  <TextBox id="cmb-boost-perks" label="สิทธิประโยชน์ของบูสเตอร์" value={form.boostPerks} onChange={(boostPerks) => set({ boostPerks })} disabled={off || !form.boostEnabled}
+                    hint="เขียนเป็นบรรทัด ๆ แสดงในแผงบูสต์" />
                 </Feature>
               </div>
 
@@ -412,6 +422,7 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                     <ChannelPicker id="cmb-status" label="ห้องแจ้งสถานะ" kind="text" value={form.statusChannelId} onChange={(statusChannelId) => set({ statusChannelId })} guild={guild} disabled={off || !form.statusEnabled} />
                     <RolePicker id="cmb-status-role" label="แท็กยศตอนล่ม" hint="ไม่ตั้ง = ไม่แท็กใคร · ยศต้องเปิดให้ @mention ได้" value={form.statusMentionRoleId} onChange={(statusMentionRoleId) => set({ statusMentionRoleId })} guild={guild} disabled={off || !form.statusEnabled} />
                   </div>
+                  <Switch label="ภาพสถานะระบบ" hint="ภาพสถานะเว็บ API และบอท พร้อมเวลาตอบสนองและ uptime อัปเดตเองในห้องแจ้งสถานะ" on={form.statusImage} onChange={(on) => set({ statusImage: on })} disabled={off || !form.statusEnabled} />
                 </Feature>
               </div>
 

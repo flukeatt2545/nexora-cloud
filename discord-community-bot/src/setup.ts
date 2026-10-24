@@ -48,8 +48,6 @@ const SLOTS: Slot[] = [
   { key: "welcomeChannelId", label: "ห้องต้อนรับ", kind: "text" },
   { key: "verifyChannelId", label: "ห้องยืนยันตัวตน", kind: "text" },
   { key: "memberRoleId", label: "ยศสมาชิก (ได้ตอนยืนยัน)", kind: "role" },
-  { key: "rolesChannelId", label: "ห้องเลือกยศ", kind: "text" },
-  { key: "selfRoleIds", label: "ยศที่ให้เลือกเอง", kind: "roles", max: 25 },
   { key: "ticketChannelId", label: "ห้องปุ่มเปิด Ticket", kind: "text" },
   { key: "ticketCategoryId", label: "หมวดที่สร้างห้อง Ticket", kind: "category" },
   { key: "ticketLogChannelId", label: "ห้อง log Ticket", kind: "text" },
@@ -64,15 +62,21 @@ const SLOTS: Slot[] = [
   { key: "statsOnlineChannelId", label: "ห้องสถิติ: ออนไลน์", kind: "voice" },
   { key: "statsSiteChannelId", label: "ห้องสถิติ: สถานะเว็บ", kind: "voice" },
   { key: "securityChannelId", label: "ห้องแจ้งเตือนความปลอดภัย", kind: "text" },
+  { key: "boostChannelId", label: "ห้องบูสต์ (แผงความคืบหน้า)", kind: "text" },
+  { key: "boostLoungeChannelId", label: "ห้องบูสเตอร์ (เฉพาะคนบูสต์)", kind: "text" },
 ];
 
 const FEATURES: { key: keyof Settings; label: string; description: string }[] = [
+  { key: "nameEmoji", label: "อีโมจิในชื่อห้องและยศ", description: "『👋』ยินดีต้อนรับ (ปิด = กรอบกับอักษรพิเศษอย่างเดียว)" },
   { key: "welcomeEnabled", label: "ต้อนรับสมาชิกใหม่", description: "ส่งข้อความต้อนรับในห้องต้อนรับ" },
+  { key: "welcomeImage", label: "ภาพต้อนรับ", description: "แนบภาพการ์ดต้อนรับพร้อมรูปโปรไฟล์และชื่อ" },
   { key: "verifyEnabled", label: "ยืนยันตัวตน", description: "กดปุ่มแล้วได้ยศสมาชิก" },
   { key: "ticketsEnabled", label: "Ticket", description: "ปุ่มเปิดห้องคุยส่วนตัวกับทีมงาน" },
   { key: "tempVoiceEnabled", label: "ห้องเสียงชั่วคราว", description: "เข้าห้อง ➕ แล้วได้ห้องเสียงของตัวเอง" },
   { key: "statsEnabled", label: "ห้องสถิติ", description: "ชื่อห้องบอกจำนวนสมาชิก คนออนไลน์ สถานะเว็บ" },
   { key: "statusEnabled", label: "แจ้งเว็บล่ม", description: "แจ้งเมื่อเว็บหรือ API ล่มและกลับมา" },
+  { key: "statusImage", label: "ภาพสถานะระบบ", description: "ภาพสถานะเว็บ API บอท อัปเดตเองในห้องแจ้งสถานะ" },
+  { key: "boostEnabled", label: "ห้องบูสต์", description: "แถบความคืบหน้าบูสต์ สิทธิประโยชน์ และรายชื่อบูสเตอร์" },
   { key: "securityEnabled", label: "แจ้งเตือนความปลอดภัย", description: "เตะ แบน ลบห้อง/ยศ ให้ยศสิทธิ์สูง บอทใหม่ บัญชีเพิ่งสร้าง" },
   { key: "securitySiteEvents", label: "เหตุการณ์ความปลอดภัยของเว็บ", description: "ส่งเหตุการณ์ NEXORA Security เข้าห้องแจ้งเตือน" },
   { key: "antiNukeEnabled", label: "Anti-nuke", description: "ลบห้อง/ยศ หรือแบนรัว ๆ ถูกถอดยศและพักการพิมพ์" },
@@ -82,7 +86,7 @@ const FEATURES: { key: keyof Settings; label: string; description: string }[] = 
 const TEXTS: { key: keyof Settings; label: string; hint: string; max: number; long: boolean }[] = [
   { key: "welcomeMessage", label: "ข้อความต้อนรับ", hint: "{user} = แท็กคนเข้า, {name} = ชื่อ, {server} = ชื่อเซิร์ฟ, {count} = ลำดับสมาชิก", max: 1500, long: true },
   { key: "verifyMessage", label: "ข้อความแผงยืนยันตัวตน", hint: "", max: 1500, long: true },
-  { key: "rolesMessage", label: "ข้อความแผงเลือกยศ", hint: "", max: 1500, long: true },
+  { key: "boostPerks", label: "สิทธิประโยชน์ของบูสเตอร์", hint: "เขียนเป็นบรรทัด ๆ แสดงในแผงบูสต์", max: 1000, long: true },
   { key: "ticketMessage", label: "ข้อความแผง Ticket", hint: "", max: 1500, long: true },
   { key: "tempNameTemplate", label: "ชื่อห้องเสียงชั่วคราว", hint: "{user} = ชื่อเจ้าของห้อง", max: 60, long: false },
   { key: "ticketMaxOpen", label: "Ticket ที่เปิดค้างได้ต่อคน (1–5)", hint: "", max: 1, long: false },
@@ -110,18 +114,18 @@ function homePage(current: Settings) {
     .setTitle("ตั้งค่าบอทดูแลเซิร์ฟ")
     .setDescription([
       `ตั้งที่นี่หรือที่[หน้าเว็บแอดมิน](${SETTINGS_URL})ก็ได้ ค่าเดียวกัน`,
-      "**🛠️ สร้างที่ขาดให้** สร้างยศ หมวด และห้องที่ยังไม่มี (ชื่อตามสไตล์ที่เลือก) · **🎨 แต่งชื่อ** เปลี่ยนชื่อห้องและยศที่มีอยู่เป็นสไตล์นี้ (เอาอีโมจิออก)",
-      `สไตล์ชื่อตอนนี้: ${STYLE_LABELS[current.nameStyle] ?? STYLE_LABELS.frame}`,
+      "**🛠️ สร้างที่ขาดให้** สร้างยศ หมวด และห้องที่ยังไม่มี (ชื่อตามสไตล์ที่เลือก) · **🎨 แต่งชื่อ** เปลี่ยนชื่อห้องและยศที่มีอยู่เป็นสไตล์นี้ (ตามสไตล์และตัวเลือกอีโมจิ)",
+      `สไตล์ชื่อตอนนี้: ${STYLE_LABELS[current.nameStyle] ?? STYLE_LABELS.frame} · อีโมจิ ${on(current.nameEmoji)}`,
     ].join("\n"))
     .addFields(
-      { name: `ต้อนรับ ${on(current.welcomeEnabled)} · ยืนยันตัวตน ${on(current.verifyEnabled)}`,
+      { name: `ต้อนรับ ${on(current.welcomeEnabled)} · ภาพ ${on(current.welcomeImage)} · ยืนยันตัวตน ${on(current.verifyEnabled)}`,
         value: `ห้องต้อนรับ ${slotText(current, "welcomeChannelId")}\nห้องยืนยัน ${slotText(current, "verifyChannelId")} · ยศสมาชิก ${slotText(current, "memberRoleId")}` },
-      { name: "เลือกยศ", value: `ห้อง ${slotText(current, "rolesChannelId")} · ${current.selfRoleIds.length} ยศ` },
       { name: `Ticket ${on(current.ticketsEnabled)}`,
         value: `ปุ่ม ${slotText(current, "ticketChannelId")} · หมวด ${slotText(current, "ticketCategoryId")} · log ${slotText(current, "ticketLogChannelId")}\nทีมงาน ${slotText(current, "staffRoleIds")}` },
       { name: `ห้องเสียงชั่วคราว ${on(current.tempVoiceEnabled)}`, value: `ห้อง ${slotText(current, "tempHubChannelId")}`, inline: true },
       { name: `ห้องสถิติ ${on(current.statsEnabled)}`, value: `หมวด ${slotText(current, "statsCategoryId")}`, inline: true },
-      { name: `แจ้งเว็บล่ม ${on(current.statusEnabled)}`, value: `ห้อง ${slotText(current, "statusChannelId")}`, inline: true },
+      { name: `แจ้งเว็บล่ม ${on(current.statusEnabled)}`, value: `ห้อง ${slotText(current, "statusChannelId")} · ภาพ ${on(current.statusImage)}`, inline: true },
+      { name: `บูสต์ ${on(current.boostEnabled)}`, value: `แผง ${slotText(current, "boostChannelId")} · ห้องบูสเตอร์ ${slotText(current, "boostLoungeChannelId")}`, inline: true },
       { name: `ความปลอดภัย ${on(current.securityEnabled)}`,
         value: `ห้อง ${slotText(current, "securityChannelId")} · Anti-nuke ${on(current.antiNukeEnabled)} · กันสแปม ${on(current.antiSpamEnabled)}` },
       { name: "สิทธิ์", value: `ผู้ดูแลบอท ${slotText(current, "managerRoleIds")}\nใช้ Ticket/ห้องเสียงได้ ${current.usageRoleIds.length ? slotText(current, "usageRoleIds") : "ทุกคน"}` },
@@ -339,7 +343,7 @@ export async function onSetupComponent(interaction: ButtonInteraction | StringSe
     await interaction.deferUpdate();
     await applySettings(interaction.client, true);
     await interaction.editReply(homePage(settings() ?? current));
-    await interaction.followUp({ embeds: [okEmbed("ลงแผงใหม่แล้ว", "แผงยืนยันตัวตน เลือกยศ และ Ticket ถูกลงใหม่ที่ท้ายห้องของมัน")], flags: ephemeral });
+    await interaction.followUp({ embeds: [okEmbed("ลงแผงใหม่แล้ว", "แผงยืนยันตัวตน Ticket และบูสต์ ถูกลงใหม่ที่ท้ายห้องของมัน")], flags: ephemeral });
   }
 }
 
@@ -367,7 +371,7 @@ function mayWipe(member: GuildMember) {
   return member.id === member.guild.ownerId || isBotAdmin(member.id) || member.permissions.has(PermissionFlagsBits.Administrator);
 }
 
-const CHANNEL_KEYS: (keyof Settings)[] = ["welcomeChannelId", "verifyChannelId", "rolesChannelId", "ticketChannelId", "ticketCategoryId",
+const CHANNEL_KEYS: (keyof Settings)[] = ["welcomeChannelId", "verifyChannelId", "rolesChannelId", "boostChannelId", "boostLoungeChannelId", "ticketChannelId", "ticketCategoryId",
   "ticketLogChannelId", "tempHubChannelId", "statsCategoryId", "statsMembersChannelId", "statsOnlineChannelId", "statsSiteChannelId", "statusChannelId", "securityChannelId"];
 
 export async function onWipeSubmit(interaction: ModalSubmitInteraction) {
@@ -388,7 +392,7 @@ export async function onWipeSubmit(interaction: ModalSubmitInteraction) {
   const cleared: Partial<Settings> = {};
   for (const key of CHANNEL_KEYS) (cleared as Record<string, string>)[key] = "";
   await updateSettings(interaction.user, cleared).catch((error) => logBotError("clear channel settings", error));
-  for (const key of ["verify", "roles", "ticket"] as PanelKey[]) await savePanel(key, { channelId: "", messageId: "" });
+  for (const key of ["verify", "roles", "ticket", "status", "boost"] as PanelKey[]) await savePanel(key, { channelId: "", messageId: "" });
   await api(interaction.user).post("/api/internal/bot/community/event", {
     kind: "wipe", guildId: guild.id, name: guild.name, created: [`ลบ ${result.deleted} ห้อง/หมวด`, ...result.failed.map((name) => `ลบไม่ได้: ${name}`)],
   }).catch((error) => logBotError("log wipe", error));
@@ -418,9 +422,10 @@ export async function onCreateCommand(interaction: ChatInputCommandInteraction) 
   const guild = interaction.guild!;
   const sub = interaction.options.getSubcommand();
   const typed = interaction.options.getString("name", true).trim();
-  // Decorated in the server's name style (no emoji) unless asked not to.
+  // Decorated in the server's name style unless asked not to; an emoji typed here is kept.
   const plain = interaction.options.getBoolean("plain") ?? false;
-  const styled = (type: ChannelType) => (plain ? typed : restyle(nameStyle(), type, typed) || typed);
+  const emoji = interaction.options.getString("emoji")?.trim() ?? "";
+  const styled = (type: ChannelType) => (plain ? typed : restyle(nameStyle(), type, `${emoji} ${typed}`) || typed);
   await interaction.deferReply({ flags: ephemeral });
   try {
     if (sub === "role") {
@@ -430,7 +435,7 @@ export async function onCreateCommand(interaction: ChatInputCommandInteraction) 
         return;
       }
       const role = await guild.roles.create({
-        name: plain ? typed : restyleRole(nameStyle(), typed) || typed, color: colorText ? parseInt(colorText.replace("#", ""), 16) : undefined,
+        name: plain ? typed : restyleRole(nameStyle(), `${emoji} ${typed}`) || typed, color: colorText ? parseInt(colorText.replace("#", ""), 16) : undefined,
         hoist: interaction.options.getBoolean("separate") ?? false, mentionable: interaction.options.getBoolean("mentionable") ?? false,
         reason: `/create โดย ${interaction.user.username}`,
       });
