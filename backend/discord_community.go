@@ -773,18 +773,34 @@ func (s *server) botCommunityEvent(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-// queueCommunitySecurity hands a website security event to the community bot, which posts it in
-// its security room. Only when that room is on and asks for website events.
+// communitySecurityRoom says where an event is posted: what happens inside Discord (a voice room
+// turning someone away) goes to the Discord room, the website's events to the web room.
+func communitySecurityRoom(action string) string {
+	if strings.HasPrefix(action, "discord.voice.") {
+		return "discord"
+	}
+	return "site"
+}
+
+// queueCommunitySecurity hands a security event to the community bot, which posts it in the right
+// security room. Only when that room is on (the web room also has to ask for website events).
 func (s *server) queueCommunitySecurity(ctx context.Context, event auditEvent) {
 	settings, _, _, err := s.loadCommunitySettings(ctx)
-	if err != nil || !settings.SecurityEnabled || !settings.SecuritySiteEvents || settings.SecuritySiteChannelID == "" {
+	if err != nil || !settings.SecurityEnabled {
+		return
+	}
+	room := communitySecurityRoom(event.Action)
+	if room == "discord" && settings.SecurityChannelID == "" {
+		return
+	}
+	if room == "site" && (!settings.SecuritySiteEvents || settings.SecuritySiteChannelID == "") {
 		return
 	}
 	embed, err := json.Marshal(buildDiscordEmbed(event))
 	if err != nil {
 		return
 	}
-	_, _ = s.db.Exec(ctx, `INSERT INTO discord_community_security_feed (embed) VALUES ($1::jsonb)`, string(embed))
+	_, _ = s.db.Exec(ctx, `INSERT INTO discord_community_security_feed (embed, room) VALUES ($1::jsonb, $2)`, string(embed), room)
 	_, _ = s.db.Exec(ctx, `DELETE FROM discord_community_security_feed WHERE created_at < NOW() - INTERVAL '1 day'`)
 }
 
@@ -792,20 +808,21 @@ func (s *server) botCommunitySecurityFeed(c *fiber.Ctx) error {
 	if err := s.verifyBotSecret(c); err != nil {
 		return err
 	}
-	rows, err := s.db.Query(c.Context(), `SELECT id, embed FROM discord_community_security_feed ORDER BY id LIMIT 20`)
+	rows, err := s.db.Query(c.Context(), `SELECT id, embed, room FROM discord_community_security_feed ORDER BY id LIMIT 20`)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	type item struct {
 		ID    int64           `json:"id"`
+		Room  string          `json:"room"`
 		Embed json.RawMessage `json:"embed"`
 	}
 	items := []item{}
 	for rows.Next() {
 		var it item
 		var embed []byte
-		if err := rows.Scan(&it.ID, &embed); err != nil {
+		if err := rows.Scan(&it.ID, &embed, &it.Room); err != nil {
 			return err
 		}
 		it.Embed = embed

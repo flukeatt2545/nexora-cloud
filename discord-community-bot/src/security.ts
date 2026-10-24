@@ -319,19 +319,21 @@ setInterval(() => {
   for (const [id, at] of warned) if (at < cutoff) warned.delete(id);
 }, 60000).unref();
 
-// The website's security events, queued by the API for this room.
+// Security events queued by the API: the website's go to the web room, what happened in Discord
+// (a voice room turning someone away) to the Discord room.
 
 export function startSiteSecurityFeed(client: Client) {
   setInterval(async () => {
     const guild = homeGuild(client);
-    const channel = guild ? siteChannel(guild) : undefined;
-    // Without its own room the events wait (the API keeps them a day); they are never mixed into the Discord room.
-    if (!guild || !channel) return;
+    if (!guild) return;
     try {
-      const res = await api().get<{ items: { id: number; embed: APIEmbed }[] }>("/api/internal/bot/community/security-feed");
+      const res = await api().get<{ items: { id: number; room?: string; embed: APIEmbed }[] }>("/api/internal/bot/community/security-feed");
       const posted: number[] = [];
       for (const item of res.data.items) {
-        await channel.send({ embeds: [item.embed] }).catch((error) => logBotError("site activity", error));
+        // Without its own room an event waits (the API keeps them a day); it is never moved to the other room.
+        const channel = item.room === "discord" ? securityChannel(guild) : siteChannel(guild);
+        if (!channel) continue;
+        await channel.send({ embeds: [item.embed] }).catch((error) => logBotError("security feed", error));
         posted.push(item.id);
       }
       if (posted.length) await api().post("/api/internal/bot/community/security-feed/ack", { ids: posted });
