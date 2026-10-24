@@ -10,28 +10,17 @@ import {
   UserSelectMenuBuilder,
   type MessageActionRowComponentBuilder,
 } from "discord.js";
+import { channelUrl, linkButton, row, type Row } from "../../ui";
 import type { VoiceRoom } from "./api";
 
-export function channelUrl(guildId: string, channelId: string) {
-  return `https://discord.com/channels/${guildId}/${channelId}`;
-}
+// The error and success cards, the channel link and the row helper are the bot's shared ones.
+export { channelUrl, errorEmbed, okEmbed } from "../../ui";
 
+// The voice rooms keep their own blue and amber for their panels.
 export const COLOR = { brand: 0x2e7eff, ok: 0x18b77a, warn: 0xe3aa52, danger: 0xf43f5e };
 
-type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
-
-export function errorEmbed(title: string, description: string) {
-  return new EmbedBuilder().setColor(COLOR.danger).setTitle(title).setDescription(description);
-}
-
-export function okEmbed(title: string, description: string) {
-  return new EmbedBuilder().setColor(COLOR.ok).setTitle(title).setDescription(description);
-}
-
 export function linkRow(guildId: string, channelId: string, label = "ไปที่ห้อง"): Row {
-  return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setURL(channelUrl(guildId, channelId)),
-  );
+  return row(linkButton(channelUrl(guildId, channelId), label));
 }
 
 /** The message posted in the room's own chat: whose room it is, and the owner's button. */
