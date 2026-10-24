@@ -63,6 +63,7 @@ const SLOTS: Slot[] = [
   { key: "statsMembersChannelId", label: "ห้องสถิติ: สมาชิก", kind: "voice" },
   { key: "statsOnlineChannelId", label: "ห้องสถิติ: ออนไลน์", kind: "voice" },
   { key: "statsSiteChannelId", label: "ห้องสถิติ: สถานะเว็บ", kind: "voice" },
+  { key: "securityChannelId", label: "ห้องแจ้งเตือนความปลอดภัย", kind: "text" },
 ];
 
 const FEATURES: { key: keyof Settings; label: string; description: string }[] = [
@@ -72,6 +73,10 @@ const FEATURES: { key: keyof Settings; label: string; description: string }[] = 
   { key: "tempVoiceEnabled", label: "ห้องเสียงชั่วคราว", description: "เข้าห้อง ➕ แล้วได้ห้องเสียงของตัวเอง" },
   { key: "statsEnabled", label: "ห้องสถิติ", description: "ชื่อห้องบอกจำนวนสมาชิก คนออนไลน์ สถานะเว็บ" },
   { key: "statusEnabled", label: "แจ้งเว็บล่ม", description: "แจ้งเมื่อเว็บหรือ API ล่มและกลับมา" },
+  { key: "securityEnabled", label: "แจ้งเตือนความปลอดภัย", description: "เตะ แบน ลบห้อง/ยศ ให้ยศสิทธิ์สูง บอทใหม่ บัญชีเพิ่งสร้าง" },
+  { key: "securitySiteEvents", label: "เหตุการณ์ความปลอดภัยของเว็บ", description: "ส่งเหตุการณ์ NEXORA Security เข้าห้องแจ้งเตือน" },
+  { key: "antiNukeEnabled", label: "Anti-nuke", description: "ลบห้อง/ยศ หรือแบนรัว ๆ ถูกถอดยศและพักการพิมพ์" },
+  { key: "antiSpamEnabled", label: "กันสแปมและคนเข้ารัว", description: "ลิงก์เชิญ แท็กเยอะ พิมพ์รัว และโหมดกัน raid" },
 ];
 
 const TEXTS: { key: keyof Settings; label: string; hint: string; max: number; long: boolean }[] = [
@@ -81,6 +86,7 @@ const TEXTS: { key: keyof Settings; label: string; hint: string; max: number; lo
   { key: "ticketMessage", label: "ข้อความแผง Ticket", hint: "", max: 1500, long: true },
   { key: "tempNameTemplate", label: "ชื่อห้องเสียงชั่วคราว", hint: "{user} = ชื่อเจ้าของห้อง", max: 60, long: false },
   { key: "ticketMaxOpen", label: "Ticket ที่เปิดค้างได้ต่อคน (1–5)", hint: "", max: 1, long: false },
+  { key: "newAccountDays", label: "บัญชีอายุน้อยกว่า (วัน) ถือว่าใหม่ 0–30", hint: "0 = ไม่เช็ก", max: 2, long: false },
 ];
 
 function on(value: boolean) {
@@ -116,6 +122,8 @@ function homePage(current: Settings) {
       { name: `ห้องเสียงชั่วคราว ${on(current.tempVoiceEnabled)}`, value: `ห้อง ${slotText(current, "tempHubChannelId")}`, inline: true },
       { name: `ห้องสถิติ ${on(current.statsEnabled)}`, value: `หมวด ${slotText(current, "statsCategoryId")}`, inline: true },
       { name: `แจ้งเว็บล่ม ${on(current.statusEnabled)}`, value: `ห้อง ${slotText(current, "statusChannelId")}`, inline: true },
+      { name: `ความปลอดภัย ${on(current.securityEnabled)}`,
+        value: `ห้อง ${slotText(current, "securityChannelId")} · Anti-nuke ${on(current.antiNukeEnabled)} · กันสแปม ${on(current.antiSpamEnabled)}` },
       { name: "สิทธิ์", value: `ผู้ดูแลบอท ${slotText(current, "managerRoleIds")}\nใช้ Ticket/ห้องเสียงได้ ${current.usageRoleIds.length ? slotText(current, "usageRoleIds") : "ทุกคน"}` },
     );
   const features = new StringSelectMenuBuilder()
@@ -341,13 +349,14 @@ export async function onSetupText(interaction: ModalSubmitInteraction) {
   const item = TEXTS.find((text) => text.key === key);
   if (!item) return;
   const raw = interaction.fields.getTextInputValue("value").trim();
-  if (key === "ticketMaxOpen") {
+  if (key === "ticketMaxOpen" || key === "newAccountDays") {
     const value = Number(raw);
-    if (!Number.isInteger(value) || value < 1 || value > 5) {
-      await interaction.reply({ embeds: [errorEmbed("ตัวเลขไม่ถูก", "ใส่เลข 1–5")], flags: ephemeral });
+    const [min, max] = key === "ticketMaxOpen" ? [1, 5] : [0, 30];
+    if (!Number.isInteger(value) || value < min || value > max) {
+      await interaction.reply({ embeds: [errorEmbed("ตัวเลขไม่ถูก", `ใส่เลข ${min}–${max}`)], flags: ephemeral });
       return;
     }
-    await save(interaction, { ticketMaxOpen: value });
+    await save(interaction, { [key]: value });
     return;
   }
   await save(interaction, { [key]: raw });
@@ -359,7 +368,7 @@ function mayWipe(member: GuildMember) {
 }
 
 const CHANNEL_KEYS: (keyof Settings)[] = ["welcomeChannelId", "verifyChannelId", "rolesChannelId", "ticketChannelId", "ticketCategoryId",
-  "ticketLogChannelId", "tempHubChannelId", "statsCategoryId", "statsMembersChannelId", "statsOnlineChannelId", "statsSiteChannelId", "statusChannelId"];
+  "ticketLogChannelId", "tempHubChannelId", "statsCategoryId", "statsMembersChannelId", "statsOnlineChannelId", "statsSiteChannelId", "statusChannelId", "securityChannelId"];
 
 export async function onWipeSubmit(interaction: ModalSubmitInteraction) {
   const member = interaction.member as GuildMember;

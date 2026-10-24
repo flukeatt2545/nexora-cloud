@@ -674,6 +674,8 @@ func main() {
 	app.Delete("/api/internal/bot/community/temp-rooms/:channelId", s.botCommunityRemoveTempRoom)
 	app.Post("/api/internal/bot/community/incidents", s.botCommunityIncident)
 	app.Post("/api/internal/bot/community/event", s.botCommunityEvent)
+	app.Get("/api/internal/bot/community/security-feed", s.botCommunitySecurityFeed)
+	app.Post("/api/internal/bot/community/security-feed/ack", s.botCommunitySecurityAck)
 	app.Get("/api/internal/bot/presence/:botKey", s.botDiscordPresence)
 	app.Get("/api/internal/bot/access/:botKey", s.botDiscordAccess)
 	app.Post("/api/internal/bot/access/:botKey", s.updateBotDiscordAccess)

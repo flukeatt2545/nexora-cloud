@@ -17,6 +17,7 @@ import { isHome, reportGuild, reportSoon } from "./guild";
 import { checkRateLimit } from "./limits";
 import { onMemberJoin, onRolesOpen, onRolesSet, onVerify } from "./members";
 import { onMessageDeleted } from "./panels";
+import { onAuditLogEntry, onSecurityJoin, onSecurityMessage, startSiteSecurityFeed } from "./security";
 import { loadSettings } from "./settings";
 import { onCreateCommand, onSetupCommand, onSetupComponent, onSetupText, onWipeSubmit } from "./setup";
 import { startStats, updateStats } from "./stats";
@@ -35,7 +36,7 @@ import {
 import { errorEmbed } from "./ui";
 
 // GuildMembers (privileged): welcome new members. MessageContent (privileged): ticket
-// transcripts. Both must be turned on for this bot on the Developer Portal's Bot page.
+// transcripts and the spam filter. Both must be turned on for this bot on the Developer Portal's Bot page.
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -43,6 +44,8 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    // Bans and audit log entries for the security room (not a privileged intent).
+    GatewayIntentBits.GuildModeration,
   ],
   partials: [Partials.Message],
 });
@@ -86,6 +89,7 @@ client.once(Events.ClientReady, async (ready) => {
   await syncTempRooms(client);
   startStatusChecks(client, () => void updateStats(client));
   startStats(client);
+  startSiteSecurityFeed(client);
   watchSettings(client);
   setInterval(() => void syncPresence(), 15000).unref();
   // The channel and role lists on the web page stay fresh even without changes here.
@@ -104,7 +108,18 @@ client.on(Events.GuildDelete, () => {
 });
 
 client.on(Events.GuildMemberAdd, (member) => {
-  if (isHome(member.guild)) onMemberJoin(member).catch((error) => logBotError("member join", error));
+  if (!isHome(member.guild)) return;
+  onSecurityJoin(member)
+    .then((kicked) => (kicked ? undefined : onMemberJoin(member)))
+    .catch((error) => logBotError("member join", error));
+});
+
+client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => {
+  onAuditLogEntry(entry, guild).catch((error) => logBotError("audit log entry", error));
+});
+
+client.on(Events.MessageCreate, (message) => {
+  onSecurityMessage(message).catch((error) => logBotError("spam filter", error));
 });
 
 client.on(Events.VoiceStateUpdate, (oldState, newState) => {

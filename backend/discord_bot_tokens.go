@@ -31,8 +31,9 @@ var webTokenBots = map[string]string{
 	"voice": "1099798015152",
 	// Manage channels and roles (/setup and /create, ticket rooms, roles picked from the panel,
 	// stats channel names), view, send, embed links, attach files (ticket transcripts), read
-	// history (panels posted earlier), connect and move members (temporary voice rooms).
-	"community": "286379024",
+	// history (panels posted earlier), connect and move members (temporary voice rooms), view
+	// audit log, kick, timeout and manage messages (security room and automatic protection).
+	"community": "1099798015122",
 }
 
 type discordBotStatus struct {

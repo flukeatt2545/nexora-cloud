@@ -41,6 +41,12 @@ export type Settings = {
   statusEnabled: boolean;
   statusChannelId: string;
   statusMentionRoleId: string;
+  securityEnabled: boolean;
+  securityChannelId: string;
+  securitySiteEvents: boolean;
+  antiNukeEnabled: boolean;
+  antiSpamEnabled: boolean;
+  newAccountDays: number;
 };
 
 export type Panel = { channelId: string; messageId: string };

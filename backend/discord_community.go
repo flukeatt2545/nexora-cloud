@@ -62,6 +62,16 @@ type communitySettings struct {
 	StatusEnabled       bool   `json:"statusEnabled"`
 	StatusChannelID     string `json:"statusChannelId"`
 	StatusMentionRoleID string `json:"statusMentionRoleId"`
+
+	// Security room (staff only): what happens in the server, the website's security events,
+	// and what the automatic protection stopped.
+	SecurityEnabled    bool   `json:"securityEnabled"`
+	SecurityChannelID  string `json:"securityChannelId"`
+	SecuritySiteEvents bool   `json:"securitySiteEvents"`
+	AntiNukeEnabled    bool   `json:"antiNukeEnabled"`
+	AntiSpamEnabled    bool   `json:"antiSpamEnabled"`
+	// Accounts younger than this many days are flagged on joining (and kicked during a raid). 0 = off.
+	NewAccountDays int `json:"newAccountDays"`
 }
 
 // A message the bot posted for one of its panels, so it can edit it (or delete it from the old
@@ -149,6 +159,7 @@ func defaultCommunitySettings() communitySettings {
 		TicketsEnabled: true, TicketMessage: communityDefaultTicket, TicketMaxOpen: 1,
 		TempVoiceEnabled: true, TempNameTemplate: communityDefaultTemp,
 		StatsEnabled: true, StatusEnabled: true,
+		SecurityEnabled: true, SecuritySiteEvents: true, AntiNukeEnabled: true, AntiSpamEnabled: true, NewAccountDays: 7,
 	}
 }
 
@@ -182,6 +193,7 @@ func validateCommunitySettings(in communitySettings) (communitySettings, error) 
 		"หมวด Ticket": &in.TicketCategoryID, "ห้อง log Ticket": &in.TicketLogChannelID, "ห้องสร้างห้องเสียง": &in.TempHubChannelID,
 		"หมวดสถิติ": &in.StatsCategoryID, "ห้องจำนวนสมาชิก": &in.StatsMembersChannelID, "ห้องคนออนไลน์": &in.StatsOnlineChannelID,
 		"ห้องสถานะเว็บ": &in.StatsSiteChannelID, "ห้องแจ้งสถานะ": &in.StatusChannelID, "ยศที่แท็กตอนเว็บล่ม": &in.StatusMentionRoleID,
+		"ห้องแจ้งเตือนความปลอดภัย": &in.SecurityChannelID,
 	}
 	for label, value := range single {
 		*value = strings.TrimSpace(*value)
@@ -229,6 +241,9 @@ func validateCommunitySettings(in communitySettings) (communitySettings, error) 
 		in.NameStyle = "frame"
 	default:
 		return in, errors.New("สไตล์ชื่อไม่ถูกต้อง")
+	}
+	if in.NewAccountDays < 0 || in.NewAccountDays > 30 {
+		return in, errors.New("อายุบัญชีใหม่ต้องอยู่ระหว่าง 0–30 วัน")
 	}
 	if in.TicketMaxOpen < 1 || in.TicketMaxOpen > 5 {
 		return in, errors.New("Ticket ที่เปิดค้างได้ต่อคนต้องอยู่ระหว่าง 1–5")
@@ -679,6 +694,12 @@ func (s *server) botCommunityEvent(c *fiber.Ctx) error {
 		action, target = "discord.community.setup_ran", "community_settings"
 	case "wipe":
 		action, target = "discord.community.server_wiped", "discord_guild"
+	case "nuke":
+		action, target = "discord.community.nuke_stopped", "discord_member"
+	case "spam":
+		action, target = "discord.community.spam_blocked", "discord_member"
+	case "raid":
+		action, target = "discord.community.raid_detected", "discord_guild"
 	default:
 		return fiber.NewError(fiber.StatusBadRequest, "ข้อมูลไม่ถูกต้อง")
 	}
@@ -695,6 +716,66 @@ func (s *server) botCommunityEvent(c *fiber.Ctx) error {
 		targetID = input.GuildID
 	}
 	s.audit(c, auditEvent{Category: "discord", Action: action, Target: target, TargetID: targetID, Metadata: meta})
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// queueCommunitySecurity hands a website security event to the community bot, which posts it in
+// its security room. Only when that room is on and asks for website events.
+func (s *server) queueCommunitySecurity(ctx context.Context, event auditEvent) {
+	settings, _, _, err := s.loadCommunitySettings(ctx)
+	if err != nil || !settings.SecurityEnabled || !settings.SecuritySiteEvents || settings.SecurityChannelID == "" {
+		return
+	}
+	embed, err := json.Marshal(buildDiscordEmbed(event))
+	if err != nil {
+		return
+	}
+	_, _ = s.db.Exec(ctx, `INSERT INTO discord_community_security_feed (embed) VALUES ($1::jsonb)`, string(embed))
+	_, _ = s.db.Exec(ctx, `DELETE FROM discord_community_security_feed WHERE created_at < NOW() - INTERVAL '1 day'`)
+}
+
+func (s *server) botCommunitySecurityFeed(c *fiber.Ctx) error {
+	if err := s.verifyBotSecret(c); err != nil {
+		return err
+	}
+	rows, err := s.db.Query(c.Context(), `SELECT id, embed FROM discord_community_security_feed ORDER BY id LIMIT 20`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	type item struct {
+		ID    int64           `json:"id"`
+		Embed json.RawMessage `json:"embed"`
+	}
+	items := []item{}
+	for rows.Next() {
+		var it item
+		var embed []byte
+		if err := rows.Scan(&it.ID, &embed); err != nil {
+			return err
+		}
+		it.Embed = embed
+		items = append(items, it)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return c.JSON(fiber.Map{"items": items})
+}
+
+func (s *server) botCommunitySecurityAck(c *fiber.Ctx) error {
+	if err := s.verifyBotSecret(c); err != nil {
+		return err
+	}
+	var input struct {
+		IDs []int64 `json:"ids"`
+	}
+	if c.BodyParser(&input) != nil || len(input.IDs) > 100 {
+		return fiber.NewError(fiber.StatusBadRequest, "ข้อมูลไม่ถูกต้อง")
+	}
+	if _, err := s.db.Exec(c.Context(), `DELETE FROM discord_community_security_feed WHERE id = ANY($1)`, input.IDs); err != nil {
+		return err
+	}
 	return c.SendStatus(fiber.StatusNoContent)
 }
 

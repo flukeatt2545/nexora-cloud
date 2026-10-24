@@ -155,7 +155,13 @@ async function buildRoles(guild: Guild, plan: Plan, problems: string[]) {
   const member = made.get("member");
   const staff = made.get("staff");
   if (member && member.id !== current.memberRoleId) plan.change.memberRoleId = member.id;
-  if (staff && !current.staffRoleIds.some((id) => guild.roles.cache.has(id))) plan.change.staffRoleIds = [staff.id];
+  // Staff rooms and tickets: the staff role plus moderators and admins. /setup: admins.
+  const admin = made.get("admin");
+  const mod = made.get("mod");
+  if (staff && !current.staffRoleIds.some((id) => guild.roles.cache.has(id))) {
+    plan.change.staffRoleIds = [staff, mod, admin].filter((role): role is Role => Boolean(role)).map((role) => role.id);
+  }
+  if (admin && !current.managerRoleIds.some((id) => guild.roles.cache.has(id))) plan.change.managerRoleIds = [admin.id];
 
   if (!current.selfRoleIds.some((id) => guild.roles.cache.has(id))) {
     const picks: Role[] = [];
@@ -314,6 +320,9 @@ export async function buildMissing(guild: Guild): Promise<Plan & { problems: str
   await step("หมวดทีมงาน", async () => {
     const category = await ensureCategory(guild, plan, "🛡️", "Staff", "ทีมงาน", "staff");
     await ensureChannel(guild, plan, category, { emoji: "🛡️", name: "ห้องทีมงาน", type: text, audience: "staff", aliases: ["staff chat"] });
+    if (current.securityEnabled) {
+      await ensureChannel(guild, plan, category, { key: "securityChannelId", emoji: "🚨", name: "แจ้งเตือนความปลอดภัย", type: text, audience: "staff", aliases: ["security", "security log", "แจ้งเตือน"] });
+    }
     await ensureChannel(guild, plan, category, { emoji: "⚙️", name: "ตั้งค่าบอท", type: text, audience: "staff", aliases: ["bot setup"] });
   });
 

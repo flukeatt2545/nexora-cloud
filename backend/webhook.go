@@ -119,7 +119,7 @@ func (s *server) dispatchWebhook(event auditEvent) {
 	if err := s.db.QueryRow(ctx, `
 		SELECT webhook_enabled, discord_webhook_ciphertext, webhook_events
 		FROM system_settings WHERE id = 1
-	`).Scan(&enabled, &ciphertext, &rawEvents); err != nil || !enabled || ciphertext == "" {
+	`).Scan(&enabled, &ciphertext, &rawEvents); err != nil {
 		return
 	}
 	var configured []string
@@ -134,12 +134,17 @@ func (s *server) dispatchWebhook(event auditEvent) {
 	if !allowed {
 		return
 	}
+	event.TargetName = s.securityTargetName(ctx, event)
+	// The community bot's security room gets the same events, whether or not the webhook is on.
+	s.queueCommunitySecurity(ctx, event)
+	if !enabled || ciphertext == "" {
+		return
+	}
 	webhookURL, err := decryptSecret(ciphertext, s.cfg.webhookKey)
 	if err != nil || !validDiscordWebhookURL(webhookURL) {
 		return
 	}
 
-	event.TargetName = s.securityTargetName(ctx, event)
 	payload := fiber.Map{
 		"username":         "NEXORA Security",
 		"embeds":           []fiber.Map{buildDiscordEmbed(event)},

@@ -117,6 +117,7 @@ const targetTypeLabel: Record<string, string> = {
   "community_status": "สถานะเว็บ",
   "discord_role": "ยศใน Discord",
   "discord_guild": "เซิร์ฟเวอร์ Discord",
+  "discord_member": "สมาชิก Discord",
   "mail_log_settings": "ตั้งค่า Log อีเมล",
   "mail_bot_settings": "การสร้างเมลผ่านบอท",
 };
@@ -304,6 +305,8 @@ const actionLabel: Record<string, string> = {
   "discord.community.ticket_claimed": "ทีมงานรับเรื่อง Ticket", "discord.community.ticket_closed": "ปิด Ticket",
   "discord.community.site_down": "เว็บหรือ API ล่ม (บอทแจ้งใน Discord)",
   "discord.community.server_wiped": "ลบห้องและหมวดทั้งหมดในเซิร์ฟผ่านบอท",
+  "discord.community.nuke_stopped": "Anti-nuke หยุดคนที่ทำลายเซิร์ฟ", "discord.community.spam_blocked": "บอทดูแลเซิร์ฟกันสแปม",
+  "discord.community.raid_detected": "มีคนเข้าเซิร์ฟรัว (raid)",
 
   // ===== ไฟล์ แฟ้ม และหมวดหมู่ =====
   "user_file.updated": "แก้ไขไฟล์", "user_file.shared": "แชร์ไฟล์", "user_file.share_revoked": "ยกเลิกการแชร์ไฟล์",
@@ -2227,7 +2230,11 @@ function discordLogFacts(log: LogItem, meta: Record<string, unknown> | null): [s
     if (text("openerName")) facts.push(["คนเปิด", `@${text("openerName")}`]);
     if (text("reason")) facts.push(["เหตุผล", text("reason")]);
     if (meta.messages !== undefined) facts.push(["ข้อความในห้อง", `${meta.messages} ข้อความ`]);
-    if (text("created")) facts.push([log.action === "discord.community.server_wiped" ? "ผล" : "สร้าง", text("created")]);
+    const createdLabel: Record<string, string> = {
+      "discord.community.server_wiped": "ผล", "discord.community.nuke_stopped": "รายละเอียด",
+      "discord.community.spam_blocked": "ทำอะไร", "discord.community.raid_detected": "รายละเอียด",
+    };
+    if (text("created")) facts.push([createdLabel[log.action] ?? "สร้าง", text("created")]);
     if (text("source")) facts.push(["แก้จาก", text("source") === "discord" ? "คำสั่ง /setup ใน Discord" : "หน้าเว็บ"]);
     if (text("fields")) facts.push(["ค่าที่แก้", text("fields")]);
     if (meta.minutes !== undefined) facts.push(["ล่มนาน", `${Math.max(1, Number(meta.minutes))} นาที`]);

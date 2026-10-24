@@ -51,6 +51,12 @@ type Settings = {
   statusEnabled: boolean;
   statusChannelId: string;
   statusMentionRoleId: string;
+  securityEnabled: boolean;
+  securityChannelId: string;
+  securitySiteEvents: boolean;
+  antiNukeEnabled: boolean;
+  antiSpamEnabled: boolean;
+  newAccountDays: number;
 };
 
 type Channel = { id: string; name: string; type: string; parentId: string; position: number };
@@ -406,6 +412,27 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                     <ChannelPicker id="cmb-status" label="ห้องแจ้งสถานะ" kind="text" value={form.statusChannelId} onChange={(statusChannelId) => set({ statusChannelId })} guild={guild} disabled={off || !form.statusEnabled} />
                     <RolePicker id="cmb-status-role" label="แท็กยศตอนล่ม" hint="ไม่ตั้ง = ไม่แท็กใคร · ยศต้องเปิดให้ @mention ได้" value={form.statusMentionRoleId} onChange={(statusMentionRoleId) => set({ statusMentionRoleId })} guild={guild} disabled={off || !form.statusEnabled} />
                   </div>
+                </Feature>
+              </div>
+
+              <div className="cmb-wide">
+                <Feature title={<Switch label="แจ้งเตือนความปลอดภัย" hint="ห้องที่เห็นเฉพาะทีมงาน: ใครเตะ แบน ลบห้อง/ยศ ให้ยศสิทธิ์สูง เชิญบอทหรือสร้าง webhook และบัญชีเพิ่งสร้างที่เข้าเซิร์ฟ" on={form.securityEnabled} onChange={(on) => set({ securityEnabled: on })} disabled={off} />}>
+                  <div className="dbot-fields">
+                    <ChannelPicker id="cmb-security" label="ห้องแจ้งเตือนความปลอดภัย" kind="text" value={form.securityChannelId} onChange={(securityChannelId) => set({ securityChannelId })} guild={guild} disabled={off || !form.securityEnabled}
+                      hint="ไม่มีห้อง? กด สร้างที่ขาดให้ ใน /setup บอทจะสร้าง 🚨 แจ้งเตือนความปลอดภัย ในหมวดทีมงาน" />
+                    <div className="hv-field">
+                      <label htmlFor="cmb-new-days">บัญชีใหม่ = อายุน้อยกว่า (วัน)</label>
+                      <input id="cmb-new-days" type="number" inputMode="numeric" min={0} max={30} value={form.newAccountDays}
+                        onChange={(event) => set({ newAccountDays: Number(event.target.value) })} disabled={off} />
+                      <small>แจ้งเมื่อบัญชีที่อายุน้อยกว่านี้เข้าเซิร์ฟ และเตะออกตอนมีคนเข้ารัว · 0 = ไม่เช็ก</small>
+                    </div>
+                  </div>
+                  <Switch label="เหตุการณ์ความปลอดภัยของเว็บ" hint="ส่งเหตุการณ์ที่ติ๊กไว้ใน Webhook ความปลอดภัยของเว็บ (ล็อกอิน เปลี่ยนรหัส ลบบัญชี ล็อกเว็บ ฯลฯ) เข้าห้องนี้ด้วย"
+                    on={form.securitySiteEvents} onChange={(on) => set({ securitySiteEvents: on })} disabled={off || !form.securityEnabled} />
+                  <Switch label="Anti-nuke" hint="ใครลบห้องหรือยศ 3 ครั้ง หรือเตะ/แบน 4 ครั้งภายใน 1 นาที ถูกถอดยศและพักการพิมพ์ 1 ชั่วโมง (บอทถูกเตะ) · เจ้าของเซิร์ฟไม่โดน"
+                    on={form.antiNukeEnabled} onChange={(on) => set({ antiNukeEnabled: on })} disabled={off} />
+                  <Switch label="กันสแปมและคนเข้ารัว" hint="ลบลิงก์เชิญเซิร์ฟอื่น แท็กเกิน 5 คน พิมพ์รัว/ซ้ำ แล้วพักการพิมพ์ · คนเข้า 8 คนใน 30 วินาทีเปิดโหมดกัน raid 10 นาที · ทีมงานไม่โดน"
+                    on={form.antiSpamEnabled} onChange={(on) => set({ antiSpamEnabled: on })} disabled={off} />
                 </Feature>
               </div>
 
