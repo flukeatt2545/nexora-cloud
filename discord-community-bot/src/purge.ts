@@ -122,6 +122,21 @@ function scopeText(job: Job, where: string) {
   return `${how}${who} ${where}`;
 }
 
+/** What is being deleted, where and whose, as three short columns. */
+function scopeFields(job: Job) {
+  return [
+    { name: "ลบ", value: job.count ? `${job.count} ข้อความล่าสุด` : "ทุกข้อความ", inline: true },
+    { name: "ในห้อง", value: job.everywhere ? "ทุกห้องข้อความ" : `<#${job.channelId}>`, inline: true },
+    { name: "ของใคร", value: job.from ? `<@${job.from}>` : "ทุกคน", inline: true },
+  ];
+}
+
+/** Room mentions on one line, cut off after a few so a field stays under Discord's limit. */
+function mentions(ids: string[], max = 15) {
+  const shown = ids.slice(0, max).map((id) => `<#${id}>`).join(" ");
+  return ids.length > max ? `${shown} และอีก ${ids.length - max} ห้อง` : shown;
+}
+
 function workingEmbed(text: string) {
   return new EmbedBuilder().setColor(COLOR.warn).setTitle("🧹 กำลังลบข้อความ").setDescription(text);
 }
@@ -131,12 +146,12 @@ async function run(interaction: ChatInputCommandInteraction | ButtonInteraction,
   const member = interaction.member as GuildMember;
   const skip = panelMessageIds();
   const rooms: GuildTextBasedChannel[] = [];
-  const skipped: string[] = [];
+  const skipped: { id: string; reason: string }[] = [];
   if (job.everywhere) {
     for (const channel of allRooms(guild)) {
       const reason = exemptReason(channel);
-      if (reason) skipped.push(`<#${channel.id}> (${reason})`);
-      else if (!botCanClear(channel)) skipped.push(`<#${channel.id}> (บอทไม่มีสิทธิ์ลบ)`);
+      if (reason) skipped.push({ id: channel.id, reason });
+      else if (!botCanClear(channel)) skipped.push({ id: channel.id, reason: "บอทไม่มีสิทธิ์ลบ" });
       else rooms.push(channel);
     }
   } else {
@@ -183,26 +198,32 @@ async function run(interaction: ChatInputCommandInteraction | ButtonInteraction,
     running = false;
   }
   const total = results.reduce((sum, item) => sum + item.deleted, 0);
-  const lines = results.filter((item) => item.deleted > 0).slice(0, 20).map((item) => `<#${item.id}> · ${item.deleted}`);
-  const notes = [
-    "ข้ามข้อความที่ปักหมุดและแผงของบอท",
+  const deletedIn = results.filter((item) => item.deleted > 0);
+  const embed = new EmbedBuilder()
+    .setColor(total ? COLOR.ok : COLOR.warn)
+    .setTitle(total ? `🧹 ลบแล้ว ${total} ข้อความ` : "🧹 ไม่มีข้อความให้ลบ")
+    .addFields(scopeFields(job))
+    .setFooter({ text: "ข้ามข้อความที่ปักหมุดและแผงของบอท" });
+  // The per-room list only helps when more than one room was touched.
+  if (deletedIn.length > 1) embed.addFields({ name: "ห้องที่ลบ", value: deletedIn.slice(0, 20).map((item) => `<#${item.id}> · **${item.deleted}**`).join("\n") });
+  const reasons = new Map<string, string[]>();
+  for (const item of skipped) reasons.set(item.reason, [...(reasons.get(item.reason) ?? []), item.id]);
+  for (const [reason, ids] of reasons) embed.addFields({ name: `ข้ามห้อง · ${reason}`, value: mentions(ids) });
+  const warnings = [
     ...(timedOut ? ["หยุดก่อนเพราะใช้เวลานานเกินไป สั่งซ้ำได้เพื่อลบส่วนที่เหลือ"] : []),
     ...(failed ? [`ลบใน ${failed} ไม่สำเร็จ (บอทอาจไม่มีสิทธิ์)`] : []),
-    ...(skipped.length ? [`ข้ามห้อง: ${skipped.slice(0, 10).join(" ")}${skipped.length > 10 ? ` และอีก ${skipped.length - 10} ห้อง` : ""}`] : []),
   ];
-  const embed = okEmbed(total ? `ลบแล้ว ${total} ข้อความ` : "ไม่มีข้อความให้ลบ", [scopeText(job, where), ...(lines.length > 1 ? ["", ...lines] : []), "", ...notes].join("\n"));
+  if (warnings.length) embed.addFields({ name: "⚠️ หมายเหตุ", value: warnings.join("\n") });
   await interaction.editReply({ embeds: [embed], components: [], allowedMentions: { parse: [] } }).catch(() => undefined);
   if (total > 0) await announceCleanup(guild, member, scopeText(job, where), total).catch(() => undefined);
 }
 
 function confirmPayload(token: string, job: Job) {
-  const where = job.everywhere ? "ทุกห้องข้อความในเซิร์ฟ" : `ใน <#${job.channelId}>`;
-  const embed = new EmbedBuilder().setColor(COLOR.danger).setTitle("🧹 ยืนยันลบข้อความ").setDescription([
-    `จะลบ **${scopeText(job, where)}**`,
-    "",
-    "ลบแล้วกู้คืนไม่ได้ · ข้ามข้อความที่ปักหมุดและแผงของบอท",
-    ...(job.everywhere ? ["ข้ามห้องบันทึก (log), ห้อง Ticket และแผงของบอท"] : []),
-    "ข้อความที่เก่ากว่า 14 วันต้องลบทีละข้อความ จึงอาจใช้เวลานาน",
+  const embed = new EmbedBuilder().setColor(COLOR.danger).setTitle("🧹 ยืนยันลบข้อความ").addFields(scopeFields(job)).setDescription([
+    "ลบแล้วกู้คืนไม่ได้",
+    "• ข้ามข้อความที่ปักหมุดและแผงของบอท",
+    ...(job.everywhere ? ["• ข้ามห้องบันทึก (log) และห้อง Ticket"] : []),
+    "• ข้อความเก่ากว่า 14 วันต้องลบทีละข้อความ อาจใช้เวลานาน",
   ].join("\n"));
   const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`cm:purge:go:${token}`).setLabel("ลบเลย").setStyle(ButtonStyle.Danger),

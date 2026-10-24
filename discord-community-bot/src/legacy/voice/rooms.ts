@@ -1,5 +1,6 @@
 import {
   ChannelType,
+  EmbedBuilder,
   escapeMarkdown,
   OverwriteType,
   PermissionFlagsBits,
@@ -14,7 +15,7 @@ import { isHome } from "../../guild";
 import { fillTemplate, settings as communitySettings } from "../../settings";
 import { api, apiMessage, logBotError, type Actor, type VoiceRoom, type VoiceSettings } from "./api";
 import { CATEGORY_ID, CATEGORY_NAME, PRIVATE_CATEGORY_NAME, PUBLIC_CATEGORY_NAME } from "./config";
-import { roomPanel } from "./ui";
+import { COLOR, linkRow, roomPanel } from "./ui";
 
 // What the bot knows about each room channel, refreshed from the API every sync.
 type CachedRoom = { id: number; ownerId: string; name: string; locked: boolean; hasPassword: boolean; kind: string };
@@ -82,12 +83,6 @@ export function lockedRooms(guild: Guild, member: GuildMember) {
 
 export function rememberRoom(channelId: string, room: CachedRoom) {
   rooms.set(channelId, room);
-}
-
-/** "ห้อง X" in bold, without saying ห้อง twice when the name already starts with it. */
-function roomLabel(name: string) {
-  const bold = `**${escapeMarkdown(name)}**`;
-  return name.startsWith("ห้อง") ? bold : `ห้อง ${bold}`;
 }
 
 /** One of the bot's own voice rooms (they come and go; deleting one is not protected against). */
@@ -392,6 +387,32 @@ async function openRoomFromHub(member: GuildMember, hub: VoiceChannel) {
   await channel.send(roomPanel(roomId, roomName, member.id)).catch(() => undefined);
 }
 
+/** The DM to someone the bot turned away from a closed room: which room, why, and what to do. */
+function deniedMessage(room: CachedRoom, channel: VoiceChannel) {
+  const embed = new EmbedBuilder()
+    .setColor(room.hasPassword ? COLOR.brand : COLOR.warn)
+    .setTitle(room.hasPassword ? "🔐 ห้องนี้ล็อกอยู่" : "🔒 ห้องนี้ยังไม่เปิด")
+    .setDescription((room.hasPassword
+      ? [
+        "บอทพาออกมาก่อน เพราะยังไม่ได้ใส่รหัส",
+        "",
+        "**วิธีเข้า**",
+        "1. ขอรหัสจากเจ้าของห้อง",
+        "2. กดปุ่ม **เข้าห้องที่ล็อก** ที่แผงห้องเสียงในเซิร์ฟนั้น",
+        "3. ใส่รหัส แล้วเข้าห้อง",
+      ]
+      : [
+        "บอทพาออกมาก่อน เพราะเจ้าของยังไม่ได้เปิดให้คนอื่นเข้า",
+        "",
+        "รอเจ้าของห้องตั้งรหัสหรือเปิดห้องให้ทุกคน แล้วลองใหม่",
+      ]).join("\n"))
+    .addFields(
+      { name: "ห้อง", value: escapeMarkdown(room.name), inline: true },
+      { name: "เซิร์ฟเวอร์", value: escapeMarkdown(channel.guild.name), inline: true },
+    );
+  return { embeds: [embed], components: [linkRow(channel.guild.id, channel.id, "ไปที่ห้อง")] };
+}
+
 /** Someone joined, left or moved. Makes rooms from hubs and keeps people out of locked rooms. */
 export async function onVoiceState(oldState: VoiceState, newState: VoiceState) {
   if (oldState.channelId === newState.channelId) return;
@@ -418,10 +439,7 @@ export async function onVoiceState(oldState: VoiceState, newState: VoiceState) {
         await member.voice.disconnect("ยังไม่ได้ใส่รหัสห้อง").catch((error) => logBotError("disconnect", error));
         await api().post(`/api/internal/bot/voice/rooms/${room.id}/denied`, { discordId: member.id, username: member.user.username }).catch(() => undefined);
         // A DM has no server around it, and the bot can be in several: say which one.
-        const where = `${roomLabel(room.name)} ในเซิร์ฟ **${escapeMarkdown(channel.guild.name)}**`;
-        await member.send(room.hasPassword
-          ? `${where} ล็อกอยู่ บอทเลยพาออกมาก่อนนะ\nถ้าอยากเข้า ขอรหัสจากเจ้าของห้อง แล้วกดปุ่ม "เข้าห้องที่ล็อก" ที่แผงห้องเสียงในเซิร์ฟนั้น`
-          : `${where} ยังไม่เปิดให้คนอื่นเข้า บอทเลยพาออกมาก่อนนะ\nรอเจ้าของห้องตั้งรหัสหรือเปิดห้องก่อน`).catch(() => undefined);
+        await member.send(deniedMessage(room, channel)).catch(() => undefined);
         watchEmpty(channel);
         return;
       }
