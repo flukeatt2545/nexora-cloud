@@ -162,7 +162,7 @@
 .vf-steps div { display: grid; gap: 1px; min-width: 0; }
 .vf-steps b { color: #f3f3f5; font-size: 15px; font-weight: 600; line-height: 1.4; } /* theme-ok: this page is dark in both themes */
 .vf-steps small { color: var(--vf-dim); font-size: 13px; line-height: 1.45; }
-.vf-steps em { color: var(--vf-dim); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; font-style: normal; letter-spacing: .08em; white-space: nowrap; }
+.vf-steps em { padding: 2px 10px; border: 1px solid var(--vf-line); color: var(--vf-dim); font-family: var(--font-gaming, inherit); font-size: 12px; font-style: normal; font-weight: 500; line-height: 1.5; white-space: nowrap; }
 .vf-steps li[data-state="todo"] b { color: #cdcdd2; } /* theme-ok: this page is dark in both themes */
 .vf-node {
   width: 32px; height: 32px; display: grid; place-items: center;
@@ -272,3 +272,185 @@
 .vf[data-view="done"] .vf-kicker { color: var(--vf-ok); }
 .vf[data-view="done"] .vf-bar { background: linear-gradient(90deg, var(--vf-ok), #b7ffd9); }
 .vf[data-view="done"] .vf-diamond { background: var(--vf-ok); box-shadow: 0 0 14px rgba(61, 220, 151, .8); }
+
+/*
+ * Signal glitch. Every 6 seconds (after a pause at the start) the whole screen stutters for about
+ * a third of a second, the backdrop and the space around the card included: the headline splits into red and cool-coloured copies that
+ * jump sideways in slices, the brand line, the badge and the card twitch, and a few bars flash
+ * across the card. A weaker twitch follows halfway through the pause. Every part uses the same
+ * 6s clock and steps(1) so values jump instead of sliding, which is what makes it read as a bad
+ * signal and not as a smooth animation. Nothing here changes the layout.
+ */
+.vf {
+  --vf-glitch-cool: #3fe6ff;
+  --vf-glitch: 6s steps(1, end) 2s infinite;
+}
+
+.vf-title { position: relative; animation: vf-g-jolt var(--vf-glitch); }
+.vf-title::before, .vf-title::after {
+  content: attr(data-text); position: absolute; inset: 0; opacity: 0; pointer-events: none; user-select: none;
+  overflow-wrap: anywhere; mix-blend-mode: screen;
+}
+.vf-title::before { color: var(--vf-red-soft); animation: vf-g-slice-a var(--vf-glitch); }
+.vf-title::after { color: var(--vf-glitch-cool); animation: vf-g-slice-b var(--vf-glitch); }
+
+.vf-top b, .vf-top span { animation: vf-g-twitch var(--vf-glitch); }
+.vf-fx { position: absolute; inset: 0; animation: vf-g-badge var(--vf-glitch); }
+.vf-frame { animation: vf-rise .8s cubic-bezier(.2, .75, .2, 1) both, vf-edge 9s ease-in-out infinite alternate, vf-g-card var(--vf-glitch); }
+.vf-glow { animation: vf-drift 18s ease-in-out infinite alternate, vf-g-bg var(--vf-glitch); }
+.vf-lines { animation: vf-g-bg var(--vf-glitch); }
+.vf-mark { animation: vf-slide 46s ease-in-out infinite alternate, vf-g-mark var(--vf-glitch); }
+
+/* Outside the card: bars across the whole screen and scan lines over everything while it stutters */
+.vf-bg .vf-wslice {
+  position: absolute; left: 0; right: 0; top: var(--y); height: var(--h); opacity: 0;
+  background: linear-gradient(90deg, transparent, rgb(var(--vf-rgb) / .3) 12%, rgb(var(--vf-rgb) / .12) 60%, transparent);
+  mix-blend-mode: screen; animation: vf-g-wbar var(--vf-glitch);
+}
+.vf-bg .vf-wslice.is-b { background: linear-gradient(270deg, transparent, rgb(63 230 255 / .22) 14%, rgb(63 230 255 / .08) 60%, transparent); animation-name: vf-g-wbar-b; }
+.vf-crt {
+  position: fixed; inset: 0; z-index: 5; opacity: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .28) 0 1px, transparent 1px 3px), radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(var(--vf-rgb) / .16));
+  animation: vf-g-crt var(--vf-glitch);
+}
+
+.vf-panel > .vf-slice {
+  position: absolute; left: 0; right: 0; top: var(--y); height: var(--h); z-index: 2; opacity: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent 0%, rgb(var(--vf-rgb) / .3) 18%, rgb(var(--vf-rgb) / .14) 70%, transparent 100%);
+  mix-blend-mode: screen; animation: vf-g-bar var(--vf-glitch);
+}
+.vf-panel > .vf-slice.is-b { background: linear-gradient(270deg, transparent 0%, rgb(63 230 255 / .2) 22%, rgb(63 230 255 / .08) 70%, transparent 100%); animation-name: vf-g-bar-b; }
+
+@keyframes vf-g-jolt {
+  0%, 4.8%, 52.8%, 100% { transform: none; }
+  0.4% { transform: translate(-3px, 0) skewX(-5deg); }
+  1.2% { transform: translate(4px, 1px); }
+  2% { transform: translate(-2px, 0) skewX(4deg); }
+  2.8% { transform: translate(3px, -1px); }
+  3.6% { transform: translate(-1px, 0); }
+  52% { transform: translate(2px, 0); }
+  52.4% { transform: translate(-2px, 0) skewX(-3deg); }
+}
+@keyframes vf-g-slice-a {
+  0%, 5%, 52.8%, 100% { opacity: 0; clip-path: inset(0 0 100% 0); transform: none; }
+  0.4% { opacity: 1; clip-path: inset(12% 0 68% 0); transform: translateX(-9px); }
+  1.2% { opacity: 1; clip-path: inset(55% 0 22% 0); transform: translateX(7px); }
+  2% { opacity: 1; clip-path: inset(30% 0 48% 0); transform: translateX(-13px); }
+  2.8% { opacity: 1; clip-path: inset(72% 0 6% 0); transform: translateX(6px); }
+  3.6% { opacity: 1; clip-path: inset(4% 0 82% 0); transform: translateX(-5px); }
+  4.4% { opacity: 1; clip-path: inset(42% 0 40% 0); transform: translateX(3px); }
+  52% { opacity: 1; clip-path: inset(34% 0 44% 0); transform: translateX(-6px); }
+}
+@keyframes vf-g-slice-b {
+  0%, 5%, 52.8%, 100% { opacity: 0; clip-path: inset(0 0 100% 0); transform: none; }
+  0.4% { opacity: 1; clip-path: inset(60% 0 14% 0); transform: translateX(10px); }
+  1.2% { opacity: 1; clip-path: inset(18% 0 62% 0); transform: translateX(-8px); }
+  2% { opacity: 1; clip-path: inset(80% 0 2% 0); transform: translateX(12px); }
+  2.8% { opacity: 1; clip-path: inset(38% 0 36% 0); transform: translateX(-7px); }
+  3.6% { opacity: 1; clip-path: inset(8% 0 74% 0); transform: translateX(6px); }
+  4.4% { opacity: 1; clip-path: inset(66% 0 18% 0); transform: translateX(-3px); }
+  52% { opacity: 1; clip-path: inset(58% 0 20% 0); transform: translateX(5px); }
+}
+@keyframes vf-g-twitch {
+  0%, 4.6%, 52.6%, 100% { transform: none; text-shadow: none; }
+  0.6% { transform: translateX(-3px); text-shadow: 2px 0 var(--vf-red-soft), -2px 0 var(--vf-glitch-cool); }
+  1.6% { transform: translateX(4px); text-shadow: -2px 0 var(--vf-red-soft), 2px 0 var(--vf-glitch-cool); }
+  2.6% { transform: translateX(-2px); text-shadow: none; }
+  3.6% { transform: translateX(2px); text-shadow: 2px 0 var(--vf-red-soft), -2px 0 var(--vf-glitch-cool); }
+  52.2% { transform: translateX(2px); text-shadow: -1px 0 var(--vf-glitch-cool); }
+}
+@keyframes vf-g-badge {
+  0%, 4.4%, 52.6%, 100% { transform: none; filter: none; }
+  0.5% { transform: translateX(5px) skewX(-4deg); filter: drop-shadow(-4px 0 var(--vf-red)) drop-shadow(4px 0 var(--vf-glitch-cool)); }
+  1.4% { transform: translateX(-6px); filter: drop-shadow(4px 0 var(--vf-red)) drop-shadow(-4px 0 var(--vf-glitch-cool)); }
+  2.3% { transform: translateX(3px) skewX(3deg); filter: hue-rotate(40deg) saturate(1.6); }
+  3.2% { transform: translateX(-3px); filter: drop-shadow(-3px 0 var(--vf-red)) drop-shadow(3px 0 var(--vf-glitch-cool)); }
+  52.2% { transform: translateX(3px); filter: drop-shadow(-3px 0 var(--vf-glitch-cool)); }
+}
+@keyframes vf-g-card {
+  0%, 4.4%, 52.6%, 100% { transform: none; }
+  0.4% { transform: translateX(-5px) skewX(-.6deg); }
+  1.2% { transform: translateX(6px); }
+  2% { transform: translate(-3px, 1px) skewX(.5deg); }
+  2.8% { transform: translateX(4px); }
+  3.6% { transform: translateX(-2px); }
+  52% { transform: translateX(-3px); }
+}
+@keyframes vf-g-bg {
+  0%, 4.6%, 52.6%, 100% { translate: 0 0; filter: none; }
+  0.4% { translate: -16px 0; filter: brightness(1.8); }
+  1.2% { translate: 22px 0; filter: hue-rotate(28deg) brightness(1.4); }
+  2% { translate: -10px 0; filter: brightness(2); }
+  2.8% { translate: 12px 0; filter: none; }
+  3.6% { translate: -5px 0; filter: brightness(1.5); }
+  52% { translate: 8px 0; filter: brightness(1.5); }
+}
+@keyframes vf-g-wbar {
+  0%, 5%, 52.8%, 100% { opacity: 0; transform: none; }
+  0.4%, 2.4% { opacity: 1; transform: translateX(-14%); }
+  1.2%, 3.2% { opacity: 0; }
+  1.6% { opacity: .9; transform: translateX(18%); }
+  52% { opacity: .7; transform: translateX(10%); }
+}
+@keyframes vf-g-wbar-b {
+  0%, 5%, 52.8%, 100% { opacity: 0; transform: none; }
+  0.8%, 2.8% { opacity: 1; transform: translateX(16%); }
+  1.6%, 3.6% { opacity: 0; }
+  2% { opacity: .9; transform: translateX(-20%); }
+  52.4% { opacity: .6; transform: translateX(-12%); }
+}
+@keyframes vf-g-crt {
+  0%, 5%, 52.8%, 100% { opacity: 0; }
+  0.4%, 1.6%, 2.8% { opacity: 1; }
+  1.2%, 2.2%, 3.6% { opacity: .35; }
+  52% { opacity: .7; }
+}
+@keyframes vf-g-mark {
+  0%, 5%, 52.8%, 100% { -webkit-text-stroke-color: rgb(var(--vf-rgb) / .13); translate: 0 0; }
+  0.4% { -webkit-text-stroke-color: rgb(var(--vf-rgb) / .55); translate: -26px 0; }
+  1.2% { -webkit-text-stroke-color: rgb(63 230 255 / .35); translate: 34px 0; }
+  2% { -webkit-text-stroke-color: rgb(var(--vf-rgb) / .55); translate: -14px 0; }
+  2.8% { -webkit-text-stroke-color: rgb(63 230 255 / .3); translate: 16px 0; }
+  3.6% { translate: -6px 0; }
+  52% { -webkit-text-stroke-color: rgb(var(--vf-rgb) / .4); translate: 12px 0; }
+}
+@keyframes vf-g-bar {
+  0%, 5%, 52.8%, 100% { opacity: 0; transform: none; }
+  0.4%, 2.4% { opacity: 1; transform: translateX(-8%); }
+  1.2%, 3.2% { opacity: 0; }
+  1.6% { opacity: .8; transform: translateX(10%); }
+  52% { opacity: .6; transform: translateX(6%); }
+}
+@keyframes vf-g-bar-b {
+  0%, 5%, 52.8%, 100% { opacity: 0; transform: none; }
+  0.8%, 2.8% { opacity: 1; transform: translateX(9%); }
+  1.6%, 3.6% { opacity: 0; }
+  2%  { opacity: .9; transform: translateX(-12%); }
+  52.4% { opacity: .5; transform: translateX(-7%); }
+}
+
+/* Smaller screens: the same effect with smaller jumps so nothing leaves the screen */
+@media (max-width: 640px) {
+  @keyframes vf-g-slice-a {
+    0%, 5%, 52.8%, 100% { opacity: 0; clip-path: inset(0 0 100% 0); transform: none; }
+    0.4% { opacity: 1; clip-path: inset(12% 0 68% 0); transform: translateX(-5px); }
+    1.2% { opacity: 1; clip-path: inset(55% 0 22% 0); transform: translateX(4px); }
+    2% { opacity: 1; clip-path: inset(30% 0 48% 0); transform: translateX(-7px); }
+    2.8% { opacity: 1; clip-path: inset(72% 0 6% 0); transform: translateX(3px); }
+    3.6% { opacity: 1; clip-path: inset(4% 0 82% 0); transform: translateX(-3px); }
+    52% { opacity: 1; clip-path: inset(34% 0 44% 0); transform: translateX(-3px); }
+  }
+  @keyframes vf-g-slice-b {
+    0%, 5%, 52.8%, 100% { opacity: 0; clip-path: inset(0 0 100% 0); transform: none; }
+    0.4% { opacity: 1; clip-path: inset(60% 0 14% 0); transform: translateX(6px); }
+    1.2% { opacity: 1; clip-path: inset(18% 0 62% 0); transform: translateX(-5px); }
+    2% { opacity: 1; clip-path: inset(80% 0 2% 0); transform: translateX(7px); }
+    2.8% { opacity: 1; clip-path: inset(38% 0 36% 0); transform: translateX(-4px); }
+    3.6% { opacity: 1; clip-path: inset(8% 0 74% 0); transform: translateX(3px); }
+    52% { opacity: 1; clip-path: inset(58% 0 20% 0); transform: translateX(3px); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vf-title::before, .vf-title::after, .vf-panel > .vf-slice, .vf-bg .vf-wslice, .vf-crt { display: none; }
+}

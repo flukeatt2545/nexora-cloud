@@ -256,7 +256,13 @@ export default function VerifyClient({ token }: { token: string }) {
         <i className="vf-glow" />
         <i className="vf-lines" />
         <span className="vf-mark">NEXORA</span>
+        <i className="vf-wslice" style={{ "--y": "9%", "--h": "3%" } as CSSProperties} />
+        <i className="vf-wslice is-b" style={{ "--y": "27%", "--h": "6%" } as CSSProperties} />
+        <i className="vf-wslice" style={{ "--y": "52%", "--h": "2%" } as CSSProperties} />
+        <i className="vf-wslice is-b" style={{ "--y": "71%", "--h": "7%" } as CSSProperties} />
+        <i className="vf-wslice" style={{ "--y": "90%", "--h": "4%" } as CSSProperties} />
       </div>
+      <i className="vf-crt" aria-hidden="true" />
 
       <div className="vf-frame">
         <section className="vf-panel" aria-live="polite" aria-busy={view === "loading"}>
@@ -266,10 +272,15 @@ export default function VerifyClient({ token }: { token: string }) {
             <span>DISCORD VERIFY</span>
           </header>
 
+          <span className="vf-slice" style={{ "--y": "14%", "--h": "5%" } as CSSProperties} aria-hidden="true" />
+          <span className="vf-slice is-b" style={{ "--y": "38%", "--h": "9%" } as CSSProperties} aria-hidden="true" />
+          <span className="vf-slice" style={{ "--y": "61%", "--h": "4%" } as CSSProperties} aria-hidden="true" />
+          <span className="vf-slice is-b" style={{ "--y": "83%", "--h": "7%" } as CSSProperties} aria-hidden="true" />
+
           <div className="vf-body">
             <div className="vf-copy">
               <p className="vf-kicker vf-in" style={step(1)}>{kicker}</p>
-              <h1 className={`vf-title${title.length > 12 ? " is-long" : ""}`} key={`${view}-${title}`}><span>{title}</span></h1>
+              <h1 className={`vf-title${title.length > 12 ? " is-long" : ""}`} key={`${view}-${title}`} data-text={title}><span>{title}</span></h1>
               <i className="vf-bar vf-in" style={step(3)} aria-hidden="true" />
               {asking && info && (
                 <dl className="vf-facts vf-in" style={step(4)}>
@@ -288,6 +299,7 @@ export default function VerifyClient({ token }: { token: string }) {
             </div>
 
             <div className={`vf-badge vf-in${view === "done" ? " is-done" : ""}${failed ? " is-failed" : ""}${view === "loading" ? " is-loading" : ""}`} style={step(2)} aria-hidden="true">
+              <div className="vf-fx">
               <i className="vf-ring vf-ring-dash" />
               <i className="vf-ring vf-ring-arc" />
               <i className="vf-dot vf-dot-n" /><i className="vf-dot vf-dot-e" /><i className="vf-dot vf-dot-s" />
@@ -297,6 +309,7 @@ export default function VerifyClient({ token }: { token: string }) {
                   : view === "loading" ? <LoaderCircle className="vf-spin" />
                   : avatar ? <img src={avatar} alt="" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.style.display = "none"; }} />
                   : <Shield />}
+              </div>
               </div>
               {view === "done" && <span className="vf-burst">{Array.from({ length: 14 }, (_, index) => <i key={index} style={{ "--r": `${index * (360 / 14)}deg`, "--d": `${(index % 4) * 40}ms` } as CSSProperties} />)}</span>}
             </div>
