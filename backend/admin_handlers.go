@@ -396,6 +396,7 @@ const auditTargetNameSQL = `COALESCE(CASE audit_logs.target_type
 	WHEN 'category' THEN (SELECT pc.name FROM product_categories pc WHERE pc.id::text = audit_logs.target_id)
 	WHEN 'mailbox' THEN (SELECT m.local_part || '@' || md.domain FROM mailboxes m JOIN mail_domains md ON md.id = m.domain_id WHERE m.public_id = audit_logs.target_id)
 	WHEN 'mail_domain' THEN (SELECT md.domain FROM mail_domains md WHERE md.public_id = audit_logs.target_id)
+	WHEN 'bot' THEN (SELECT a.name FROM bot_apps a WHERE a.public_id = audit_logs.target_id)
 	WHEN 'voice_room' THEN (SELECT r.name FROM voice_rooms r WHERE r.id::text = audit_logs.target_id)
 END, '')`
 

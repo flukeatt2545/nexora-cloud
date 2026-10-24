@@ -26,7 +26,10 @@ import { API_BASE } from "../runtime";
 import SocialOAuthButton, { type SocialProvider, useSocialAvailability } from "../SocialOAuthButton";
 import AdminMailView from "./AdminMailView";
 import DiscordBotView from "./DiscordBotView";
-import AdminBotsView from "./AdminBotsView";
+import AdminBotsOverview from "./AdminBotsOverview";
+import AdminBotsFleet from "./AdminBotsFleet";
+import AdminBotsQuotas from "./AdminBotsQuotas";
+import AdminBotsActivity from "./AdminBotsActivity";
 import SessionGuard, { EXPIRED_EVENT, useSessionEnded } from "../components/SessionGuard";
 import SessionTtlField from "./SessionTtlField";
 import MailSettingsPanel from "./MailSettingsPanel";
@@ -37,7 +40,7 @@ import Link from "next/link";
 // Admin pages about selling: they show a notice while the store is switched off.
 const STORE_VIEWS = new Set<string>(["store-categories", "store-products", "store-orders", "store-sales", "topups", "topup-transactions", "topup-settings"]);
 
-export type DashboardView = "profile" | "hosting" | "databases" | "mail" | "discord-bot" | "user-bots" | "overview" | "users" | "access" | "logs" | "announcements" | "settings" | "homepage-settings" | "files" | "file-system" | "file-categories" | "store-categories" | "store-products" | "store-orders" | "store-sales" | "topups" | "topup-transactions" | "topup-settings";
+export type DashboardView = "profile" | "hosting" | "databases" | "mail" | "discord-bot" | "bots-overview" | "bots-list" | "bots-quotas" | "bots-activity" | "overview" | "users" | "access" | "logs" | "announcements" | "settings" | "homepage-settings" | "files" | "file-system" | "file-categories" | "store-categories" | "store-products" | "store-orders" | "store-sales" | "topups" | "topup-transactions" | "topup-settings";
 type Role = "user" | "admin" | "superadmin";
 type AuthUser = { id: number; username: string; displayName: string; email: string; avatarUrl: string; role: Role; status: string; passwordEnabled?: boolean; permissions: string[] };
 type Session = { id: number; ipAddress: string; userAgent: string; createdAt: string; lastSeenAt: string; expiresAt: string; current: boolean };
@@ -282,6 +285,11 @@ const actionLabel: Record<string, string> = {
   "discord.bot.activity": "กิจกรรมบอท Discord", "discord.presence.updated": "เปลี่ยนสถานะบอท Discord",
   "discord.bot_token.updated": "เปลี่ยน token บอท Discord", "discord.bot_token.removed": "ลบ token บอท Discord",
 
+  // ===== บอทของผู้ใช้ =====
+  "bot.created": "สร้างบอทของผู้ใช้", "bot.deleted": "ลบบอทของผู้ใช้", "bot.resources.updated": "ปรับทรัพยากรบอท",
+  "bot.limit.updated": "ตั้งโควตาบอทต่อคน", "bot.source.github": "ดึงโค้ดบอทจาก GitHub", "bot.source.uploaded": "อัปโหลดโค้ดบอท",
+  "bot.token.updated": "เปลี่ยนโทเคนบอทของผู้ใช้", "bot.environment.updated": "แก้ตัวแปรลับของบอท", "bot.environment.deleted": "ลบตัวแปรลับของบอท",
+
   // ===== ห้องเสียง Discord =====
   "discord.voice.room_created": "สร้างห้องเสียง", "discord.voice.room_deleted": "ลบห้องเสียง",
   "discord.voice.room_updated": "แก้ชื่อหรือจำนวนคนในห้องเสียง", "discord.voice.delete_requested": "สั่งลบห้องเสียงจากเว็บ",
@@ -462,7 +470,10 @@ const viewNavGroup: Partial<Record<DashboardView, string>> = {
   databases: "hosting",
   mail: "hosting",
   "discord-bot": "hosting",
-  "user-bots": "hosting",
+  "bots-overview": "bots",
+  "bots-list": "bots",
+  "bots-quotas": "bots",
+  "bots-activity": "bots",
   announcements: "content",
   "file-system": "content",
   "file-categories": "content",
@@ -487,7 +498,10 @@ const viewLoadingMeta: Record<DashboardView, { page: string; system: string }> =
   databases: { page: "ฐานข้อมูล", system: "เว็บไซต์" },
   mail: { page: "ระบบอีเมล", system: "อีเมลโดเมน" },
   "discord-bot": { page: "บอท Discord", system: "เว็บไซต์" },
-  "user-bots": { page: "บอทของผู้ใช้", system: "เว็บไซต์" },
+  "bots-overview": { page: "ภาพรวมบอท", system: "บอทของผู้ใช้" },
+  "bots-list": { page: "บอททั้งหมด", system: "บอทของผู้ใช้" },
+  "bots-quotas": { page: "โควตาบอท", system: "บอทของผู้ใช้" },
+  "bots-activity": { page: "คิวงานและประวัติบอท", system: "บอทของผู้ใช้" },
   users: { page: "จัดการผู้ใช้", system: "ผู้ใช้และสิทธิ์" },
   access: { page: "สิทธิ์การเข้าถึง", system: "ผู้ใช้และสิทธิ์" },
   logs: { page: "บันทึกกิจกรรม", system: "บันทึกระบบ" },
@@ -560,6 +574,7 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
     return {
       account: activeGroup === "account",
       hosting: activeGroup === "hosting",
+      bots: activeGroup === "bots",
       content: activeGroup === "content",
       users: activeGroup === "users",
       records: activeGroup === "records",
@@ -784,8 +799,13 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
       { href: "/admin/hosting", label: "จัดการเว็บไซต์", icon: Cloud, key: "hosting", show: true },
       { href: "/admin/databases", label: "ฐานข้อมูล", icon: Database, key: "databases", show: true },
       { href: "/admin/mail", label: "อีเมลโดเมน", icon: Mail, key: "mail", show: me.role !== "user" },
-      { href: "/admin/discord-bot", label: "บอท Discord", icon: Bot, key: "discord-bot", show: me.role !== "user" },
-      { href: "/admin/bots", label: "บอทของผู้ใช้", icon: SquareTerminal, key: "user-bots", show: me.role !== "user" }
+      { href: "/admin/discord-bot", label: "บอท Discord", icon: Bot, key: "discord-bot", show: me.role !== "user" }
+    ] },
+    { key: "bots", label: "บอทของผู้ใช้", icon: SquareTerminal, show: me.role !== "user", links: [
+      { href: "/admin/bots", label: "ภาพรวม", icon: LayoutDashboard, key: "bots-overview", show: true },
+      { href: "/admin/bots/list", label: "บอททั้งหมด", icon: List, key: "bots-list", show: true },
+      { href: "/admin/bots/quotas", label: "โควตา", icon: Users, key: "bots-quotas", show: true },
+      { href: "/admin/bots/activity", label: "คิวงานและประวัติ", icon: Activity, key: "bots-activity", show: true },
     ] },
 
     { key: "account", label: "บัญชีผู้ใช้", icon: User, show: true, links: [{ href: "/admin/profile", label: "โปรไฟล์ของฉัน", icon: User, key: "profile", show: true }] },
@@ -860,7 +880,10 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
           {view === "databases" && <DatabaseAdminView me={me} notify={setNotice} ask={setConfirmRequest} />}
           {view === "mail" && <AdminMailView notify={setNotice} ask={setConfirmRequest} isSuperadmin={me.role === "superadmin"} />}
           {view === "discord-bot" && <DiscordBotView notify={setNotice} isSuperadmin={me.role === "superadmin"} />}
-          {view === "user-bots" && <AdminBotsView notify={setNotice} ask={setConfirmRequest} />}
+          {view === "bots-overview" && <AdminBotsOverview notify={setNotice} ask={setConfirmRequest} />}
+          {view === "bots-list" && <AdminBotsFleet notify={setNotice} ask={setConfirmRequest} />}
+          {view === "bots-quotas" && <AdminBotsQuotas notify={setNotice} />}
+          {view === "bots-activity" && <AdminBotsActivity />}
           {view === "users" && <UsersView me={me} notify={setNotice} ask={setConfirmRequest} />}
           {view === "access" && <AccessView me={me} notify={setNotice} ask={setConfirmRequest} />}
           {view === "logs" && <LogsView />}

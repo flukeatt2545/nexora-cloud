@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
@@ -144,4 +146,67 @@ func (s *server) adminSetBotLimit(c *fiber.Ctx) error {
 	}
 	s.audit(c, auditEvent{Actor: actor, Category: "bots", Action: "bot.limit.updated", Target: "user", TargetID: strconv.FormatInt(userID, 10), Metadata: map[string]any{"limit": input.Limit}})
 	return c.JSON(fiber.Map{"ok": true})
+}
+
+// adminBotActivity is what the admin's activity page shows: the jobs the runtime is working on
+// or recently finished (start, stop, restart, rebuild, delete), and the audit trail of bot changes.
+func (s *server) adminBotActivity(c *fiber.Ctx) error {
+	rows, err := s.db.Query(c.Context(), `
+		SELECT o.id,o.kind,o.state,o.phase,o.error_message,o.attempt,o.created_at,o.started_at,o.finished_at,
+		       b.public_id,b.name,COALESCE(ow.identifier,''),COALESCE(ac.identifier,'')
+		FROM bot_operations o
+		JOIN bot_apps b ON b.id=o.bot_id
+		LEFT JOIN users ow ON ow.id=b.owner_user_id
+		LEFT JOIN users ac ON ac.id=o.actor_user_id
+		ORDER BY o.id DESC LIMIT 60
+	`)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError)
+	}
+	defer rows.Close()
+	operations := make([]fiber.Map, 0)
+	for rows.Next() {
+		var id int64
+		var attempt int
+		var kind, state, phase, message, botID, botName, owner, actor string
+		var created time.Time
+		var started, finished *time.Time
+		if err := rows.Scan(&id, &kind, &state, &phase, &message, &attempt, &created, &started, &finished, &botID, &botName, &owner, &actor); err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError)
+		}
+		operations = append(operations, fiber.Map{
+			"id": id, "kind": kind, "state": state, "phase": phase, "error": message, "attempt": attempt,
+			"createdAt": created, "startedAt": started, "finishedAt": finished,
+			"bot": fiber.Map{"id": botID, "name": botName}, "owner": owner, "actor": actor,
+		})
+	}
+	if rows.Err() != nil {
+		return fiber.NewError(fiber.StatusInternalServerError)
+	}
+	trail, err := s.db.Query(c.Context(), `
+		SELECT id,actor_username,actor_role,action,target_type,target_id,outcome,metadata,created_at,`+auditTargetNameSQL+`
+		FROM audit_logs WHERE category='bots' ORDER BY id DESC LIMIT 60
+	`)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError)
+	}
+	defer trail.Close()
+	events := make([]fiber.Map, 0)
+	for trail.Next() {
+		var id int64
+		var actor, role, action, targetType, targetID, outcome, targetName string
+		var metadata json.RawMessage
+		var created time.Time
+		if err := trail.Scan(&id, &actor, &role, &action, &targetType, &targetID, &outcome, &metadata, &created, &targetName); err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError)
+		}
+		events = append(events, fiber.Map{
+			"id": id, "actor": actor, "actorRole": role, "action": action, "targetType": targetType, "targetId": targetID,
+			"targetName": targetName, "outcome": outcome, "metadata": metadata, "createdAt": created,
+		})
+	}
+	if trail.Err() != nil {
+		return fiber.NewError(fiber.StatusInternalServerError)
+	}
+	return c.JSON(fiber.Map{"operations": operations, "events": events})
 }
