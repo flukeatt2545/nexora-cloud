@@ -86,6 +86,14 @@ async function newWindow(interaction: RepliableInteraction) {
   }
 }
 
+/**
+ * Discord never removes a private message by itself (it stays until the member closes it), so a
+ * one-off answer is deleted after a while. The bot can only do this for 15 minutes after the reply.
+ */
+function expireLater(interaction: RepliableInteraction, ms: number) {
+  setTimeout(() => void interaction.deleteReply().catch(() => undefined), ms).unref();
+}
+
 setInterval(() => {
   const cutoff = Date.now() - WINDOW_TTL_MS;
   for (const [key, value] of windows) if (value.at < cutoff) windows.delete(key);
@@ -157,6 +165,7 @@ async function fail(interaction: RepliableInteraction, title: string, text: stri
     await interaction.reply({ ...payload, flags: ephemeral });
     await newWindow(interaction);
   }
+  expireLater(interaction, 45000);
 }
 
 // Create
@@ -226,11 +235,13 @@ async function askPassword(interaction: ButtonInteraction | ChatInputCommandInte
   if (room.ownerId === interaction.user.id) {
     await interaction.reply({ flags: ephemeral, content: "ห้องของคุณเอง เข้าได้เลย", components: [linkRow(interaction.guildId!, channelId)] });
     await newWindow(interaction);
+    expireLater(interaction, 60000);
     return;
   }
   if (!room.locked) {
     await interaction.reply({ flags: ephemeral, content: "ห้องนี้ไม่ได้ล็อก เข้าไปได้เลย", components: [linkRow(interaction.guildId!, channelId)] });
     await newWindow(interaction);
+    expireLater(interaction, 60000);
     return;
   }
   if (!room.hasPassword) {
@@ -293,6 +304,7 @@ async function checkPassword(interaction: ModalSubmitInteraction, roomId: number
     embeds: [okEmbed("รหัสถูก", `เข้า ${channel} ได้เลย ออกแล้วกลับมาใหม่ก็ไม่ต้องใส่รหัสอีก`)],
     components: [linkRow(channel.guild.id, channel.id, "เข้าห้อง")],
   });
+  expireLater(interaction, 60000);
 }
 
 // Manage
@@ -367,6 +379,7 @@ async function manageCommand(interaction: ChatInputCommandInteraction) {
     : "ยังไม่มีห้องเลย สร้างได้ด้วย `/room create`";
   await interaction.reply({ flags: ephemeral, content: text });
   await newWindow(interaction);
+  expireLater(interaction, 60000);
 }
 
 async function changePassword(interaction: ModalSubmitInteraction, roomId: number) {
@@ -691,12 +704,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (list.length) await interaction.reply({ ...lockedRoomPicker(list), flags: ephemeral });
         else await interaction.reply({ flags: ephemeral, content: "ตอนนี้ยังไม่มีห้องที่ล็อกอยู่" });
         await newWindow(interaction);
+        if (!list.length) expireLater(interaction, 30000);
       } else if (id === "vr:mine") {
         const owned = interaction.guild ? roomsOwnedBy(interaction.user.id, interaction.guild) : [];
         if (owned.length === 1) await showManage(interaction, owned[0].id, "reply");
         else {
           await interaction.reply({ flags: ephemeral, content: owned.length ? `ห้องของคุณ: ${owned.map((item) => `<#${item.channelId}>`).join(" ")}\nกด "จัดการห้อง" ในแชทของห้องนั้นได้เลย` : "ยังไม่มีห้องเลย กด \"สร้างห้อง\" ได้เลย" });
           await newWindow(interaction);
+          expireLater(interaction, 60000);
         }
       } else if (id.startsWith("vr:join:")) {
         const entry = roomChannel(interaction, roomId);
