@@ -71,6 +71,11 @@ export function botPlaceChannelIds() {
   return [...known.values()].filter((place) => place.kind !== "hub").map((place) => place.channelId);
 }
 
+/** The panel and welcome messages the bot keeps up to date (deleting one makes its buttons stop working). */
+export function botPlaceMessageIds() {
+  return [...known.values()].map((place) => place.messageId).filter(Boolean);
+}
+
 export async function addPlace(kind: "hub" | MessageKey, guildId: string, channelId: string, name: string, messageId = "", messageVersion = 0) {
   await api().post("/api/internal/bot/voice/places", { kind, guildId, channelId, name, messageId, messageVersion });
   if (kind === "panel" && messageId) knownPanels.add(messageId);

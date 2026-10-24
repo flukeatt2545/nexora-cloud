@@ -93,7 +93,8 @@ export const commands = [
       .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread))
     .addUserOption((option) => option.setName("member").setNameLocalizations({ th: "สมาชิก" }).setDescription("ลบเฉพาะข้อความของคนนี้"))
     .addStringOption((option) => option.setName("scope").setNameLocalizations({ th: "ขอบเขต" }).setDescription("ลบทั้งเซิร์ฟเวอร์เลยไหม (ไม่ใส่ = ลบเฉพาะห้องนี้หรือห้องที่เลือก)").addChoices(
-      { name: "ทุกห้องข้อความในเซิร์ฟ (ข้ามห้อง log และ Ticket · เจ้าของ/Administrator)", value: "all" },
+      { name: "ทุกห้อง ไม่เว้นเลย (รวมห้อง log, Ticket, ข้อความปักหมุด · เจ้าของ/Administrator)", value: "full" },
+      { name: "ทุกห้องข้อความ (ข้ามห้อง log และ Ticket · เจ้าของ/Administrator)", value: "all" },
     )),
 
   new SlashCommandBuilder()

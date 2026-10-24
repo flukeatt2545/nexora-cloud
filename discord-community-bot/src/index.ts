@@ -24,7 +24,7 @@ import { onRoleCheckButton } from "./rolecheck";
 import { announceRestore, onAuditLogEntry, onSecurityJoin, onSecurityMessage, startSiteSecurityFeed } from "./security";
 import { loadSettings, settings, updateSettings } from "./settings";
 import { onProtectCommand } from "./guard";
-import { onPurgeButton, onPurgeCommand } from "./purge";
+import { onPurgeButton, onPurgeCommand, onPurgeModal } from "./purge";
 import { isRoomChannel } from "./legacy/voice/rooms";
 import { noteChannelDeleted, onChannelRestored } from "./trust";
 import { CHANNEL_KEYS, onCreateCommand, onSetupCommand, onSetupComponent, onSetupText, onWipeSubmit } from "./setup";
@@ -242,6 +242,7 @@ async function route(interaction: Interaction) {
     else if (id.startsWith("cm:ticket:closing:")) await onTicketCloseSubmit(interaction);
     else if (id.startsWith("cm:text:")) await onSetupText(interaction);
     else if (id === "cm:wipe") await onWipeSubmit(interaction);
+    else if (id.startsWith("cm:purge:")) await onPurgeModal(interaction);
     return;
   }
   if (!interaction.isMessageComponent()) return;
