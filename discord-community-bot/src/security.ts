@@ -16,7 +16,7 @@ import { api, logBotError } from "./api";
 import { isBotAdmin } from "./config";
 import { homeGuild, isHome } from "./guild";
 import { settings } from "./settings";
-import { COLOR, when } from "./ui";
+import { BRAND, brandEmbed, COLOR, when } from "./ui";
 
 // The security room (staff only): who kicked, banned or deleted what (from the server's audit
 // log), accounts that are only days old, new bots and webhooks, the website's own security
@@ -77,7 +77,7 @@ async function alert(guild: Guild, embed: EmbedBuilder | APIEmbed, content?: str
 }
 
 function card(color: number, title: string, description: string) {
-  return new EmbedBuilder().setColor(color).setTitle(title).setDescription(description).setTimestamp(new Date());
+  return brandEmbed(color).setAuthor({ name: `${BRAND} · SECURITY` }).setTitle(title).setDescription(description).setTimestamp(new Date());
 }
 
 function logEvent(kind: "nuke" | "spam" | "raid", guild: Guild, name: string, id: string, details: string[]) {

@@ -9,7 +9,15 @@ import {
   type MessageActionRowComponentBuilder,
 } from "discord.js";
 
-export const COLOR = { brand: 0x2e7eff, ok: 0x18b77a, warn: 0xe3aa52, danger: 0xf43f5e };
+// Black and red: embeds get the red stripe, the pictures (image.ts) match it.
+export const COLOR = { brand: 0xe11d2e, ok: 0x3ddc97, warn: 0xf59e0b, danger: 0xff3b4a };
+
+export const BRAND = "NEXORA CLOUD";
+
+/** The look every panel and notice shares: red stripe, brand line on top, a quiet footer. */
+export function brandEmbed(color: number = COLOR.brand) {
+  return new EmbedBuilder().setColor(color).setAuthor({ name: BRAND });
+}
 
 export type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
 
@@ -48,14 +56,14 @@ export function minutesText(ms: number) {
 
 export function verifyPanel(text: string) {
   return {
-    embeds: [new EmbedBuilder().setColor(COLOR.brand).setTitle("ยืนยันตัวตน").setDescription(text)],
+    embeds: [brandEmbed().setImage("attachment://verify.png").setDescription(text).setFooter({ text: "กดครั้งเดียวก็เห็นทุกห้อง" })],
     components: [row(new ButtonBuilder().setCustomId("cm:verify").setStyle(ButtonStyle.Success).setLabel("ยืนยันตัวตน").setEmoji("✅"))],
   };
 }
 
 export function ticketPanel(text: string) {
   return {
-    embeds: [new EmbedBuilder().setColor(COLOR.brand).setTitle("ติดต่อทีมงาน").setDescription(text)],
+    embeds: [brandEmbed().setImage("attachment://ticket.png").setDescription(text).setFooter({ text: "ตอบโดยทีมงาน · เห็นเฉพาะคุณกับทีมงาน" })],
     components: [row(new ButtonBuilder().setCustomId("cm:ticket:open").setStyle(ButtonStyle.Primary).setLabel("เปิด Ticket").setEmoji("🎫"))],
   };
 }

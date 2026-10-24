@@ -1,6 +1,7 @@
 import { ChannelType, type BaseMessageOptions, type Guild, type TextChannel } from "discord.js";
 import { logBotError } from "./api";
 import { panels, savePanel, settings, type PanelKey } from "./settings";
+import { bannerFile } from "./image";
 import { ticketPanel, verifyPanel } from "./ui";
 
 // The panels are one message each, edited in place when their content changes, moved when their
@@ -45,19 +46,21 @@ export async function removePanel(guild: Guild, key: PanelKey) {
 
 type SyncKey = "verify" | "ticket";
 
-function wanted(key: SyncKey): { channelId: string; payload: ReturnType<typeof verifyPanel> } | null {
+async function wanted(key: SyncKey): Promise<{ channelId: string; payload: BaseMessageOptions } | null> {
   const current = settings();
   if (!current) return null;
   if (key === "verify") {
-    return current.verifyEnabled && current.verifyChannelId ? { channelId: current.verifyChannelId, payload: verifyPanel(current.verifyMessage) } : null;
+    return current.verifyEnabled && current.verifyChannelId
+      ? { channelId: current.verifyChannelId, payload: { ...verifyPanel(current.verifyMessage), files: [await bannerFile("verify")] } } : null;
   }
-  return current.ticketsEnabled && current.ticketChannelId ? { channelId: current.ticketChannelId, payload: ticketPanel(current.ticketMessage) } : null;
+  return current.ticketsEnabled && current.ticketChannelId
+    ? { channelId: current.ticketChannelId, payload: { ...ticketPanel(current.ticketMessage), files: [await bannerFile("ticket")] } } : null;
 }
 
 const label: Record<SyncKey, string> = { verify: "ยืนยันตัวตน", ticket: "Ticket" };
 
 async function syncPanel(guild: Guild, key: SyncKey, repost: boolean) {
-  const next = wanted(key);
+  const next = await wanted(key);
   if (!next) {
     await removePanel(guild, key);
     return "";

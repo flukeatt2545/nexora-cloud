@@ -4,7 +4,7 @@ import { homeGuild } from "./guild";
 import { boostCard } from "./image";
 import { postPanel, removePanel, textChannel } from "./panels";
 import { settings } from "./settings";
-import { when } from "./ui";
+import { BRAND, brandEmbed, when } from "./ui";
 
 // The boost room: one message with the server's boost level, a progress bar to the next level,
 // what each level unlocks, the perks boosters get here and who boosts. Refreshed every 10
@@ -57,9 +57,8 @@ export async function refreshBoost(client: Client, repost = false) {
   const levels = LEVELS.map((item) => `${level >= item.level ? "✅" : "🔒"} **เลเวล ${item.level}** (${item.boosts} บูสต์) · ${item.perks}`).join("\n");
   const names = list.slice(0, MAX_LISTED).map((member) => `• ${member} · ตั้งแต่ ${when(member.premiumSince!, "D")}`).join("\n");
   const lounge = current.boostLoungeChannelId ? `\nห้องของบูสเตอร์: <#${current.boostLoungeChannelId}>` : "";
-  const embed = new EmbedBuilder()
-    .setColor(0xf47fff)
-    .setTitle("บูสต์เซิร์ฟเวอร์")
+  const embed = brandEmbed()
+    .setAuthor({ name: `${BRAND} · SERVER BOOST` })
     .setImage("attachment://boost.png")
     .setDescription(`\`${bar(count)}\` **${count}** / ${LEVELS[LEVELS.length - 1].boosts} บูสต์`)
     .addFields(

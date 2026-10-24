@@ -11,7 +11,7 @@ import { assignable } from "./access";
 import { logBotError } from "./api";
 import { welcomeCard } from "./image";
 import { fillTemplate, settings } from "./settings";
-import { COLOR, errorEmbed, okEmbed } from "./ui";
+import { brandEmbed, errorEmbed, okEmbed } from "./ui";
 
 const ephemeral = MessageFlags.Ephemeral as const;
 
@@ -26,7 +26,7 @@ export async function onMemberJoin(member: GuildMember) {
       const text = fillTemplate(current.welcomeMessage, {
         user: `<@${member.id}>`, name: member.displayName, server: member.guild.name, count: member.guild.memberCount.toLocaleString("th-TH"),
       });
-      const embed = new EmbedBuilder().setColor(COLOR.brand).setDescription(text);
+      const embed = brandEmbed().setDescription(text);
       if (current.verifyEnabled && current.verifyChannelId) embed.addFields({ name: "เริ่มต้น", value: `ยืนยันตัวตนที่ <#${current.verifyChannelId}>` });
       const files: AttachmentBuilder[] = [];
       if (current.welcomeImage) {

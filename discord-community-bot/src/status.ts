@@ -1,12 +1,12 @@
 import axios from "axios";
 import { AttachmentBuilder, ChannelType, EmbedBuilder, type Client, type Message, type TextChannel } from "discord.js";
 import { api, logBotError } from "./api";
-import { STATUS_API_URL, STATUS_WEB_URL } from "./config";
+import { PUBLIC_APP_URL, STATUS_API_URL, STATUS_WEB_URL } from "./config";
 import { homeGuild } from "./guild";
 import { statusCard, type StatusRow } from "./image";
 import { postPanel, removePanel } from "./panels";
 import { settings } from "./settings";
-import { COLOR, minutesText, when } from "./ui";
+import { BRAND, brandEmbed, COLOR, minutesText, when } from "./ui";
 
 // Checks the website and the API every minute. Two failed checks in a row (about two minutes
 // down) post an alert in the status room; the next good check posts that it is back, how long
@@ -55,7 +55,11 @@ async function check(url: string): Promise<{ problem: string; ms: number }> {
   }
 }
 
-const TARGET_HOSTS: Record<Target, string> = { web: hostOf(STATUS_WEB_URL), api: hostOf(STATUS_API_URL) };
+// The API is checked over the internal network (api:8080); the picture shows its public name.
+const TARGET_HOSTS: Record<Target, string> = {
+  web: hostOf(STATUS_WEB_URL),
+  api: hostOf(STATUS_API_URL).includes(".") ? hostOf(STATUS_API_URL) : `api.${hostOf(PUBLIC_APP_URL)}`,
+};
 
 function hostOf(url: string) {
   try {
@@ -113,8 +117,8 @@ async function wentDown(client: Client, target: (typeof targets)[number], s: Sta
   const channel = statusChannel(client);
   if (!channel) return;
   const role = settings()?.statusMentionRoleId;
-  const embed = new EmbedBuilder()
-    .setColor(COLOR.danger)
+  const embed = brandEmbed(COLOR.danger)
+    .setAuthor({ name: `${BRAND} · STATUS` })
     .setTitle(`🔴 ${target.name}ล่ม`)
     .setDescription(`ใช้งาน${target.name}ไม่ได้ตั้งแต่ ${when(s.downSince!, "t")} (${when(s.downSince!, "R")})\nสาเหตุ: ${s.detail}`)
     .setFooter({ text: "บอทจะแจ้งอีกครั้งเมื่อกลับมาใช้ได้" });
@@ -129,8 +133,8 @@ async function cameBack(client: Client, target: (typeof targets)[number], s: Sta
     .catch((error) => logBotError("record incident", error));
   const channel = statusChannel(client);
   if (!channel) return;
-  const embed = new EmbedBuilder()
-    .setColor(COLOR.ok)
+  const embed = brandEmbed(COLOR.ok)
+    .setAuthor({ name: `${BRAND} · STATUS` })
     .setTitle(`🟢 ${target.name}กลับมาใช้ได้แล้ว`)
     .setDescription(`ล่มไป ${down} (${when(since, "t")} – ${when(now, "t")})`);
   if (s.alert) {
