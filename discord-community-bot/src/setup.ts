@@ -29,7 +29,7 @@ import { buildMissing, decorateAll, deleteAllChannels, ensureSetupChannel, hideF
 import { isBotAdmin, SETTINGS_URL } from "./config";
 import { reportSoon } from "./guild";
 import { nameStyle, savePanel, settings, updateSettings, type PanelKey, type Settings } from "./settings";
-import { restyle, roleName, splitName, STYLE_LABELS, type NameStyle } from "./style";
+import { restyle, restyleRole, STYLE_LABELS, type NameStyle } from "./style";
 import { COLOR, errorEmbed, okEmbed, row } from "./ui";
 
 const ephemeral = MessageFlags.Ephemeral as const;
@@ -110,7 +110,7 @@ function homePage(current: Settings) {
     .setTitle("ตั้งค่าบอทดูแลเซิร์ฟ")
     .setDescription([
       `ตั้งที่นี่หรือที่[หน้าเว็บแอดมิน](${SETTINGS_URL})ก็ได้ ค่าเดียวกัน`,
-      "**🛠️ สร้างที่ขาดให้** สร้างยศ หมวด และห้องที่ยังไม่มี (ชื่อตามสไตล์ที่เลือก) · **🎨 แต่งชื่อ** เปลี่ยนชื่อห้องที่มีอยู่เป็นสไตล์นี้",
+      "**🛠️ สร้างที่ขาดให้** สร้างยศ หมวด และห้องที่ยังไม่มี (ชื่อตามสไตล์ที่เลือก) · **🎨 แต่งชื่อ** เปลี่ยนชื่อห้องและยศที่มีอยู่เป็นสไตล์นี้ (เอาอีโมจิออก)",
       `สไตล์ชื่อตอนนี้: ${STYLE_LABELS[current.nameStyle] ?? STYLE_LABELS.frame}`,
     ].join("\n"))
     .addFields(
@@ -238,8 +238,8 @@ export async function onSetupComponent(interaction: ButtonInteraction | StringSe
     const result = await decorateAll(interaction.guild!);
     reportSoon(interaction.client);
     await interaction.editReply({
-      embeds: [new EmbedBuilder().setColor(result.failed ? COLOR.warn : COLOR.ok).setTitle("แต่งชื่อห้องแล้ว").setDescription(
-        `เปลี่ยนชื่อ ${result.changed} ห้อง/หมวด เป็นสไตล์ ${STYLE_LABELS[nameStyle()]}` +
+      embeds: [new EmbedBuilder().setColor(result.failed ? COLOR.warn : COLOR.ok).setTitle("แต่งชื่อแล้ว").setDescription(
+        `เปลี่ยนชื่อ ${result.changed} ห้อง/หมวด/ยศ เป็นสไตล์ ${STYLE_LABELS[nameStyle()]}` +
         (result.failed ? `\nเปลี่ยนไม่ได้ ${result.failed} ห้อง (บอทไม่มีสิทธิ์จัดการห้องนั้น หรือ Discord จำกัดการเปลี่ยนชื่อถี่ ๆ ลองใหม่ใน 10 นาที)` : ""))],
       components: [row(new ButtonBuilder().setCustomId("cm:setup:home").setStyle(ButtonStyle.Secondary).setLabel("กลับไปหน้าตั้งค่า"))],
     });
@@ -418,10 +418,9 @@ export async function onCreateCommand(interaction: ChatInputCommandInteraction) 
   const guild = interaction.guild!;
   const sub = interaction.options.getSubcommand();
   const typed = interaction.options.getString("name", true).trim();
-  // Decorated in the server's name style unless asked not to; an emoji typed at the start is kept.
+  // Decorated in the server's name style (no emoji) unless asked not to.
   const plain = interaction.options.getBoolean("plain") ?? false;
-  const emoji = interaction.options.getString("emoji")?.trim() ?? "";
-  const styled = (type: ChannelType) => (plain ? typed : restyle(nameStyle(), type, `${emoji} ${typed}`) || typed);
+  const styled = (type: ChannelType) => (plain ? typed : restyle(nameStyle(), type, typed) || typed);
   await interaction.deferReply({ flags: ephemeral });
   try {
     if (sub === "role") {
@@ -431,7 +430,7 @@ export async function onCreateCommand(interaction: ChatInputCommandInteraction) 
         return;
       }
       const role = await guild.roles.create({
-        name: plain ? typed : roleName(nameStyle(), emoji || splitName(typed).emoji || "✨", splitName(typed).words || typed), color: colorText ? parseInt(colorText.replace("#", ""), 16) : undefined,
+        name: plain ? typed : restyleRole(nameStyle(), typed) || typed, color: colorText ? parseInt(colorText.replace("#", ""), 16) : undefined,
         hoist: interaction.options.getBoolean("separate") ?? false, mentionable: interaction.options.getBoolean("mentionable") ?? false,
         reason: `/create โดย ${interaction.user.username}`,
       });

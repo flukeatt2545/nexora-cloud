@@ -12,10 +12,10 @@ type NameStyle = "plain" | "frame" | "line" | "cute";
 
 // The same examples as STYLE_LABELS in discord-community-bot/src/style.ts.
 const NAME_STYLES: { value: NameStyle; label: string }[] = [
-  { value: "frame", label: "กรอบ  『👋』ยินดีต้อนรับ · 『👑』𝐎𝐰𝐧𝐞𝐫" },
-  { value: "line", label: "เส้นคั่น  ┊👋┊ยินดีต้อนรับ · ┊👑┊𝗢𝘄𝗻𝗲𝗿" },
-  { value: "cute", label: "น่ารัก  ꒰👋꒱・ยินดีต้อนรับ · ꒰👑꒱ ᴏᴡɴᴇʀ" },
-  { value: "plain", label: "เรียบ ๆ  👋・ยินดีต้อนรับ · 👑 Owner" },
+  { value: "frame", label: "กรอบ  『ยินดีต้อนรับ』 · 『𝐎𝐰𝐧𝐞𝐫』" },
+  { value: "line", label: "เส้นคั่น  ┊・ยินดีต้อนรับ · ┊ 𝗢𝘄𝗻𝗲𝗿" },
+  { value: "cute", label: "น่ารัก  ꒰ยินดีต้อนรับ꒱ · ꒰ᴏᴡɴᴇʀ꒱" },
+  { value: "plain", label: "เรียบ ๆ  ยินดีต้อนรับ · Owner" },
 ];
 
 type Settings = {
@@ -323,7 +323,7 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                   <select id="cmb-style" className="hv-select" value={form.nameStyle} onChange={(event) => set({ nameStyle: event.target.value as NameStyle })} disabled={off}>
                     {NAME_STYLES.map((style) => <option key={style.value} value={style.value}>{style.label}</option>)}
                   </select>
-                  <small>ใช้กับห้อง หมวด และยศที่บอทสร้าง · เปลี่ยนชื่อห้องที่มีอยู่ด้วยปุ่ม 🎨 แต่งชื่อ ใน /setup</small>
+                  <small>ใช้กับห้อง หมวด และยศที่บอทสร้าง (ไม่มีอีโมจิ) · เปลี่ยนชื่อห้องและยศที่มีอยู่ด้วยปุ่ม 🎨 แต่งชื่อ ใน /setup</small>
                 </div>
               </div>
               <div className={`cmb-guild${guild?.problems.length ? " is-warn" : ""}`} role="status">
@@ -419,7 +419,7 @@ export function DiscordCommunity({ notify }: { notify: Notice }) {
                 <Feature title={<Switch label="แจ้งเตือนความปลอดภัย" hint="ห้องที่เห็นเฉพาะทีมงาน: ใครเตะ แบน ลบห้อง/ยศ ให้ยศสิทธิ์สูง เชิญบอทหรือสร้าง webhook และบัญชีเพิ่งสร้างที่เข้าเซิร์ฟ" on={form.securityEnabled} onChange={(on) => set({ securityEnabled: on })} disabled={off} />}>
                   <div className="dbot-fields">
                     <ChannelPicker id="cmb-security" label="ห้องแจ้งเตือนความปลอดภัย" kind="text" value={form.securityChannelId} onChange={(securityChannelId) => set({ securityChannelId })} guild={guild} disabled={off || !form.securityEnabled}
-                      hint="ไม่มีห้อง? กด สร้างที่ขาดให้ ใน /setup บอทจะสร้าง 🚨 แจ้งเตือนความปลอดภัย ในหมวดทีมงาน" />
+                      hint="ไม่มีห้อง? กด สร้างที่ขาดให้ ใน /setup บอทจะสร้างห้อง แจ้งเตือนความปลอดภัย ในหมวดทีมงาน" />
                     <div className="hv-field">
                       <label htmlFor="cmb-new-days">บัญชีใหม่ = อายุน้อยกว่า (วัน)</label>
                       <input id="cmb-new-days" type="number" inputMode="numeric" min={0} max={30} value={form.newAccountDays}
