@@ -6,6 +6,7 @@ import {
   type APIEmbed,
   type Client,
   type Guild,
+  type GuildBasedChannel,
   type GuildAuditLogsEntry,
   type GuildMember,
   type Message,
@@ -13,9 +14,9 @@ import {
 } from "discord.js";
 import { isStaff } from "./access";
 import { api, logBotError } from "./api";
-import { isBotAdmin } from "./config";
 import { homeGuild, isHome } from "./guild";
 import { settings } from "./settings";
+import { isTrusted, wasThrowaway } from "./trust";
 import { BRAND, brandEmbed, COLOR, when } from "./ui";
 
 // The security room (staff only): who kicked, banned or deleted what (from the server's audit
@@ -97,11 +98,13 @@ function logEvent(kind: "nuke" | "spam" | "raid", guild: Guild, name: string, id
 const actions = new Map<string, { kind: string; at: number }[]>();
 const punished = new Map<string, number>();
 const WINDOW_MS = 60000;
+// Deleting a channel has its own limit (1 = the first one), set on the web page or with /protect.
 const LIMITS: Record<string, number> = { destroy: 3, punish: 4, create: 8, webhook: 3 };
-const KIND_TEXT: Record<string, string> = { destroy: "ลบห้องหรือยศ", punish: "เตะหรือแบนสมาชิก", create: "สร้างห้อง", webhook: "สร้าง webhook" };
+const KIND_TEXT: Record<string, string> = { channel: "ลบห้อง", destroy: "ลบยศ", punish: "เตะหรือแบนสมาชิก", create: "สร้างห้อง", webhook: "สร้าง webhook" };
 
-function trusted(guild: Guild, userId: string) {
-  return userId === guild.ownerId || userId === guild.client.user.id || isBotAdmin(userId);
+function limitFor(kind: string) {
+  if (kind !== "channel") return LIMITS[kind];
+  return Math.min(5, Math.max(1, Math.round(settings()?.nukeChannelLimit ?? 1)));
 }
 
 async function stopNuker(guild: Guild, executorId: string, kind: string, count: number) {
@@ -125,14 +128,14 @@ async function stopNuker(guild: Guild, executorId: string, kind: string, count: 
   logEvent("nuke", guild, member?.user.username ?? executorId, executorId, [`${KIND_TEXT[kind]} ${count} ครั้งใน 1 นาที`, result]);
 }
 
-function countAction(guild: Guild, executorId: string, kind: string) {
-  if (!settings()?.antiNukeEnabled || trusted(guild, executorId)) return;
+async function countAction(guild: Guild, executorId: string, kind: string) {
+  if (!settings()?.antiNukeEnabled || await isTrusted(guild, executorId)) return;
   const now = Date.now();
   const list = (actions.get(executorId) ?? []).filter((item) => now - item.at < WINDOW_MS);
   list.push({ kind, at: now });
   actions.set(executorId, list);
   const count = list.filter((item) => item.kind === kind).length;
-  if (count >= LIMITS[kind]) void stopNuker(guild, executorId, kind, count);
+  if (count >= limitFor(kind)) void stopNuker(guild, executorId, kind, count);
 }
 
 setInterval(() => {
@@ -156,27 +159,31 @@ export async function onAuditLogEntry(entry: GuildAuditLogsEntry, guild: Guild) 
   const quiet = ours || !settings()?.securityEnabled;
   switch (entry.action) {
     case AuditLogEvent.MemberKick:
-      countAction(guild, by, "punish");
+      await countAction(guild, by, "punish");
       if (!quiet) await alert(guild, card(COLOR.warn, "👢 เตะสมาชิก", `${byText} เตะ ${target} ออกจากเซิร์ฟ${reason}`));
       break;
     case AuditLogEvent.MemberBanAdd:
-      countAction(guild, by, "punish");
+      await countAction(guild, by, "punish");
       if (!quiet) await alert(guild, card(COLOR.danger, "🔨 แบนสมาชิก", `${byText} แบน ${target}${reason}`));
       break;
     case AuditLogEvent.MemberBanRemove:
       if (!quiet) await alert(guild, card(COLOR.brand, "🔓 ยกเลิกแบน", `${byText} ยกเลิกแบน ${target}${reason}`));
       break;
     case AuditLogEvent.ChannelDelete: {
-      countAction(guild, by, "destroy");
       const name = String(changed(entry, "name")?.old ?? entry.targetId);
+      // Rooms the bot makes and removes by itself (temporary voice rooms, tickets) are not
+      // counted; they are noted a moment before or after this entry arrives.
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      if (entry.targetId && wasThrowaway(entry.targetId)) break;
+      await countAction(guild, by, "channel");
       if (!quiet) await alert(guild, card(COLOR.danger, "🗑️ ห้องถูกลบ", `${byText} ลบห้อง **${name}**${reason}`));
       break;
     }
     case AuditLogEvent.ChannelCreate:
-      countAction(guild, by, "create");
+      await countAction(guild, by, "create");
       break;
     case AuditLogEvent.RoleDelete: {
-      countAction(guild, by, "destroy");
+      await countAction(guild, by, "destroy");
       const name = String(changed(entry, "name")?.old ?? entry.targetId);
       if (!quiet) await alert(guild, card(COLOR.danger, "🗑️ ยศถูกลบ", `${byText} ลบยศ **${name}**${reason}`));
       break;
@@ -204,12 +211,20 @@ export async function onAuditLogEntry(entry: GuildAuditLogsEntry, guild: Guild) 
       if (!quiet) await alert(guild, card(COLOR.warn, "🤖 มีบอทใหม่เข้าเซิร์ฟ", `${byText} เชิญบอท ${target} เข้าเซิร์ฟ`));
       break;
     case AuditLogEvent.WebhookCreate:
-      countAction(guild, by, "webhook");
+      await countAction(guild, by, "webhook");
       if (!quiet) await alert(guild, card(COLOR.warn, "🪝 สร้าง webhook", `${byText} สร้าง webhook **${String(changed(entry, "name")?.new ?? "")}**`));
       break;
     default:
       break;
   }
+}
+
+/** The voice-room module made a deleted channel again: tell the security room. */
+export async function announceRestore(guild: Guild, oldName: string, made: GuildBasedChannel, deleterId: string) {
+  if (!settings()?.securityEnabled) return;
+  await alert(guild, card(COLOR.ok, "♻️ สร้างห้องคืนแล้ว",
+    `${deleterId ? `<@${deleterId}> ลบห้อง` : "มีคนลบห้อง"} **${oldName}** → บอทสร้างคืนเป็น <#${made.id}> (ชื่อ หมวด ตำแหน่ง และสิทธิ์เดิม)
+ข้อความที่เคยอยู่ในห้องกู้คืนไม่ได้`));
 }
 
 // Joins: new accounts and raids

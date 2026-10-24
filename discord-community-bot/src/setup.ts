@@ -67,6 +67,7 @@ const SLOTS: Slot[] = [
   { key: "securitySiteChannelId", label: "ห้องกิจกรรมเว็บ (เหตุการณ์ของเว็บ)", kind: "text" },
   { key: "boostChannelId", label: "ห้องบูสต์ (แผงความคืบหน้า)", kind: "text" },
   { key: "boostLoungeChannelId", label: "ห้องบูสเตอร์ (เฉพาะคนบูสต์)", kind: "text" },
+  { key: "nukeTrustedRoleIds", label: "ยศที่ลบห้องได้ (ไม่ถูกลงโทษ ไม่ถูกสร้างคืน)", kind: "roles", max: 10 },
 ];
 
 const FEATURES: { key: keyof Settings; label: string; description: string }[] = [
@@ -99,6 +100,7 @@ const TEXTS: { key: keyof Settings; label: string; hint: string; max: number; lo
   { key: "tempNameTemplate", label: "ชื่อห้องเสียงชั่วคราว", hint: "{user} = ชื่อเจ้าของห้อง", max: 60, long: false },
   { key: "ticketMaxOpen", label: "Ticket ที่เปิดค้างได้ต่อคน (1–5)", hint: "", max: 1, long: false },
   { key: "newAccountDays", label: "บัญชีอายุน้อยกว่า (วัน) ถือว่าใหม่ 0–30", hint: "0 = ไม่เช็ก", max: 2, long: false },
+  { key: "nukeChannelLimit", label: "ลบกี่ห้องใน 1 นาทีถึงถูกลงโทษ (1–5)", hint: "1 = ห้องแรกก็โดน · คนที่ลบได้ตั้งด้วย /protect trust", max: 1, long: false },
 ];
 
 function on(value: boolean) {
@@ -137,7 +139,7 @@ function homePage(current: Settings) {
       { name: `แจ้งเว็บล่ม ${on(current.statusEnabled)}`, value: `ห้อง ${slotText(current, "statusChannelId")} · ภาพ ${on(current.statusImage)}`, inline: true },
       { name: `บูสต์ ${on(current.boostEnabled)}`, value: `แผง ${slotText(current, "boostChannelId")} · ห้องบูสเตอร์ ${slotText(current, "boostLoungeChannelId")}`, inline: true },
       { name: `ความปลอดภัย ${on(current.securityEnabled)}`,
-        value: `Discord ${slotText(current, "securityChannelId")} · เว็บ ${slotText(current, "securitySiteChannelId")}\nAnti-nuke ${on(current.antiNukeEnabled)} · กันสแปม ${on(current.antiSpamEnabled)}` },
+        value: `Discord ${slotText(current, "securityChannelId")} · เว็บ ${slotText(current, "securitySiteChannelId")}\nAnti-nuke ${on(current.antiNukeEnabled)} (ลบ ${current.nukeChannelLimit} ห้องโดน) · กันสแปม ${on(current.antiSpamEnabled)}` },
       { name: "สิทธิ์", value: `ผู้ดูแลบอท ${slotText(current, "managerRoleIds")}\nใช้ Ticket/ห้องเสียงได้ ${current.usageRoleIds.length ? slotText(current, "usageRoleIds") : "ทุกคน"}` },
     );
   const features = new StringSelectMenuBuilder()
@@ -374,9 +376,9 @@ export async function onSetupText(interaction: ModalSubmitInteraction) {
       return;
     }
   }
-  if (key === "ticketMaxOpen" || key === "newAccountDays") {
+  if (key === "ticketMaxOpen" || key === "newAccountDays" || key === "nukeChannelLimit") {
     const value = Number(raw);
-    const [min, max] = key === "ticketMaxOpen" ? [1, 5] : [0, 30];
+    const [min, max] = key === "newAccountDays" ? [0, 30] : [1, 5];
     if (!Number.isInteger(value) || value < min || value > max) {
       await interaction.reply({ embeds: [errorEmbed("ตัวเลขไม่ถูก", `ใส่เลข ${min}–${max}`)], flags: ephemeral });
       return;
@@ -388,11 +390,11 @@ export async function onSetupText(interaction: ModalSubmitInteraction) {
 }
 
 /** Deleting every channel is for the server owner and Administrators only, not manager roles. */
-function mayWipe(member: GuildMember) {
+export function mayWipe(member: GuildMember) {
   return member.id === member.guild.ownerId || isBotAdmin(member.id) || member.permissions.has(PermissionFlagsBits.Administrator);
 }
 
-const CHANNEL_KEYS: (keyof Settings)[] = ["welcomeChannelId", "leaveChannelId", "roleCheckChannelId", "verifyChannelId", "rolesChannelId", "boostChannelId", "boostLoungeChannelId", "ticketChannelId", "ticketCategoryId",
+export const CHANNEL_KEYS: (keyof Settings)[] = ["welcomeChannelId", "leaveChannelId", "roleCheckChannelId", "verifyChannelId", "rolesChannelId", "boostChannelId", "boostLoungeChannelId", "ticketChannelId", "ticketCategoryId",
   "ticketLogChannelId", "tempHubChannelId", "statsCategoryId", "statsMembersChannelId", "statsOnlineChannelId", "statsSiteChannelId", "statusChannelId", "securityChannelId", "securitySiteChannelId"];
 
 export async function onWipeSubmit(interaction: ModalSubmitInteraction) {

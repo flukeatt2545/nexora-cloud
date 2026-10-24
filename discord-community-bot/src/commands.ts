@@ -50,6 +50,33 @@ export const commands = [
       .addBooleanOption((option) => option.setName("plain").setNameLocalizations({ th: "ไม่ตกแต่ง" }).setDescription("ใช้ชื่อตามที่พิมพ์ ไม่ใส่กรอบและอักษรพิเศษ"))),
 
   new SlashCommandBuilder()
+    .setName("protect")
+    .setDescription("ป้องกันเซิร์ฟเวอร์: ใครลบห้องได้ และลบกี่ห้องถึงถูกลงโทษ (ผู้ดูแล)")
+    .setIntegrationTypes(ApplicationIntegrationType.GuildInstall)
+    .setContexts(InteractionContextType.Guild)
+    .addSubcommand((sub) => sub
+      .setName("status")
+      .setNameLocalizations({ th: "ดู" })
+      .setDescription("ดูการป้องกันตอนนี้"))
+    .addSubcommand((sub) => sub
+      .setName("trust")
+      .setNameLocalizations({ th: "ให้ลบห้องได้" })
+      .setDescription("ให้คนหรือยศนี้ลบห้องได้ ไม่ถูกลงโทษและไม่ถูกสร้างห้องคืน (เจ้าของ/Administrator)")
+      .addUserOption((option) => option.setName("member").setNameLocalizations({ th: "สมาชิก" }).setDescription("ใคร"))
+      .addRoleOption((option) => option.setName("role").setNameLocalizations({ th: "ยศ" }).setDescription("ทั้งยศ")))
+    .addSubcommand((sub) => sub
+      .setName("untrust")
+      .setNameLocalizations({ th: "เอาออก" })
+      .setDescription("เอาคนหรือยศนี้ออกจากรายชื่อที่ลบห้องได้ (เจ้าของ/Administrator)")
+      .addUserOption((option) => option.setName("member").setNameLocalizations({ th: "สมาชิก" }).setDescription("ใคร"))
+      .addRoleOption((option) => option.setName("role").setNameLocalizations({ th: "ยศ" }).setDescription("ทั้งยศ")))
+    .addSubcommand((sub) => sub
+      .setName("limit")
+      .setNameLocalizations({ th: "จำนวน" })
+      .setDescription("ลบกี่ห้องใน 1 นาทีถึงถูกลงโทษ (เจ้าของ/Administrator)")
+      .addIntegerOption((option) => option.setName("count").setNameLocalizations({ th: "ห้อง" }).setDescription("1–5 (1 = ห้องแรกก็โดน)").setMinValue(1).setMaxValue(5).setRequired(true))),
+
+  new SlashCommandBuilder()
     .setName("ticket")
     .setDescription("จัดการ Ticket (ใช้ในห้อง Ticket)")
     .setIntegrationTypes(ApplicationIntegrationType.GuildInstall)

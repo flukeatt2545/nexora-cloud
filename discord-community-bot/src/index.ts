@@ -21,9 +21,12 @@ import { communityCommandNames } from "./commands";
 import { onMemberJoin, onMemberLeave, onVerify } from "./members";
 import { onMessageDeleted } from "./panels";
 import { onRoleCheckButton } from "./rolecheck";
-import { onAuditLogEntry, onSecurityJoin, onSecurityMessage, startSiteSecurityFeed } from "./security";
-import { loadSettings } from "./settings";
-import { onCreateCommand, onSetupCommand, onSetupComponent, onSetupText, onWipeSubmit } from "./setup";
+import { announceRestore, onAuditLogEntry, onSecurityJoin, onSecurityMessage, startSiteSecurityFeed } from "./security";
+import { loadSettings, settings, updateSettings } from "./settings";
+import { onProtectCommand } from "./guard";
+import { isRoomChannel } from "./legacy/voice/rooms";
+import { noteChannelDeleted, onChannelRestored } from "./trust";
+import { CHANNEL_KEYS, onCreateCommand, onSetupCommand, onSetupComponent, onSetupText, onWipeSubmit } from "./setup";
 import { startStats, updateStats } from "./stats";
 import { startStatusChecks } from "./status";
 import { onChannelGone as onTempChannelGone, onVoiceState as onTempVoiceState, syncTempRooms } from "./tempvoice";
@@ -60,6 +63,27 @@ const client = new Client({
 
 // The voice-room, mail and NEXORA modules listen on this same connection.
 attachLegacy(client);
+
+// First on every channel delete (before the voice-room module and this bot's own handlers): note
+// the rooms that come and go on their own, so deleting them is neither counted nor undone.
+client.prependListener(Events.ChannelDelete, (channel) => {
+  if (channel.isDMBased() || !isHome(channel.guild)) return;
+  noteChannelDeleted(channel, isRoomChannel(channel.id));
+});
+
+// The voice-room module put a deleted channel back: whatever pointed at the old one (the welcome
+// room, the ticket category, the panels) now points at the new one, and the security room is told.
+onChannelRestored(async (oldId, oldName, made, deleterId) => {
+  if (!isHome(made.guild)) return;
+  const current = settings();
+  const change: Record<string, string> = {};
+  if (current) for (const key of CHANNEL_KEYS) if (current[key] === oldId) change[key] = made.id;
+  if (Object.keys(change).length) {
+    await updateSettings(client.user!.id, change).catch((error) => logBotError("remap restored channel", error));
+    await applySettings(client);
+  }
+  await announceRestore(made.guild, oldName, made, deleterId);
+});
 
 const ephemeral = MessageFlags.Ephemeral as const;
 
@@ -206,6 +230,7 @@ async function route(interaction: Interaction) {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === "setup") await onSetupCommand(interaction);
     else if (interaction.commandName === "create") await onCreateCommand(interaction);
+    else if (interaction.commandName === "protect") await onProtectCommand(interaction);
     else if (interaction.commandName === "ticket") await onTicketCommand(interaction);
     return;
   }

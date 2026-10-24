@@ -97,6 +97,13 @@ type communitySettings struct {
 	AntiSpamEnabled       bool   `json:"antiSpamEnabled"`
 	// Accounts younger than this many days are flagged on joining (and kicked during a raid). 0 = off.
 	NewAccountDays int `json:"newAccountDays"`
+	// Anti-nuke: someone who is not trusted loses their roles after deleting this many channels in
+	// a minute (1 = the first one). The deleted channels are put back by the voice-room module.
+	NukeChannelLimit int `json:"nukeChannelLimit"`
+	// People and roles that may delete channels and roles (besides the owner, the bot and the bot's
+	// admins): they are not counted, punished, or have their deletions undone.
+	NukeTrustedUserIDs []string `json:"nukeTrustedUserIds"`
+	NukeTrustedRoleIDs []string `json:"nukeTrustedRoleIds"`
 }
 
 // A message the bot posted for one of its panels, so it can edit it (or delete it from the old
@@ -195,6 +202,7 @@ func defaultCommunitySettings() communitySettings {
 		StatsEnabled: true, StatusEnabled: true, StatusImage: true,
 		BoostEnabled: true, BoostPerks: communityDefaultBoost,
 		SecurityEnabled: true, SecuritySiteEvents: true, AntiNukeEnabled: true, AntiSpamEnabled: true, NewAccountDays: 7,
+		NukeChannelLimit: 1, NukeTrustedUserIDs: []string{}, NukeTrustedRoleIDs: []string{},
 	}
 }
 
@@ -214,7 +222,7 @@ func cleanCommunityIDs(ids []string, max int, label string) ([]string, error) {
 		out = append(out, id)
 	}
 	if len(out) > max {
-		return nil, errors.New(label + " ใส่ได้ไม่เกิน " + strconv.Itoa(max) + " ยศ")
+		return nil, errors.New(label + " ใส่ได้ไม่เกิน " + strconv.Itoa(max) + " รายการ")
 	}
 	return out, nil
 }
@@ -249,6 +257,12 @@ func validateCommunitySettings(in communitySettings) (communitySettings, error) 
 	if in.UsageRoleIDs, err = cleanCommunityIDs(in.UsageRoleIDs, 10, "ยศที่ใช้บอทได้"); err != nil {
 		return in, err
 	}
+	if in.NukeTrustedUserIDs, err = cleanCommunityIDs(in.NukeTrustedUserIDs, 20, "คนที่ลบห้องได้"); err != nil {
+		return in, err
+	}
+	if in.NukeTrustedRoleIDs, err = cleanCommunityIDs(in.NukeTrustedRoleIDs, 10, "ยศที่ลบห้องได้"); err != nil {
+		return in, err
+	}
 	texts := []struct {
 		value    *string
 		fallback string
@@ -281,6 +295,9 @@ func validateCommunitySettings(in communitySettings) (communitySettings, error) 
 	}
 	if in.NewAccountDays < 0 || in.NewAccountDays > 30 {
 		return in, errors.New("อายุบัญชีใหม่ต้องอยู่ระหว่าง 0–30 วัน")
+	}
+	if in.NukeChannelLimit < 1 || in.NukeChannelLimit > 5 {
+		return in, errors.New("จำนวนห้องที่ลบได้ก่อนถูกลงโทษต้องอยู่ระหว่าง 1–5")
 	}
 	if in.TicketMaxOpen < 1 || in.TicketMaxOpen > 5 {
 		return in, errors.New("Ticket ที่เปิดค้างได้ต่อคนต้องอยู่ระหว่าง 1–5")

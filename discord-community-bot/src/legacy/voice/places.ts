@@ -16,6 +16,7 @@ import { api, logBotError } from "./api";
 import { buildMessage, loadMessages, messageVersion, OLD_LOG_TITLE, type MessageKey } from "./messages";
 import { HUB_NAME, OLD_HUB_NAMES, rememberHub, setHubs } from "./rooms";
 import { protectSettings, reportProtection } from "./protect";
+import { channelRestored, isTrusted, wasThrowaway } from "../../trust";
 import { postSessionFeed } from "./sessions";
 import { COLOR } from "./ui";
 
@@ -231,6 +232,8 @@ async function takeOver(kind: string, made: GuildBasedChannel) {
 export async function onChannelDeleted(channel: NonThreadGuildBasedChannel) {
   const place = known.get(channel.id);
   if (!place && !protectSettings().protectChannels) return;
+  // Rooms that come and go on their own (join-to-create rooms, tickets) are not put back.
+  if (!place && wasThrowaway(channel.id)) return;
   if (place) {
     known.delete(channel.id);
     restoring.add(channel.id);
@@ -242,7 +245,8 @@ export async function onChannelDeleted(channel: NonThreadGuildBasedChannel) {
   try {
     const deleter = await findDeleter(channel);
     if (deleter?.id === channel.client.user.id) return;
-    if (!place && deleter?.id === channel.guild.ownerId) return;
+    // The owner and the people the server trusts (web page or /protect) may delete channels.
+    if (!place && deleter && await isTrusted(channel.guild, deleter.id)) return;
     let made: GuildBasedChannel | null = null;
     try {
       made = await recreate(channel);
@@ -256,6 +260,7 @@ export async function onChannelDeleted(channel: NonThreadGuildBasedChannel) {
     } catch (error) {
       logBotError("recreate channel", error);
     }
+    if (made) channelRestored(channel.id, channel.name, made, deleter?.id ?? "");
     if (place) {
       await api().post("/api/internal/bot/voice/places/deleted", {
         kind: place.kind, guildId: place.guildId, channelId: channel.id, newChannelId: made?.id ?? "", name: channel.name,

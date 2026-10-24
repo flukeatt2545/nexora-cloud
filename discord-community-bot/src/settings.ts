@@ -61,6 +61,9 @@ export type Settings = {
   antiNukeEnabled: boolean;
   antiSpamEnabled: boolean;
   newAccountDays: number;
+  nukeChannelLimit: number;
+  nukeTrustedUserIds: string[];
+  nukeTrustedRoleIds: string[];
 };
 
 export type Panel = { channelId: string; messageId: string };
