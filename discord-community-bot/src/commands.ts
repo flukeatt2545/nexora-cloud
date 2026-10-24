@@ -1,11 +1,14 @@
-import { ApplicationIntegrationType, ChannelType, InteractionContextType, SlashCommandBuilder } from "discord.js";
+import { ApplicationIntegrationType, ChannelType, InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
-// Everyone sees these; the bot checks who may run each one (manager roles set on the web page
-// cannot be expressed with Discord's own command permissions).
+// /setup, /create and /protect are hidden from members without Manage Server (an admin can open one
+// to a role in Server Settings > Integrations). The bot still checks who may run each one, since the
+// manager roles set on the web page cannot be expressed with Discord's own command permissions.
+// /ticket stays visible: members close their own tickets.
 export const commands = [
   new SlashCommandBuilder()
     .setName("setup")
     .setDescription("ตั้งค่าบอท: ห้อง ยศ ฟีเจอร์ที่เปิด และสร้างที่ขาดให้ (ผู้ดูแล)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setIntegrationTypes(ApplicationIntegrationType.GuildInstall)
     .setContexts(InteractionContextType.Guild),
 
@@ -13,6 +16,7 @@ export const commands = [
     .setName("create")
     .setNameLocalizations({ th: "สร้าง" })
     .setDescription("สร้างห้อง หมวด หรือยศ (ผู้ดูแล)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setIntegrationTypes(ApplicationIntegrationType.GuildInstall)
     .setContexts(InteractionContextType.Guild)
     .addSubcommand((sub) => sub
@@ -52,6 +56,7 @@ export const commands = [
   new SlashCommandBuilder()
     .setName("protect")
     .setDescription("ป้องกันเซิร์ฟเวอร์: ใครลบห้องได้ และลบกี่ห้องถึงถูกลงโทษ (ผู้ดูแล)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setIntegrationTypes(ApplicationIntegrationType.GuildInstall)
     .setContexts(InteractionContextType.Guild)
     .addSubcommand((sub) => sub
