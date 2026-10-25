@@ -304,7 +304,9 @@ func (s *server) communityVerifyDiscord(c *fiber.Ctx) error {
 	}
 	state := randomURLToken(32)
 	verifier := randomURLToken(48)
-	value, _ := json.Marshal(oauthState{Provider: "discord", Mode: "verify", Verifier: verifier, VerifyToken: token})
+	stateData := oauthState{Provider: "discord", Mode: "verify", Verifier: verifier, VerifyToken: token}
+	s.bindOAuthState(c, &stateData)
+	value, _ := json.Marshal(stateData)
 	if err := s.redis.Set(c.Context(), "oauth:state:"+state, value, 10*time.Minute).Err(); err != nil {
 		return fiber.NewError(fiber.StatusServiceUnavailable)
 	}

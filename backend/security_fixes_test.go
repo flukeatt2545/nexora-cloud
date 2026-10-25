@@ -1,9 +1,13 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"net/mail"
 	"strings"
 	"testing"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // Regression tests for the issues the security audit found. Each one failed before its fix.
@@ -100,5 +104,40 @@ func TestStalwartEMLCannotAddHeadersOrRecipients(t *testing.T) {
 func TestHeaderTokenDropsLineBreaks(t *testing.T) {
 	if got := headerToken(" <a@b>\r\nBcc: x@y\x00 "); strings.ContainsAny(got, "\r\n\x00") {
 		t.Fatalf("line break survived: %q", got)
+	}
+}
+
+func TestOAuthStateIsBoundToTheBrowserThatStartedIt(t *testing.T) {
+	app := fiber.New()
+	s := &server{cfg: config{cookieSecure: true}}
+	var state oauthState
+	app.Get("/start", func(c *fiber.Ctx) error {
+		s.bindOAuthState(c, &state)
+		return c.SendStatus(fiber.StatusNoContent)
+	})
+	response, err := app.Test(httptest.NewRequest(fiber.MethodGet, "/start", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var nonce string
+	for _, cookie := range response.Cookies() {
+		if cookie.Name == oauthBindingCookie {
+			nonce = cookie.Value
+			if !cookie.HttpOnly || !cookie.Secure || cookie.SameSite != http.SameSiteLaxMode || cookie.Path != "/api/auth/oauth/" {
+				t.Fatalf("binding cookie is not locked down: %+v", cookie)
+			}
+		}
+	}
+	if nonce == "" || state.Binding == "" || strings.Contains(state.Binding, nonce) {
+		t.Fatal("the state must hold only a hash of the browser nonce")
+	}
+	if !oauthBindingMatches(state, nonce) {
+		t.Fatal("the browser that started the flow must be accepted")
+	}
+	if oauthBindingMatches(state, "") || oauthBindingMatches(state, "someone-elses-nonce") {
+		t.Fatal("a callback from another browser must be refused")
+	}
+	if oauthBindingMatches(oauthState{}, nonce) {
+		t.Fatal("a state without a binding must be refused")
 	}
 }

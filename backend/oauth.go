@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -33,6 +34,47 @@ type oauthState struct {
 	Mode      string `json:"mode"`
 	// Set when the member came from the Discord server's verify page (mode "verify").
 	VerifyToken string `json:"verifyToken,omitempty"`
+	// Hash of the nonce held in the browser that started the flow; the callback must present it.
+	Binding string `json:"binding,omitempty"`
+}
+
+const oauthBindingCookie = "nexora_oauth_bind"
+
+// bindOAuthState ties the state to the browser that is about to be sent to the provider. Without
+// this, someone could start a flow, sign in at the provider with their own account and hand the
+// callback link to a victim, whose browser would then finish the flow (login/connect CSRF).
+func (s *server) bindOAuthState(c *fiber.Ctx, data *oauthState) {
+	nonce := randomURLToken(32)
+	data.Binding = tokenHash(nonce)
+	c.Cookie(&fiber.Cookie{
+		Name:     oauthBindingCookie,
+		Value:    nonce,
+		Path:     "/api/auth/oauth/",
+		MaxAge:   600,
+		HTTPOnly: true,
+		Secure:   s.cfg.cookieSecure,
+		SameSite: fiber.CookieSameSiteLaxMode,
+	})
+}
+
+func (s *server) clearOAuthBinding(c *fiber.Ctx) {
+	c.Cookie(&fiber.Cookie{
+		Name:     oauthBindingCookie,
+		Value:    "",
+		Path:     "/api/auth/oauth/",
+		MaxAge:   -1,
+		Expires:  time.Unix(1, 0),
+		HTTPOnly: true,
+		Secure:   s.cfg.cookieSecure,
+		SameSite: fiber.CookieSameSiteLaxMode,
+	})
+}
+
+func oauthBindingMatches(data oauthState, nonce string) bool {
+	if data.Binding == "" || nonce == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(tokenHash(nonce)), []byte(data.Binding)) == 1
 }
 
 type oauthIdentity struct {
@@ -185,6 +227,7 @@ func (s *server) consumeOAuthTicket(c *fiber.Ctx) error {
 	stateData := oauthState{Provider: launch.Provider, Mode: launch.Mode, UserID: launch.UserID, SessionID: launch.SessionID}
 	state := randomURLToken(32)
 	stateData.Verifier = randomURLToken(48)
+	s.bindOAuthState(c, &stateData)
 	stateValue, _ := json.Marshal(stateData)
 	if err := s.redis.Set(c.Context(), "oauth:state:"+state, stateValue, 10*time.Minute).Err(); err != nil {
 		return fiber.NewError(fiber.StatusServiceUnavailable)
@@ -245,11 +288,13 @@ func (s *server) oauthCallback(c *fiber.Ctx) error {
 		return c.Redirect(oauthErrorLocation("oauth_cancelled", provider), fiber.StatusFound)
 	}
 	value, err := s.redis.GetDel(c.Context(), "oauth:state:"+state).Bytes()
+	nonce := c.Cookies(oauthBindingCookie)
+	s.clearOAuthBinding(c)
 	if err != nil {
 		return c.Redirect(oauthErrorLocation("oauth_state", provider), fiber.StatusFound)
 	}
 	var stateData oauthState
-	if json.Unmarshal(value, &stateData) != nil || stateData.Provider != provider {
+	if json.Unmarshal(value, &stateData) != nil || stateData.Provider != provider || !oauthBindingMatches(stateData, nonce) {
 		return c.Redirect(oauthErrorLocation("oauth_state", provider), fiber.StatusFound)
 	}
 	if stateData.Mode == "verify" {
