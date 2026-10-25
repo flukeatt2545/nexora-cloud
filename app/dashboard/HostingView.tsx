@@ -20,6 +20,9 @@ type HostingSite = {
   name: string;
   subdomain: string;
   customDomain: string;
+  customDomainVerified?: boolean;
+  customDomainTxtName?: string;
+  customDomainTxtValue?: string;
   projectType: "auto" | "static" | "php" | "node";
   detectedProjectType: string;
   packageManager: "npm" | "pnpm" | "yarn";
@@ -606,6 +609,17 @@ export default function HostingView({
       notify({ kind: "error", text: (error as Error).message });
     } finally {
       setDetailLoading(false);
+    }
+  }
+
+  async function verifyDomain() {
+    if (!detail) return;
+    try {
+      await hostingApi(`/api/hosting/sites/${detail.site.id}/domain/verify`, mutationOptions("POST", {}));
+      await reloadDetail(detail.site.id);
+      notify({ kind: "success", text: "ยืนยัน Domain แล้ว" });
+    } catch (error) {
+      notify({ kind: "error", text: (error as Error).message });
     }
   }
 
@@ -1410,7 +1424,18 @@ export default function HostingView({
                     <div><dt>CPU / RAM</dt><dd>{detail.site.cpuMillicores ? `${(detail.site.cpuMillicores / 1000).toLocaleString("th-TH")} vCPU` : "—"} · {detail.site.memoryMb ? `${detail.site.memoryMb.toLocaleString("th-TH")} MB` : "—"}</dd></div>
                     <div><dt>พื้นที่</dt><dd>{detail.site.diskLimitMb ? `${detail.site.diskLimitMb.toLocaleString("th-TH")} MB` : "—"}</dd></div>
                     {detail.site.customDomain && detail.site.customDomain !== detail.site.subdomain && (
-                      <div><dt>โดเมนเพิ่มเติม</dt><dd>{detail.site.customDomain}</dd></div>
+                      <div>
+                        <dt>โดเมนเพิ่มเติม</dt>
+                        <dd>
+                          {detail.site.customDomain} · {detail.site.customDomainVerified ? "ยืนยันแล้ว" : "ยังไม่ได้ยืนยัน (ยังไม่เปิดให้ใช้งาน)"}
+                          {!detail.site.customDomainVerified && detail.site.customDomainTxtName && detail.site.customDomainTxtValue && (
+                            <>
+                              <br /><small>เพิ่ม TXT record ชื่อ <code>{detail.site.customDomainTxtName}</code> ค่า <code>{detail.site.customDomainTxtValue}</code> ที่ DNS ของโดเมน แล้วกดตรวจสอบ</small>
+                              <br /><button type="button" className="hv-btn" onClick={verifyDomain}>ตรวจสอบ TXT</button>
+                            </>
+                          )}
+                        </dd>
+                      </div>
                     )}
                     {detail.site.expiresAt && <div><dt>หมดอายุ</dt><dd>{formatDate(detail.site.expiresAt)}</dd></div>}
                   </dl>

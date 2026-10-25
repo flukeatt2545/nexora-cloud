@@ -406,6 +406,7 @@ func main() {
 	hosting.Post("/sites", s.createHostingSite)
 	hosting.Get("/sites/:id", s.getHostingSite)
 	hosting.Patch("/sites/:id", s.updateHostingSite)
+	hosting.Post("/sites/:id/domain/verify", s.rateLimit("hosting_domain_verify", 20, 10*time.Minute), s.verifyHostingDomain)
 	hosting.Delete("/sites/:id", s.deleteHostingSite)
 	hosting.Post("/sites/:id/members", s.addHostingMember)
 	hosting.Delete("/sites/:id/members/:userId", s.removeHostingMember)

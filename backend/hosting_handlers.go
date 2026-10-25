@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"regexp"
 	"strconv"
@@ -56,6 +57,12 @@ type hostingSite struct {
 	Version             int64      `json:"version"`
 	CreatedAt           time.Time  `json:"createdAt"`
 	UpdatedAt           time.Time  `json:"updatedAt"`
+
+	// The custom domain is only served once the owner has published the TXT record named here.
+	CustomDomainVerified bool   `json:"customDomainVerified"`
+	CustomDomainTxtName  string `json:"customDomainTxtName,omitempty"`
+	CustomDomainTxtValue string `json:"customDomainTxtValue,omitempty"`
+	customDomainToken    string
 }
 
 type hostingSiteInput struct {
@@ -149,8 +156,8 @@ func hostingConflict(c *fiber.Ctx, err error) error {
 		switch pgErr.ConstraintName {
 		case "hosting_sites_subdomain_active_unique":
 			return c.Status(fiber.StatusConflict).JSON(apiError{Error: "Subdomain นี้ถูกใช้งานแล้ว", Code: "subdomain_taken"})
-		case "hosting_sites_custom_domain_active_unique":
-			return c.Status(fiber.StatusConflict).JSON(apiError{Error: "Domain นี้ถูกใช้งานแล้ว", Code: "domain_taken"})
+		case "hosting_sites_custom_domain_verified_unique":
+			return c.Status(fiber.StatusConflict).JSON(apiError{Error: "Domain นี้ถูกยืนยันโดยเว็บไซต์อื่นแล้ว", Code: "domain_taken"})
 		case "hosting_operations_one_active_per_site":
 			return c.Status(fiber.StatusConflict).JSON(apiError{Error: "เว็บไซต์นี้มีรายการที่กำลังทำงานอยู่", Code: "operation_in_progress"})
 		case "hosting_operations_actor_user_id_idempotency_key_key":
@@ -174,6 +181,7 @@ func (s *server) listHostingSites(c *fiber.Ctx) error {
 
 	rows, err := s.db.Query(c.Context(), `
 		SELECT s.id, s.public_id, s.name, s.subdomain, COALESCE(s.custom_domain, ''),
+		       s.custom_domain_verified_at IS NOT NULL, COALESCE(s.custom_domain_token, ''),
 		       s.project_type, COALESCE(s.detected_project_type, ''), s.package_manager,
 		       s.status, s.maintenance_mode, s.expires_at, s.expiry_action,
 		       s.owner_user_id, owner.identifier,
@@ -209,6 +217,7 @@ func (s *server) listHostingSites(c *fiber.Ctx) error {
 		var dbID int64
 		if err := rows.Scan(
 			&dbID, &item.ID, &item.Name, &item.Subdomain, &item.CustomDomain,
+			&item.CustomDomainVerified, &item.customDomainToken,
 			&item.ProjectType, &item.DetectedProjectType, &item.PackageManager,
 			&item.Status, &item.MaintenanceMode, &item.ExpiresAt, &item.ExpiryAction,
 			&item.OwnerID, &item.OwnerUsername, &item.AccessRole, &item.MemberCount,
@@ -219,6 +228,7 @@ func (s *server) listHostingSites(c *fiber.Ctx) error {
 			return fiber.NewError(fiber.StatusInternalServerError)
 		}
 		nextCursor = dbID
+		item.fillDomainProof()
 		items = append(items, item)
 	}
 	return c.JSON(fiber.Map{"items": items, "nextCursor": nextCursor})
@@ -228,6 +238,7 @@ func (s *server) loadHostingSite(ctx context.Context, actor *currentUser, public
 	var item hostingSite
 	err := s.db.QueryRow(ctx, `
 		SELECT s.public_id, s.name, s.subdomain, COALESCE(s.custom_domain, ''),
+		       s.custom_domain_verified_at IS NOT NULL, COALESCE(s.custom_domain_token, ''),
 		       s.project_type, COALESCE(s.detected_project_type, ''), s.package_manager,
 		       s.status, s.maintenance_mode, s.expires_at, s.expiry_action,
 		       s.owner_user_id, owner.identifier,
@@ -247,6 +258,7 @@ func (s *server) loadHostingSite(ctx context.Context, actor *currentUser, public
 		  AND ($3 IN ('admin','superadmin') OR s.owner_user_id = $2 OR member.user_id IS NOT NULL)
 	`, publicID, actor.ID, actor.Role).Scan(
 		&item.ID, &item.Name, &item.Subdomain, &item.CustomDomain,
+		&item.CustomDomainVerified, &item.customDomainToken,
 		&item.ProjectType, &item.DetectedProjectType, &item.PackageManager,
 		&item.Status, &item.MaintenanceMode, &item.ExpiresAt, &item.ExpiryAction,
 		&item.OwnerID, &item.OwnerUsername, &item.AccessRole, &item.MemberCount,
@@ -254,7 +266,90 @@ func (s *server) loadHostingSite(ctx context.Context, actor *currentUser, public
 		&item.CPUMillicores, &item.MemoryMB, &item.ProcessLimit, &item.DiskLimitMB,
 		&item.Version, &item.CreatedAt, &item.UpdatedAt,
 	)
+	item.fillDomainProof()
 	return item, err
+}
+
+const customDomainTxtPrefix = "_nexora-verify."
+
+// fillDomainProof tells the owner which TXT record proves the domain. The token is not a secret:
+// it only has to be unique to this site and domain, and only someone who controls the domain's DNS
+// can publish it.
+func (h *hostingSite) fillDomainProof() {
+	if h.CustomDomain == "" || h.CustomDomainVerified || h.customDomainToken == "" {
+		return
+	}
+	h.CustomDomainTxtName = customDomainTxtPrefix + h.CustomDomain
+	h.CustomDomainTxtValue = "nexora-verify=" + h.customDomainToken
+}
+
+// lookupDomainTXT is a variable so tests can supply DNS answers.
+var lookupDomainTXT = func(ctx context.Context, name string) ([]string, error) {
+	return net.DefaultResolver.LookupTXT(ctx, name)
+}
+
+func txtProvesDomain(records []string, token string) bool {
+	if token == "" {
+		return false
+	}
+	want := "nexora-verify=" + token
+	for _, record := range records {
+		if strings.TrimSpace(record) == want {
+			return true
+		}
+	}
+	return false
+}
+
+// verifyHostingDomain checks the site's TXT record and, when it is there, starts serving the domain.
+func (s *server) verifyHostingDomain(c *fiber.Ctx) error {
+	actor := current(c)
+	publicID := c.Params("id")
+	item, err := s.loadHostingSite(c.Context(), actor, publicID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return c.Status(fiber.StatusNotFound).JSON(apiError{Error: "ไม่พบเว็บไซต์", Code: "site_not_found"})
+	}
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError)
+	}
+	if item.AccessRole == "viewer" {
+		return c.Status(fiber.StatusForbidden).JSON(apiError{Error: "สิทธิ์ Viewer ยืนยัน Domain ไม่ได้", Code: "forbidden"})
+	}
+	if item.CustomDomain == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(apiError{Error: "เว็บไซต์นี้ยังไม่ได้ตั้ง Domain", Code: "no_custom_domain"})
+	}
+	if item.CustomDomainVerified {
+		return c.JSON(fiber.Map{"site": item, "verified": true})
+	}
+
+	ctx, cancel := context.WithTimeout(c.Context(), 6*time.Second)
+	defer cancel()
+	records, lookupErr := lookupDomainTXT(ctx, customDomainTxtPrefix+item.CustomDomain)
+	if lookupErr != nil && len(records) == 0 {
+		return c.Status(fiber.StatusConflict).JSON(apiError{Error: "ยังไม่พบ TXT record ของ Domain นี้ รอ DNS อัปเดตสักครู่แล้วลองใหม่", Code: "txt_not_found"})
+	}
+	if !txtProvesDomain(records, item.customDomainToken) {
+		return c.Status(fiber.StatusConflict).JSON(apiError{Error: "TXT record ไม่ตรงกับค่าที่ระบบกำหนด", Code: "txt_mismatch"})
+	}
+
+	tag, err := s.db.Exec(c.Context(), `
+		UPDATE hosting_sites
+		SET custom_domain_verified_at=NOW(), version=version+1, updated_at=NOW()
+		WHERE public_id=$1 AND deleted_at IS NULL AND custom_domain_verified_at IS NULL
+		  AND LOWER(custom_domain)=LOWER($2) AND custom_domain_token=$3
+	`, publicID, item.CustomDomain, item.customDomainToken)
+	if err != nil {
+		return hostingConflict(c, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return c.Status(fiber.StatusConflict).JSON(apiError{Error: "Domain เปลี่ยนไประหว่างตรวจสอบ ลองใหม่อีกครั้ง", Code: "domain_changed"})
+	}
+	s.audit(c, auditEvent{Actor: actor, Category: "hosting", Action: "hosting.domain.verified", Target: "hosting_site", TargetID: publicID, Metadata: map[string]any{"domain": item.CustomDomain}})
+	updated, err := s.loadHostingSite(c.Context(), actor, publicID)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError)
+	}
+	return c.JSON(fiber.Map{"site": updated, "verified": true})
 }
 
 func (s *server) getHostingSite(c *fiber.Ctx) error {
@@ -355,10 +450,10 @@ func (s *server) createHostingSite(c *fiber.Ctx) error {
 	var siteDBID int64
 	err = tx.QueryRow(c.Context(), `
 		INSERT INTO hosting_sites
-		  (public_id, owner_user_id, name, subdomain, custom_domain, project_type, package_manager)
-		VALUES ($1,$2,$3,$4,NULLIF($5,''),$6,$7)
+		  (public_id, owner_user_id, name, subdomain, custom_domain, custom_domain_token, project_type, package_manager)
+		VALUES ($1,$2,$3,$4,NULLIF($5,''),CASE WHEN $5 <> '' THEN $8::text END,$6,$7)
 		RETURNING id
-	`, publicID, ownerID, input.Name, input.Subdomain, input.CustomDomain, input.ProjectType, input.PackageManager).Scan(&siteDBID)
+	`, publicID, ownerID, input.Name, input.Subdomain, input.CustomDomain, input.ProjectType, input.PackageManager, randomHex(16)).Scan(&siteDBID)
 	if err != nil {
 		return hostingConflict(c, err)
 	}
@@ -435,9 +530,16 @@ func (s *server) updateHostingSite(c *fiber.Ctx) error {
 	_, err = tx.Exec(c.Context(), `
 		UPDATE hosting_sites
 		SET name=$1, subdomain=$2, custom_domain=NULLIF($3,''), project_type=$4,
-		    package_manager=$5, version=version+1, updated_at=NOW()
+		    package_manager=$5, version=version+1, updated_at=NOW(),
+		    -- a different domain has to be proved again; the same one keeps its proof
+		    custom_domain_verified_at = CASE WHEN LOWER(COALESCE(custom_domain,'')) = LOWER($3) THEN custom_domain_verified_at END,
+		    custom_domain_token = CASE
+		      WHEN $3 = '' THEN NULL
+		      WHEN LOWER(COALESCE(custom_domain,'')) = LOWER($3) THEN custom_domain_token
+		      ELSE $7::text
+		    END
 		WHERE id=$6
-	`, input.Name, input.Subdomain, input.CustomDomain, input.ProjectType, input.PackageManager, access.DBID)
+	`, input.Name, input.Subdomain, input.CustomDomain, input.ProjectType, input.PackageManager, access.DBID, randomHex(16))
 	if err != nil {
 		return hostingConflict(c, err)
 	}

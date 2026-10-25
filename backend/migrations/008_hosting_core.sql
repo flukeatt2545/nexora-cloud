@@ -29,9 +29,7 @@ CREATE TABLE IF NOT EXISTS hosting_sites (
 CREATE UNIQUE INDEX IF NOT EXISTS hosting_sites_subdomain_active_unique
     ON hosting_sites (LOWER(subdomain)) WHERE deleted_at IS NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS hosting_sites_custom_domain_active_unique
-    ON hosting_sites (LOWER(custom_domain))
-    WHERE custom_domain IS NOT NULL AND custom_domain <> '' AND deleted_at IS NULL;
+-- The unique index on custom_domain is created in 083, where it only covers verified domains.
 
 CREATE INDEX IF NOT EXISTS hosting_sites_owner_idx
     ON hosting_sites (owner_user_id, created_at DESC) WHERE deleted_at IS NULL;

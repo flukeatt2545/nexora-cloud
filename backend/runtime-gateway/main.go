@@ -224,7 +224,7 @@ func (g *gateway) lookup(ctx context.Context, host, subdomain string) (siteRoute
 		WHERE deleted_at IS NULL
 		  AND (
 		    ($1 <> '' AND LOWER(subdomain)=LOWER($1))
-		    OR (custom_domain IS NOT NULL AND LOWER(custom_domain)=LOWER($2))
+		    OR (custom_domain IS NOT NULL AND custom_domain_verified_at IS NOT NULL AND LOWER(custom_domain)=LOWER($2))
 		  )
 		ORDER BY ($1 <> '' AND LOWER(subdomain)=LOWER($1)) DESC, id
 		LIMIT 1

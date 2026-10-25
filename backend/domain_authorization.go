@@ -34,7 +34,7 @@ func (s *server) hostingDomainAuthorized(c *fiber.Ctx) error {
 			SELECT 1 FROM hosting_sites
 			WHERE deleted_at IS NULL
 			  AND (($1 <> '' AND LOWER(subdomain)=LOWER($1))
-			       OR (custom_domain IS NOT NULL AND LOWER(custom_domain)=LOWER($2)))
+			       OR (custom_domain IS NOT NULL AND custom_domain_verified_at IS NOT NULL AND LOWER(custom_domain)=LOWER($2)))
 		)
 	`, lookupSub, domain).Scan(&exists)
 	if err != nil || !exists {

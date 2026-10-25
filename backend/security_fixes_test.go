@@ -141,3 +141,35 @@ func TestOAuthStateIsBoundToTheBrowserThatStartedIt(t *testing.T) {
 		t.Fatal("a state without a binding must be refused")
 	}
 }
+
+func TestCustomDomainNeedsTheTxtRecordOfItsOwnSite(t *testing.T) {
+	token := "0123456789abcdef"
+	if !txtProvesDomain([]string{"v=spf1 -all", " nexora-verify=" + token + " "}, token) {
+		t.Fatal("the right record must prove the domain")
+	}
+	for _, records := range [][]string{
+		nil,
+		{"nexora-verify=another-sites-token"},
+		{"nexora-verify=" + token + "x"},
+		{token},
+	} {
+		if txtProvesDomain(records, token) {
+			t.Fatalf("records %v must not prove the domain", records)
+		}
+	}
+	if txtProvesDomain([]string{"nexora-verify="}, "") {
+		t.Fatal("an empty token must never match")
+	}
+
+	site := hostingSite{CustomDomain: "shop.example.com", customDomainToken: token}
+	site.fillDomainProof()
+	if site.CustomDomainTxtName != "_nexora-verify.shop.example.com" || site.CustomDomainTxtValue != "nexora-verify="+token {
+		t.Fatalf("wrong instructions: %q %q", site.CustomDomainTxtName, site.CustomDomainTxtValue)
+	}
+	site.CustomDomainVerified = true
+	site.CustomDomainTxtName, site.CustomDomainTxtValue = "", ""
+	site.fillDomainProof()
+	if site.CustomDomainTxtName != "" || site.CustomDomainTxtValue != "" {
+		t.Fatal("a verified domain needs no instructions")
+	}
+}
