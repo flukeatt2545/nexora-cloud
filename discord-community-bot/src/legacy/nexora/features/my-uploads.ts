@@ -2,6 +2,7 @@ import axios from "axios";
 import { EmbedBuilder, SlashCommandBuilder, type ChatInputCommandInteraction } from "discord.js";
 import { recordActivity } from "./activity-log";
 import { describeError, errorStatus } from "./errors";
+import { displayName, fmtSize } from "./upload";
 
 const API_URL = (process.env.NEXORA_API_URL || "http://api:8080").replace(/\/+$/, "");
 const BOT_SECRET = (process.env.BOT_INTERNAL_SECRET || "").trim();
@@ -10,7 +11,9 @@ const HISTORY_LIMIT = 10;
 
 export const myUploadsCommand = new SlashCommandBuilder()
   .setName("my-uploads")
-  .setDescription("ดูรูปที่เคยอัปโหลดผ่านบอท");
+  .setNameLocalizations({ th: "รูปของฉัน" })
+  .setDescription("ดูรูปที่เคยอัปโหลดผ่านบอท")
+  .setDMPermission(false);
 
 type HistoryItem = {
   url: string;
@@ -20,22 +23,10 @@ type HistoryItem = {
   created_at: string;
 };
 
-function fmtSize(bytes: number): string {
-  if (!bytes || bytes <= 0) return "0 B";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
-
 function fmtDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
-}
-
-function shortName(name: string, max = 40): string {
-  const s = String(name || "ไฟล์รูป");
-  return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
 
 export async function handleMyUploadsCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -68,26 +59,25 @@ export async function handleMyUploadsCommand(interaction: ChatInputCommandIntera
       return;
     }
 
-    const embeds = items.map((item, i) =>
-      new EmbedBuilder()
-        .setTitle(`รูปที่ ${i + 1} — ${shortName(item.filename)}`)
-        .setDescription(
-          `[เปิดรูปเต็ม](${item.url})\n\`${item.url}\`\n${fmtSize(item.size)} · ${fmtDate(item.created_at)}`
-        )
-        .setImage(item.url)
-        .setColor(0x5865f2)
+    // One card with the list, and the newest pictures as a grid (embeds sharing a URL).
+    const lines = items.map(
+      (item, i) => `**${i + 1}.** [${displayName(item.filename)}](${item.url})\n└ ${fmtSize(item.size)} · ${fmtDate(item.created_at)}`
     );
-    embeds[0]
-      .setFooter({ text: `ประวัติการอัปโหลดของ ${username} (${items.length} รูปล่าสุด)` })
+    const gridUrl = items[0].url;
+    const summary = new EmbedBuilder()
+      .setTitle(`รูปที่คุณอัปโหลดล่าสุด ${items.length} รูป`)
+      .setDescription(lines.join("\n"))
+      .setURL(gridUrl)
+      .setImage(items[0].url)
+      .setColor(0x5865f2)
+      .setFooter({ text: `${username} · ลบรูปได้ที่ /gallery` })
       .setTimestamp();
+    const grid = items.slice(1, 4).map((item) => new EmbedBuilder().setURL(gridUrl).setImage(item.url).setColor(0x5865f2));
     recordActivity(interaction, {
       outcome: "success",
       result: `แสดงรูปที่เคยอัปโหลดล่าสุด ${items.length} รูป`,
     });
-    await interaction.editReply({
-      content: `เจอ **${items.length} รูป** ที่คุณเคยอัปโหลด\nอยากลบรูปไหน ใช้คำสั่ง "/gallery" เพื่อเปิดหน้าจัดการ`,
-      embeds: embeds.slice(0, 10),
-    });
+    await interaction.editReply({ content: "", embeds: [summary, ...grid] });
   } catch (error) {
     console.error("[ERROR] /my-uploads", errorStatus(error) || "", describeError(error));
     recordActivity(interaction, { outcome: "failure", result: "ดึงประวัติการอัปโหลดไม่สำเร็จ ระบบหลังบ้านไม่ตอบสนอง", details: String((error instanceof Error && error.message) || "unknown").slice(0, 200) });

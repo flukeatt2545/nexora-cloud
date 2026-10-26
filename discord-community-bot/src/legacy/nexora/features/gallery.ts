@@ -15,7 +15,9 @@ const BOT_SECRET = (process.env.BOT_INTERNAL_SECRET || "").trim();
 
 export const galleryCommand = new SlashCommandBuilder()
   .setName("gallery")
-  .setDescription("รับลิงก์แกลเลอรีรูปของคุณ (ดูและลบรูปได้ ไม่ต้องล็อกอิน)");
+  .setNameLocalizations({ th: "แกลเลอรี" })
+  .setDescription("รับลิงก์แกลเลอรีรูปของคุณ (ดูและลบรูปได้ ไม่ต้องล็อกอิน)")
+  .setDMPermission(false);
 
 export async function handleGalleryCommand(interaction: ChatInputCommandInteraction): Promise<void> {
   // NOTE: index.ts must route commandName === "gallery" here WITHOUT admin/scope
