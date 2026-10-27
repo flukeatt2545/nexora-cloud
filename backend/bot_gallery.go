@@ -30,13 +30,13 @@ import (
 
 const (
 	// galleryPublicBase must stay in sync with the web app's /gallery route.
-	galleryPublicBase    = "https://nkn02.com/gallery"
-	galleryTicketTTL     = 10 * time.Minute
-	gallerySessionTTL    = 24 * time.Hour
-	galleryCookieName    = "nexora_gallery"
-	galleryTicketBytes   = 32
-	gallerySessionBytes  = 32
-	galleryMaxListLimit  = 100
+	galleryPublicBase   = "https://nkn02.com/gallery"
+	galleryTicketTTL    = 10 * time.Minute
+	gallerySessionTTL   = 24 * time.Hour
+	galleryCookieName   = "nexora_gallery"
+	galleryTicketBytes  = 32
+	gallerySessionBytes = 32
+	galleryMaxListLimit = 500
 )
 
 type gallerySession struct {
@@ -218,7 +218,8 @@ type galleryUploadItem struct {
 }
 
 // galleryListUploads handles GET /api/gallery/uploads (session cookie required).
-// Only the session owner's uploads in the ticket's guild are returned.
+// Only the session owner's uploads in the ticket's guild are returned, with the
+// owner's name and "usage" ({bytes, limit_bytes}) for the storage limit of botUploadImages.
 func (s *server) galleryListUploads(c *fiber.Ctx) error {
 	sess, ok := s.requireGallerySession(c)
 	if !ok {
@@ -245,7 +246,19 @@ func (s *server) galleryListUploads(c *fiber.Ctx) error {
 		}
 		items = append(items, it)
 	}
-	return c.JSON(fiber.Map{"items": items})
+
+	// Storage used across every server, the same total the upload limit counts.
+	var usedBytes int64
+	if err := s.db.QueryRow(c.Context(), `SELECT COALESCE(SUM(size_bytes), 0) FROM bot_uploads WHERE discord_user_id = $1`,
+		sess.DiscordUserID).Scan(&usedBytes); err != nil {
+		log.Printf("[gallery] usage query error: %v", err)
+		return c.JSON(fiber.Map{"items": items, "discord_username": sess.Username})
+	}
+	return c.JSON(fiber.Map{
+		"items":            items,
+		"discord_username": sess.Username,
+		"usage":            fiber.Map{"bytes": usedBytes, "limit_bytes": int64(botUploadTotalBytes)},
+	})
 }
 
 // galleryDeleteUpload handles DELETE /api/gallery/uploads/:id (session cookie required).

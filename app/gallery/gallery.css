@@ -1,46 +1,78 @@
 /* ============================================================
-   Gallery
-   Quiet, photo-first dark UI. One warm accent, hairline borders,
-   small radii, no glows. Type: Kanit (display) / IBM Plex Sans Thai.
+   Gallery — a photo library.
+   Side panel (who, storage, how to add) beside a tight square grid,
+   like a photos app: the pictures carry the colour, the page stays
+   neutral. Every colour comes from the site theme (app/theme.css), so
+   light/dark mode and the admin's brand colour apply here too. Overlays
+   that sit on top of photos, and the viewer, are dark in both modes.
+   Type: Kanit (display) / IBM Plex Sans Thai (text).
    ============================================================ */
 
-.gal {
-  --bg: #0d0d0f;
-  --surface: #151518;
-  --surface-2: #1c1c20;
-  --line: rgba(255, 255, 255, 0.075);
-  --line-strong: rgba(255, 255, 255, 0.16);
-  --text: #ecebe6;
-  --text-2: #a3a199;
-  --text-3: #6e6c66;
-  --accent: #d9a55c;
-  --danger: #e5766e;
-  --danger-bg: rgba(229, 118, 110, 0.1);
-  --radius: 8px;
-  --header-h: 56px;
+.gl {
+  --g-bg: var(--background);
+  --g-panel: var(--theme-elevated);
+  --g-raised: var(--control-surface-strong);
+  --g-text: var(--theme-text-strong);
+  --g-text-2: var(--theme-text-soft);
+  --g-text-3: color-mix(in srgb, var(--theme-text-soft) 86%, var(--background));
+  --g-line: color-mix(in srgb, var(--theme-text-strong) 9%, transparent);
+  --g-line-strong: color-mix(in srgb, var(--theme-text-strong) 16%, transparent);
+  --g-hover: var(--theme-hover);
+  --g-accent: var(--primary-ink);
+  --g-danger: var(--danger);
+  --g-warn: var(--warning-ink, #e0a43a);
+  --g-shadow: var(--theme-shadow);
+  /* on top of photos: the same in both modes */
+  --g-on-photo: rgba(12, 12, 14, 0.62);
+  --g-on-photo-line: rgba(255, 255, 255, 0.9);
+
+  --side-w: 288px;
+  --bar-h: 64px;
+  --gutter: 28px;
+  --tile: 168px;
+  --tile-gap: 4px;
+  --tile-r: 6px;
   --font-display: "Kanit", "IBM Plex Sans Thai", sans-serif;
-  --font-body: "IBM Plex Sans Thai", "Plus Jakarta Sans", "Noto Sans Thai", sans-serif;
+  --font-text: "IBM Plex Sans Thai", "Plus Jakarta Sans", "Noto Sans Thai", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
   min-height: 100vh;
   min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-body);
+  background: var(--g-bg);
+  color: var(--g-text);
+  font-family: var(--font-text);
   -webkit-font-smoothing: antialiased;
-  color-scheme: dark;
 }
 
-.gal-wrap {
-  width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding-left: clamp(16px, 3vw, 32px);
-  padding-right: clamp(16px, 3vw, 32px);
+.gl *,
+.gl *::before,
+.gl *::after {
+  box-sizing: border-box;
 }
 
-.gal-visually-hidden {
+/* :where() keeps this at element weight, so every component's own colour wins over it */
+:where(.gl) :is(button, select, input) {
+  font: inherit;
+  color: inherit;
+}
+
+.gl :focus-visible {
+  outline: 2px solid var(--g-accent);
+  outline-offset: 2px;
+}
+
+.gl code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--g-raised);
+  box-shadow: inset 0 0 0 1px var(--g-line);
+  color: var(--g-text);
+  white-space: nowrap;
+}
+
+.gl-visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -52,184 +84,366 @@
   border: 0;
 }
 
-.gal button,
-.gal select,
-.gal input {
-  font: inherit;
-  color: inherit;
-}
+/* ---------------- buttons ---------------- */
 
-.gal :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* ---------------- header ---------------- */
-
-.gal-header {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  background: rgba(13, 13, 15, 0.92);
-  border-bottom: 1px solid var(--line);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.gal-header-in {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  height: var(--header-h);
-}
-
-.gal-back {
+.gl-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 7px;
   min-height: 40px;
-  padding-right: 6px;
-  font-size: 13px;
-  color: var(--text-2);
-  text-decoration: none;
-  border-radius: 6px;
-  transition: color 0.15s;
-}
-
-.gal-back:hover {
-  color: var(--text);
-}
-
-.gal-brand-name {
-  margin-right: auto;
-  padding-left: 18px;
-  border-left: 1px solid var(--line-strong);
-  font-family: var(--font-display);
-  font-size: 15px;
+  padding: 0 16px;
+  border: 1px solid var(--g-line-strong);
+  border-radius: 10px;
+  background: var(--g-panel);
+  color: var(--g-text);
+  font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: 0.04em;
-  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
 }
 
-.gal-user {
+.gl-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--g-text) 30%, transparent);
+}
+
+.gl-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.gl-btn.sm {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+.gl-btn.accent {
+  border-color: var(--primary-border);
+  background: var(--primary-soft);
+  color: var(--g-accent);
+}
+
+.gl-btn.accent:hover:not(:disabled) {
+  border-color: var(--g-accent);
+}
+
+.gl-btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--g-accent);
+}
+
+.gl-btn.ghost:hover:not(:disabled) {
+  background: var(--g-hover);
+}
+
+.gl-btn.danger {
+  border-color: transparent;
+  background: var(--g-danger);
+  color: #fff;
+}
+
+.gl-btn.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--g-danger) 86%, #000);
+}
+
+.gl-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--g-text-2);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.gl-icon:hover {
+  background: var(--g-hover);
+  color: var(--g-text);
+}
+
+.gl-icon > span {
+  display: none;
+}
+
+/* ---------------- brand row ---------------- */
+
+.gl-brandbar {
   display: flex;
   align-items: center;
-  gap: 9px;
-  max-width: 220px;
-  min-width: 0;
+  gap: 12px;
+  min-height: 40px;
 }
 
-.gal-avatar {
+.gl-home {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: var(--g-text-2);
+  box-shadow: inset 0 0 0 1px var(--g-line-strong);
+  transition: color 0.15s, box-shadow 0.15s;
+}
+
+.gl-home:hover {
+  color: var(--g-text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--g-text) 30%, transparent);
+}
+
+.gl-wordmark {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.gl-avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 26px;
-  height: 26px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: var(--surface-2);
-  border: 1px solid var(--line-strong);
+  background: var(--primary-soft);
+  color: var(--g-accent);
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: 20px;
   font-weight: 500;
-  color: var(--accent);
 }
 
-.gal-username {
+.gl-avatar.sm {
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
   font-size: 13px;
-  color: var(--text-2);
+}
+
+/* ---------------- library shell ---------------- */
+
+.gl-shell {
+  display: grid;
+  grid-template-columns: var(--side-w) minmax(0, 1fr);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.gl-side {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  height: 100vh;
+  height: 100dvh;
+  padding: 18px 22px 22px;
+  overflow-y: auto;
+  border-right: 1px solid var(--g-line);
+  background: var(--g-panel);
+}
+
+.gl-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding-top: 10px;
+}
+
+.gl-profile-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gl-profile-text strong {
+  font-size: 15.5px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* ---------------- main / title ---------------- */
-
-.gal-main {
-  flex: 1;
-  padding-top: clamp(24px, 4vw, 44px);
-  padding-bottom: clamp(48px, 8vw, 96px);
-}
-
-.gal-title-row {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  margin-bottom: 20px;
-}
-
-.gal-h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(26px, 4.2vw, 36px);
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.gal-hint {
-  margin: 0 0 0 auto;
+.gl-profile-text span {
   font-size: 13px;
-  color: var(--text-3);
-}
-
-.gal-hint code {
-  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  font-size: 0.9em;
-  padding: 2px 6px;
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  background: var(--surface);
-  color: var(--text-2);
-}
-
-.gal-sub {
-  margin: 0;
-  font-size: 13.5px;
-  color: var(--text-2);
+  color: var(--g-text-2);
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------------- tools ---------------- */
-
-.gal-tools {
+/* storage */
+.gl-usage-row {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 9px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.gl-usage-num {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gl-usage-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--g-line-strong);
+  overflow: hidden;
+}
+
+.gl-usage-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--g-accent);
+  transition: width 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.gl-usage[data-level="high"] .gl-usage-track span {
+  background: var(--g-warn);
+}
+
+.gl-usage[data-level="full"] .gl-usage-track span {
+  background: var(--g-danger);
+}
+
+.gl-usage-note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--g-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.gl-usage[data-level="full"] .gl-usage-note {
+  color: var(--g-danger);
+}
+
+/* how to add photos */
+.gl-howto {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--g-raised);
+}
+
+.gl-howto-title {
+  margin: 0 0 4px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.gl-howto-text {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--g-text-2);
+}
+
+.gl-side-foot {
+  margin: auto 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--g-text-3);
+}
+
+.gl-content {
+  min-width: 0;
+}
+
+/* ---------------- top bar ---------------- */
+
+/* no transform/filter here: the phone layout puts the selection actions in a fixed bar inside it */
+.gl-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
+  height: var(--bar-h);
+  padding: 0 var(--gutter);
+  border-bottom: 1px solid var(--g-line);
+  background: var(--g-bg);
 }
 
-.gal-search,
-.gal-select select {
-  height: 40px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  transition: border-color 0.15s, background 0.15s;
+.gl-bar[data-mode="select"] {
+  background: color-mix(in srgb, var(--primary) 7%, var(--g-bg));
+  border-bottom-color: var(--primary-border);
 }
 
-.gal-search:hover,
-.gal-select select:hover {
-  border-color: var(--line-strong);
+.gl-bar-title {
+  margin: 0 auto 0 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
 }
 
-.gal-search {
+.gl-bar-count {
+  margin: 0;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--g-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.gl-bar-count b {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--g-text);
+}
+
+.gl-bar-count span {
+  color: var(--g-text-3);
+}
+
+.gl-bar-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.gl-search {
   display: flex;
   align-items: center;
   gap: 9px;
-  flex: 1 1 240px;
+  flex: 1 1 auto;
+  max-width: 440px;
   min-width: 0;
-  padding: 0 6px 0 12px;
-  color: var(--text-3);
+  height: 40px;
+  padding: 0 6px 0 13px;
+  border: 1px solid var(--g-line-strong);
+  border-radius: 10px;
+  background: var(--g-panel);
+  color: var(--g-text-3);
+  transition: border-color 0.15s;
 }
 
-.gal-search:focus-within {
-  border-color: var(--accent);
-  color: var(--text-2);
+.gl-search:focus-within {
+  border-color: var(--g-accent);
+  color: var(--g-text-2);
 }
 
-.gal-search input {
+.gl-search input {
   flex: 1;
   min-width: 0;
   height: 100%;
@@ -237,240 +451,299 @@
   outline: 0;
   background: transparent;
   font-size: 14px;
+  color: var(--g-text);
 }
 
-.gal-search input::placeholder {
-  color: var(--text-3);
+.gl-search input::placeholder {
+  color: var(--g-text-3);
 }
 
-.gal-search input::-webkit-search-cancel-button {
+.gl-search input::-webkit-search-cancel-button {
   display: none;
 }
 
-.gal-search-clear {
+.gl-search-clear {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
-  color: var(--text-2);
+  color: var(--g-text-2);
   cursor: pointer;
 }
 
-.gal-search-clear:hover {
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--text);
+.gl-search-clear:hover {
+  background: var(--g-hover);
+  color: var(--g-text);
 }
 
-.gal-select select {
+.gl-sort {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--g-line-strong);
+  border-radius: 10px;
+  background: var(--g-panel);
+  color: var(--g-text-2);
+}
+
+.gl-sort:focus-within {
+  border-color: var(--g-accent);
+}
+
+.gl-sort select {
   appearance: none;
   -webkit-appearance: none;
-  padding: 0 34px 0 12px;
-  font-size: 14px;
-  color: var(--text);
-  cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a3a199' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  height: 100%;
+  padding: 0 18px 0 0;
+  border: 0;
+  outline: 0;
+  background-color: transparent;
+  /* the arrow is drawn in currentColor so it follows the theme */
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 5px center, right 0 center;
+  background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
-  background-position: right 12px center;
+  font-size: 13.5px;
+  color: var(--g-text);
+  cursor: pointer;
 }
 
-.gal-select select:focus-visible {
-  outline-offset: 0;
-  border-color: var(--accent);
+.gl-sort select option {
+  background: var(--g-panel);
+  color: var(--g-text);
 }
 
-.gal-seg {
+.gl-seg {
   display: inline-flex;
   height: 40px;
   padding: 3px;
   gap: 2px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
+  border: 1px solid var(--g-line-strong);
+  border-radius: 10px;
+  background: var(--g-panel);
 }
 
-.gal-seg button {
+.gl-seg button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
+  width: 34px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 7px;
   background: transparent;
-  color: var(--text-3);
+  color: var(--g-text-3);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
-.gal-seg button:hover {
-  color: var(--text);
+.gl-seg button:hover {
+  color: var(--g-text);
 }
 
-.gal-seg button.is-on {
-  background: var(--surface-2);
-  color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+.gl-seg button.is-on {
+  background: var(--g-raised);
+  color: var(--g-accent);
+  box-shadow: inset 0 0 0 1px var(--g-line-strong);
 }
 
-.gal-seg button:focus-visible {
+.gl-seg button:focus-visible {
   outline-offset: -2px;
 }
 
-/* ---------------- groups + grid ---------------- */
-
-.gal-group + .gal-group {
-  margin-top: 8px;
+.gl-density-cycle {
+  display: none;
 }
 
-.gal-group-h {
+.gl-pick {
+  margin-left: auto;
+}
+
+/* ---------------- days + grid ---------------- */
+
+.gl-photos {
+  padding: 4px var(--gutter) 72px;
+}
+
+.gl-day + .gl-day {
+  margin-top: 18px;
+}
+
+.gl-day-h {
   position: sticky;
-  top: var(--header-h);
-  z-index: 5;
+  top: var(--bar-h);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 14px 0 10px;
+  background: var(--g-bg);
+}
+
+.gl-day-h h2 {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  margin: 0 calc(-1 * clamp(16px, 3vw, 32px));
-  padding: 18px clamp(16px, 3vw, 32px) 12px;
-  background: linear-gradient(to bottom, var(--bg) 72%, rgba(13, 13, 15, 0));
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin: 0;
+  min-width: 0;
   font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
-.gal-group-h span {
-  font-family: var(--font-body);
-  font-size: 12px;
+.gl-day-date {
+  font-family: var(--font-text);
+  font-size: 13px;
   font-weight: 400;
-  color: var(--text-3);
+  color: var(--g-text-3);
+}
+
+.gl-day-count {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--g-text-3);
   font-variant-numeric: tabular-nums;
 }
 
-.gal-grid {
-  --col: 210px;
-  --ratio: 4 / 3;
+.gl-day-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  min-height: 32px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  color: var(--g-text-2);
+  cursor: pointer;
+}
+
+.gl-day-pick:hover {
+  color: var(--g-text);
+}
+
+.gl-day-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--g-line-strong);
+  color: transparent;
+  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+}
+
+.gl-day-pick[aria-pressed="true"] .gl-day-check {
+  background: var(--primary);
+  box-shadow: none;
+  color: #fff;
+}
+
+.gl-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--col), 1fr));
-  gap: 22px 14px;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr));
+  gap: var(--tile-gap);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.gal-grid[data-density="s"] {
-  --col: 140px;
-  --ratio: 1 / 1;
-  gap: 16px 10px;
+.gl-grid[data-density="s"] {
+  --tile: 112px;
+  --tile-gap: 3px;
+  --tile-r: 4px;
 }
 
-.gal-grid[data-density="l"] {
-  --col: 340px;
-  --ratio: 3 / 2;
-  gap: 28px 18px;
-}
-
-/* few photos: keep tiles generous instead of a lone thumbnail in a sea of empty space */
-.gal-grid[data-count="few"] {
-  --col: 360px;
-  --ratio: 4 / 3;
-}
-
-.gal-grid[data-count="some"] {
-  --col: 280px;
+.gl-grid[data-density="l"] {
+  --tile: 264px;
+  --tile-gap: 8px;
+  --tile-r: 8px;
 }
 
 /* ---------------- tiles ---------------- */
 
-.gal-card {
+.gl-tile {
   position: relative;
   min-width: 0;
 }
 
-.gal-thumb {
+.gl-tile-btn {
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: var(--ratio);
+  aspect-ratio: 1;
   padding: 0;
   border: 0;
-  border-radius: var(--radius);
-  background: var(--surface);
+  border-radius: var(--tile-r);
+  background: var(--g-raised);
   overflow: hidden;
   cursor: zoom-in;
-  box-shadow: inset 0 0 0 1px var(--line);
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background 0.15s;
 }
 
-.gal-thumb img {
+.gl-tile-btn .smart-img {
+  transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1), border-radius 0.18s;
+}
+
+.gl-tile-btn img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1), filter 0.2s;
+  -webkit-user-drag: none;
+  transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
-.gal-thumb::after {
+/* hairline so light photos keep an edge on a light page; the picked ring uses it too */
+.gl-tile-btn::after {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 2;
   border-radius: inherit;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px var(--g-line);
   pointer-events: none;
 }
 
-.gal-thumb:focus-visible {
-  outline-offset: 3px;
+.gl-tile-btn:focus-visible {
+  outline-offset: 2px;
 }
 
-.gal-quick {
+.gl-tile-info {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  gap: 6px;
-  opacity: 0;
-  transform: translateY(-2px);
-  transition: opacity 0.15s, transform 0.15s;
-}
-
-.gal-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 7px;
-  background: rgba(10, 10, 12, 0.78);
-  color: var(--text);
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.gal-chip:hover {
-  background: rgba(10, 10, 12, 0.95);
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-.gal-chip.danger:hover {
-  color: var(--danger);
-  border-color: rgb(var(--danger-rgb) / 0.5);
-}
-
-.gal-cap {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding-top: 9px;
-  min-width: 0;
+  gap: 1px;
+  padding: 30px 10px 8px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.66), rgba(0, 0, 0, 0));
+  color: #fff;
+  text-align: left;
+  opacity: 0;
+  transition: opacity 0.18s;
+  pointer-events: none;
 }
 
-.gal-fname {
-  font-size: 13px;
+.gl-tile-name {
+  font-size: 12.5px;
   font-weight: 500;
   line-height: 1.35;
   white-space: nowrap;
@@ -478,81 +751,478 @@
   text-overflow: ellipsis;
 }
 
-.gal-meta {
-  font-size: 12px;
-  color: var(--text-3);
+.gl-tile-meta {
+  font-size: 11px;
+  opacity: 0.78;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.gal-grid[data-density="s"] .gal-cap {
-  padding-top: 6px;
-}
-
-.gal-grid[data-density="s"] .gal-meta {
+.gl-grid[data-density="s"] .gl-tile-info {
   display: none;
 }
 
-.gal-grid[data-density="s"] .gal-fname {
-  font-size: 12px;
+.gl-tile-check {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1.5px solid var(--g-on-photo-line);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.22);
+  color: transparent;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.gl-tile-check:hover {
+  color: rgba(255, 255, 255, 0.85); /* theme-ok: drawn on top of the photo */
+}
+
+.gl-tile-check:focus-visible {
+  opacity: 1;
+}
+
+.gl[data-selecting] .gl-tile-check {
+  opacity: 1;
+}
+
+.gl-tile-acts {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 5px;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.gl-tile-acts button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--g-on-photo);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.15s;
+}
+
+.gl-tile-acts button:hover {
+  background: rgba(12, 12, 14, 0.85);
+}
+
+.gl-tile-acts button.danger:hover {
+  background: var(--g-danger);
+}
+
+.gl-tile:focus-within .gl-tile-acts {
+  opacity: 1;
+  transform: none;
+}
+
+/* picked */
+.gl-tile[data-picked] .gl-tile-btn {
+  background: var(--primary-soft);
+}
+
+.gl-tile[data-picked] .gl-tile-btn .smart-img {
+  transform: scale(0.86);
+  border-radius: 4px;
+}
+
+.gl-tile[data-picked] .gl-tile-btn::after {
+  box-shadow: inset 0 0 0 2px var(--g-accent);
+}
+
+.gl-tile[data-picked] .gl-tile-check {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+  opacity: 1;
+}
+
+.gl[data-selecting] .gl-tile-btn {
+  cursor: pointer;
+}
+
+.gl[data-selecting] .gl-tile-info {
+  display: none;
 }
 
 @media (hover: hover) {
-  .gal-card:hover .gal-thumb img {
-    transform: scale(1.035);
-    filter: brightness(0.9);
+  .gl-tile:hover .gl-tile-btn img {
+    transform: scale(1.04);
   }
 
-  .gal-card:hover .gal-quick,
-  .gal-card:focus-within .gal-quick {
+  .gl-tile:hover .gl-tile-info,
+  .gl-tile-btn:focus-visible .gl-tile-info {
+    opacity: 1;
+  }
+
+  .gl-tile:hover .gl-tile-check,
+  .gl-tile:hover .gl-tile-acts {
     opacity: 1;
     transform: none;
   }
 }
 
-/* keyboard users on any device */
-.gal-card:focus-within .gal-quick {
-  opacity: 1;
-  transform: none;
+.gl-tip,
+.gl-foot-note {
+  margin: 40px 0 0;
+  font-size: 12.5px;
+  color: var(--g-text-3);
+  text-align: center;
 }
 
-/* ---------------- skeleton ---------------- */
+.gl-tip,
+.gl-foot-note {
+  display: none;
+}
 
-.gal-skel-thumb,
-.gal-skel-line {
+/* only touch screens have a long press to mention */
+@media (hover: none) and (pointer: coarse) {
+  .gl-tip {
+    display: block;
+  }
+}
+
+/* ---------------- states without photos ---------------- */
+
+.gl-plain {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.gl-plain-top {
+  border-bottom: 1px solid var(--g-line);
+}
+
+.gl-plain-top .gl-brandbar {
+  width: 100%;
+  max-width: 1120px;
+  height: 64px;
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.gl-plain-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: clamp(36px, 7vw, 92px) var(--gutter) 72px;
+}
+
+.gl-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  grid-template-areas:
+    "copy reply"
+    "steps steps";
+  align-items: center;
+  gap: 56px clamp(32px, 6vw, 80px);
+}
+
+.gl-intro-copy {
+  grid-area: copy;
+  min-width: 0;
+}
+
+.gl-intro .gl-dc {
+  grid-area: reply;
+}
+
+.gl-intro .gl-steps {
+  grid-area: steps;
+}
+
+.gl-kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 18px;
+  font-size: 13.5px;
+  color: var(--g-text-2);
+}
+
+.gl-kicker::before {
+  content: "";
+  width: 22px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--g-accent);
+}
+
+.gl-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--g-text-2);
+}
+
+.gl-flag.warn {
+  color: var(--g-danger);
+}
+
+.gl-display {
+  margin: 0 0 18px;
+  font-family: var(--font-display);
+  font-size: clamp(32px, 4.4vw, 50px);
+  font-weight: 600;
+  line-height: 1.16;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.gl-display.sm {
+  font-size: clamp(24px, 2.6vw, 30px);
+  line-height: 1.3;
+}
+
+.gl-mark {
+  font-family: var(--mono);
+  font-size: 0.78em;
+  font-weight: 600;
+  color: var(--g-accent);
+  white-space: nowrap;
+}
+
+.gl-lede {
+  max-width: 52ch;
+  margin: 0 0 24px;
+  font-size: clamp(15px, 1.05vw, 16.5px);
+  line-height: 1.8;
+  color: var(--g-text-2);
+}
+
+.gl-intro-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.gl-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 32px;
+  margin: 0;
+  padding: 26px 0 0;
+  border-top: 1px solid var(--g-line-strong);
+  list-style: none;
+}
+
+.gl-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gl-step-n {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--g-accent);
+  letter-spacing: 0.06em;
+}
+
+.gl-steps strong {
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.gl-steps li > span:last-child {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--g-text-2);
+}
+
+.gl-notice {
+  max-width: 560px;
+  margin: clamp(24px, 6vw, 64px) 0;
+}
+
+.gl-photos .gl-notice {
+  margin: 48px 0;
+}
+
+/* the bot's reply as it looks in Discord */
+.gl-dc {
+  margin: 0;
+  padding: 20px 22px 18px;
+  border: 1px solid var(--g-line);
+  border-radius: 14px;
+  background: var(--g-panel);
+  box-shadow: 0 30px 60px -36px var(--g-shadow);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.gl-dc-ref {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 18px;
+  margin-bottom: 4px;
+  padding-left: 50px;
+  font-size: 12.5px;
+  color: var(--g-text-3);
+}
+
+.gl-dc-ref b {
+  font-weight: 500;
+  color: var(--g-text-2);
+}
+
+/* the elbow line Discord draws from a reply to the command */
+.gl-dc-ref-line {
+  position: absolute;
+  left: 18px;
+  top: 9px;
+  width: 26px;
+  height: 10px;
+  border-top: 2px solid var(--g-line-strong);
+  border-left: 2px solid var(--g-line-strong);
+  border-top-left-radius: 6px;
+}
+
+.gl-dc-msg {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.gl-dc-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--g-accent);
+}
+
+.gl-dc-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.gl-dc-tag {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #5865f2; /* theme-ok: Discord's own app tag colour */
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.gl-dc-text {
+  margin: 3px 0 12px;
+  color: var(--g-text-2);
+}
+
+.gl-dc-img {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(220px, 100%);
+  aspect-ratio: 4 / 3;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: var(--g-raised);
+  color: var(--g-text-3);
+}
+
+.gl-dc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 5px;
+  background: var(--g-raised);
+  box-shadow: inset 0 0 0 1px var(--g-line-strong);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.gl-dc-eph {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--g-text-3);
+}
+
+/* ---------------- loading ---------------- */
+
+.gl-skel-line,
+.gl-skel-tile {
   position: relative;
   overflow: hidden;
-  background: var(--surface);
+  background: var(--g-raised);
 }
 
-.gal-skel-thumb::after,
-.gal-skel-line::after {
+.gl-skel-line::after,
+.gl-skel-tile::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.05) 50%, transparent 80%);
-  animation: gal-shimmer 1.4s infinite;
+  background: linear-gradient(100deg, transparent 20%, var(--g-hover) 50%, transparent 80%);
+  animation: gl-shimmer 1.4s infinite;
 }
 
-.gal-skel-thumb {
-  aspect-ratio: var(--ratio);
-  border-radius: var(--radius);
+.gl-skel-line {
+  width: min(320px, 70%);
+  height: 12px;
+  margin-bottom: 14px;
+  border-radius: 6px;
 }
 
-.gal-skel-line {
-  height: 11px;
-  border-radius: 4px;
-  margin-top: 11px;
+.gl-skel-line.wide {
+  width: min(220px, 55%);
+  height: 30px;
+  margin-bottom: 16px;
+  border-radius: 8px;
 }
 
-.gal-skel-line.short {
-  width: 45%;
-  margin-top: 8px;
+.gl-loading .gl-grid {
+  margin-top: 34px;
 }
 
-@keyframes gal-shimmer {
+.gl-skel-tile {
+  aspect-ratio: 1;
+  border-radius: var(--tile-r);
+}
+
+@keyframes gl-shimmer {
   from {
     transform: translateX(-100%);
   }
@@ -561,196 +1231,9 @@
   }
 }
 
-/* ---------------- states (login / empty / error) ---------------- */
-
-.gal-state {
-  max-width: clamp(540px, 38vw, 680px);
-  margin: clamp(24px, 6vw, 72px) 0;
-  padding-top: 22px;
-  border-top: 1px solid var(--line-strong);
-}
-
-.gal-state-flag {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 14px;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--text-2);
-}
-
-.gal-state-flag.warn {
-  color: var(--danger);
-}
-
-.gal-state-title {
-  margin: 0 0 12px;
-  font-family: var(--font-display);
-  font-size: clamp(22px, 1.9vw, 30px);
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.gal-state-desc {
-  margin: 0 0 14px;
-  font-size: clamp(14.5px, 0.95vw, 16.5px);
-  line-height: 1.8;
-  color: var(--text-2);
-}
-
-.gal-state-desc.dim {
-  color: var(--text-3);
-  font-size: clamp(13.5px, 0.85vw, 14.5px);
-}
-
-.gal-state code,
-.gal-steps code {
-  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  font-size: 0.88em;
-  padding: 2px 7px;
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  background: var(--surface);
-  color: var(--text);
-  white-space: nowrap;
-}
-
-.gal-steps {
-  list-style: none;
-  margin: 26px 0 0;
-  padding: 0;
-}
-
-.gal-steps li {
-  display: grid;
-  grid-template-columns: clamp(36px, 2.4vw, 44px) 1fr;
-  gap: 4px;
-  padding: clamp(16px, 1.1vw, 20px) 0;
-  border-top: 1px solid var(--line);
-}
-
-.gal-steps li:last-child {
-  border-bottom: 1px solid var(--line);
-}
-
-.gal-step-n {
-  font-family: var(--font-display);
-  font-size: clamp(22px, 1.6vw, 26px);
-  font-weight: 500;
-  line-height: 1.2;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-
-.gal-steps p {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin: 0;
-}
-
-.gal-steps strong {
-  font-size: clamp(14.5px, 0.95vw, 16.5px);
-  font-weight: 500;
-  line-height: 1.6;
-}
-
-.gal-steps p span {
-  font-size: clamp(13px, 0.85vw, 14.5px);
-  color: var(--text-2);
-}
-
-/* ---------------- buttons + inline error ---------------- */
-
-.gal-iconbtn {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--text-2);
-  cursor: pointer;
-  text-decoration: none;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.gal-iconbtn:hover {
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--text);
-}
-
-.gal-iconbtn.danger:hover {
-  background: var(--danger-bg);
-  color: var(--danger);
-}
-
-.gal-iconbtn.ghost {
-  border-color: var(--line-strong);
-  background: rgba(10, 10, 12, 0.6);
-  color: var(--text);
-}
-
-.gal-btn {
-  min-height: 40px;
-  padding: 0 18px;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
-}
-
-.gal-btn:disabled {
-  opacity: 0.55;
-  cursor: progress;
-}
-
-.gal-btn.danger {
-  background: var(--danger);
-  color: #fff;
-}
-
-.gal-btn.danger:hover:not(:disabled) {
-  background: var(--danger);
-}
-
-.gal-btn.ghost {
-  background: transparent;
-  color: var(--text-2);
-  border-color: var(--line-strong);
-}
-
-.gal-btn.ghost:hover:not(:disabled) {
-  color: var(--text);
-  border-color: rgba(255, 255, 255, 0.32);
-}
-
-/* ---------------- footer ---------------- */
-
-.gal-footer {
-  border-top: 1px solid var(--line);
-}
-
-.gal-footer-in {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 6px 28px;
-  padding-top: 20px;
-  padding-bottom: calc(24px + env(safe-area-inset-bottom));
-  font-size: 12px;
-  color: var(--text-3);
-}
-
 /* ---------------- toasts ---------------- */
 
-.gal-toasts {
+.gl-toasts {
   position: fixed;
   top: calc(env(safe-area-inset-top) + 14px);
   left: 0;
@@ -764,44 +1247,44 @@
   pointer-events: none;
 }
 
-.gal-toast {
+.gl-toast {
   display: flex;
   align-items: center;
   gap: 10px;
   width: fit-content;
-  max-width: min(440px, 100%);
-  padding: 10px 8px 10px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  background: #1b1b1f;
-  color: var(--text);
+  max-width: min(460px, 100%);
+  padding: 10px 8px 10px 13px;
+  border: 1px solid var(--g-line-strong);
+  border-radius: 12px;
+  background: var(--g-panel);
+  color: var(--g-text);
   font-size: 13.5px;
   line-height: 1.45;
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 14px 34px -10px var(--g-shadow);
   pointer-events: auto;
-  animation: gal-toast-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: gl-toast-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.gal-toast.error {
+.gl-toast.error {
   border-color: rgb(var(--danger-rgb) / 0.45);
 }
 
-.gal-toast-icon {
+.gl-toast-icon {
   display: inline-flex;
   flex: none;
-  color: var(--accent);
+  color: var(--success, var(--g-accent));
 }
 
-.gal-toast.error .gal-toast-icon {
-  color: var(--danger);
+.gl-toast.error .gl-toast-icon {
+  color: var(--g-danger);
 }
 
-.gal-toast-text {
+.gl-toast-text {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.gal-toast-close {
+.gl-toast-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -810,18 +1293,18 @@
   height: 26px;
   margin-left: 2px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
-  color: var(--text-3);
+  color: var(--g-text-3);
   cursor: pointer;
 }
 
-.gal-toast-close:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
+.gl-toast-close:hover {
+  background: var(--g-hover);
+  color: var(--g-text);
 }
 
-@keyframes gal-toast-in {
+@keyframes gl-toast-in {
   from {
     opacity: 0;
     transform: translateY(-8px) scale(0.98);
@@ -832,9 +1315,9 @@
   }
 }
 
-/* ---------------- modal ---------------- */
+/* ---------------- delete dialog ---------------- */
 
-.gal-modal-backdrop {
+.gl-dialog-backdrop {
   position: fixed;
   inset: 0;
   z-index: 200;
@@ -842,79 +1325,116 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(4, 4, 6, 0.72);
-  animation: gal-fadein 0.16s ease;
+  background: var(--theme-overlay);
+  animation: gl-fadein 0.16s ease;
 }
 
-.gal-modal {
+.gl-dialog {
   width: 100%;
-  max-width: 440px;
-  padding: 22px;
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
-  animation: gal-modal-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  max-width: 420px;
+  padding: 24px;
+  border: 1px solid var(--g-line-strong);
+  border-radius: 16px;
+  background: var(--g-panel);
+  color: var(--g-text);
+  box-shadow: 0 30px 70px -20px var(--g-shadow);
+  animation: gl-dialog-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.gal-modal-body {
+.gl-dialog-strip {
   display: flex;
   align-items: center;
-  gap: 14px;
+  margin-bottom: 18px;
 }
 
-.gal-modal-thumb {
-  flex: none;
-  width: 64px;
-  height: 64px;
-  border-radius: 8px;
+.gl-dialog-thumb {
+  width: 58px;
+  height: 58px;
+  border-radius: 10px;
   overflow: hidden;
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--g-raised);
+  box-shadow: 0 0 0 3px var(--g-panel);
 }
 
-.gal-modal-thumb img {
+.gl-dialog-thumb + .gl-dialog-thumb {
+  margin-left: -14px;
+}
+
+.gl-dialog-thumb img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.gal-modal-text {
-  min-width: 0;
+.gl-dialog-more {
+  margin-left: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--g-text-2);
+  font-variant-numeric: tabular-nums;
 }
 
-.gal-modal-title {
+.gl-dialog-title {
   margin: 0 0 4px;
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
   line-height: 1.3;
 }
 
-.gal-modal-file {
+.gl-dialog-file {
   margin: 0;
   font-size: 12.5px;
-  color: var(--text-3);
+  color: var(--g-text-3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
-.gal-modal-desc {
-  margin: 16px 0 20px;
+.gl-dialog-desc {
+  margin: 14px 0 20px;
   font-size: 13.5px;
   line-height: 1.7;
-  color: var(--text-2);
+  color: var(--g-text-2);
 }
 
-.gal-modal-actions {
+.gl-dialog-progress {
+  height: 4px;
+  margin: -6px 0 18px;
+  border-radius: 2px;
+  background: var(--g-line-strong);
+  overflow: hidden;
+}
+
+.gl-dialog-progress span {
+  display: block;
+  height: 100%;
+  background: var(--g-danger);
+  transition: width 0.2s ease;
+}
+
+.gl-dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
 
-@keyframes gal-modal-in {
+.gl-dialog .gl-btn:disabled {
+  cursor: progress;
+}
+
+@keyframes gl-fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes gl-dialog-in {
   from {
     opacity: 0;
     transform: translateY(8px) scale(0.98);
@@ -925,26 +1445,7 @@
   }
 }
 
-@media (max-width: 640px) {
-  .gal-modal-backdrop {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .gal-modal {
-    max-width: none;
-    padding: 20px 18px calc(18px + env(safe-area-inset-bottom));
-    border-radius: 16px 16px 0 0;
-    border-bottom: 0;
-    animation: gal-sheet-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-
-  .gal-modal-actions .gal-btn {
-    flex: 1;
-  }
-}
-
-@keyframes gal-sheet-in {
+@keyframes gl-sheet-in {
   from {
     transform: translateY(100%);
   }
@@ -953,61 +1454,103 @@
   }
 }
 
-/* ---------------- lightbox ---------------- */
+/* ---------------- viewer (dark in both modes) ---------------- */
 
-.gal-lb {
+.gl-view {
+  --g-text: #f3f2ee;
+  --g-text-2: #b6b5af;
+  --g-text-3: #8e8d88;
+  --g-line: rgba(255, 255, 255, 0.1);
+  --g-line-strong: rgba(255, 255, 255, 0.2);
+  --g-hover: rgba(255, 255, 255, 0.09);
+  --v-bg: #0b0b0d;
+  --v-glass: rgba(24, 24, 28, 0.7);
+
   position: fixed;
   inset: 0;
   z-index: 100;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "close title acts"
+    "stage stage stage"
+    "strip strip strip";
+  align-items: center;
+  column-gap: 8px;
+  padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 0 max(14px, env(safe-area-inset-left));
+  background: var(--v-bg);
+  color: var(--g-text);
+  color-scheme: dark;
+  animation: gl-fadein 0.18s ease;
+}
+
+.gl-view-close {
+  grid-area: close;
+}
+
+.gl-view-title {
+  grid-area: title;
   display: flex;
   flex-direction: column;
-  background: #08080a;
-  animation: gal-fadein 0.18s ease;
+  gap: 1px;
+  min-width: 0;
 }
 
-@keyframes gal-fadein {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.gl-view-title strong {
+  font-size: 14.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.gal-lb-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 4px
-    max(18px, env(safe-area-inset-left));
-}
-
-.gal-lb-count {
-  font-size: 13px;
-  color: var(--text-2);
+.gl-view-title span {
+  font-size: 12.5px;
+  color: var(--g-text-2);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.08em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.gal-lb-fig {
-  flex: 1;
-  min-height: 0;
-  margin: 0;
-  padding: 8px clamp(12px, 8vw, 88px);
+.gl-view-acts {
+  grid-area: acts;
+  display: flex;
+  gap: 2px;
+}
+
+.gl-view-acts .gl-icon.danger:hover {
+  background: rgb(var(--danger-rgb) / 0.18);
+  color: #ff8a8a; /* theme-ok: danger text on the always-dark viewer */
+}
+
+.gl-view-stage {
+  grid-area: stage;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  height: 100%;
+  min-height: 0;
+  padding: 10px 68px;
+}
+
+.gl-view-fig {
+  width: 100%;
+  height: 100%;
+  margin: 0;
   touch-action: pan-y;
 }
 
-.gal-lb-fig .smart-img {
+.gl-view-fig .smart-img {
   width: 100%;
   height: 100%;
-  background: transparent;
   min-height: 0;
+  background: transparent;
 }
 
-.gal-lb-fig img {
+.gl-view-fig img {
   display: block;
   width: 100%;
   height: 100%;
@@ -1016,8 +1559,8 @@
   user-select: none;
 }
 
-/* the full-area shimmer is too loud for a viewer; use a small spinner instead */
-.gal-lb-fig .smart-img-skeleton {
+/* the full-area shimmer is too loud for a viewer; a small spinner instead */
+.gl-view-fig .smart-img-skeleton {
   inset: auto;
   top: 50%;
   left: 50%;
@@ -1025,19 +1568,19 @@
   height: 28px;
   margin: -14px 0 0 -14px;
   border: 2px solid rgba(255, 255, 255, 0.14);
-  border-top-color: var(--accent);
+  border-top-color: rgba(255, 255, 255, 0.75);
   border-radius: 50%;
   background: none;
-  animation: gal-spin 0.8s linear infinite;
+  animation: gl-spin 0.8s linear infinite;
 }
 
-@keyframes gal-spin {
+@keyframes gl-spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-.gal-lb-nav {
+.gl-view-nav {
   position: absolute;
   top: 50%;
   z-index: 2;
@@ -1047,234 +1590,472 @@
   width: 44px;
   height: 44px;
   margin-top: -22px;
-  border: 1px solid var(--line-strong);
+  padding: 0;
+  border: 1px solid var(--g-line-strong);
   border-radius: 50%;
-  background: rgba(14, 14, 17, 0.72);
-  color: var(--text);
+  background: var(--v-glass);
+  color: var(--g-text);
   cursor: pointer;
   transition: background 0.15s;
 }
 
-.gal-lb-nav:hover {
-  background: rgba(34, 34, 40, 0.95);
+.gl-view-nav:hover {
+  background: rgba(48, 48, 54, 0.95);
 }
 
-.gal-lb-nav.prev {
-  left: max(14px, env(safe-area-inset-left));
+.gl-view-nav.prev {
+  left: 4px;
 }
 
-.gal-lb-nav.next {
-  right: max(14px, env(safe-area-inset-right));
+.gl-view-nav.next {
+  right: 4px;
 }
 
-.gal-lb-bar {
+.gl-view-strip {
+  grid-area: strip;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 14px 20px calc(18px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--line);
+  justify-content: safe center;
+  gap: 6px;
+  margin: 0 calc(-1 * max(14px, env(safe-area-inset-right))) 0 calc(-1 * max(14px, env(safe-area-inset-left)));
+  padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.gal-lb-info {
-  flex: 1;
-  min-width: 0;
+.gl-view-strip::-webkit-scrollbar {
+  display: none;
 }
 
-.gal-lb-actions {
-  display: flex;
+.gl-view-strip button {
+  position: relative;
   flex: none;
-  gap: 2px;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.gl-view-strip button:hover {
+  opacity: 0.85;
+}
+
+.gl-view-strip button.is-on {
+  opacity: 1;
+}
+
+.gl-view-strip button.is-on::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px #fff;
+}
+
+.gl-view-strip img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* ---------------- responsive ---------------- */
 
-@media (max-width: 900px) {
-  .gal-grid {
-    --col: 180px;
+@media (min-width: 1500px) {
+  .gl {
+    --side-w: 312px;
+    --gutter: 36px;
+    --tile: 188px;
   }
 
-  .gal-grid[data-density="l"] {
-    --col: 280px;
+  .gl-grid[data-density="s"] {
+    --tile: 124px;
+  }
+
+  .gl-grid[data-density="l"] {
+    --tile: 300px;
   }
 }
 
-@media (max-width: 640px) {
-  .gal {
-    --header-h: 52px;
+/* tablets and small laptops: the side panel becomes a header */
+@media (max-width: 1023px) {
+  .gl {
+    --bar-h: 60px;
+    --gutter: 20px;
   }
 
-  .gal-header-in {
-    gap: 12px;
+  .gl-shell {
+    display: block;
   }
 
-  .gal-back span {
+  .gl-side {
+    position: static;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "brand brand"
+      "profile usage"
+      "howto howto";
+    align-items: center;
+    gap: 18px 28px;
+    height: auto;
+    padding: 10px var(--gutter) 20px;
+    border-right: 0;
+    border-bottom: 1px solid var(--g-line);
+    overflow: visible;
+  }
+
+  .gl-side .gl-brandbar {
+    grid-area: brand;
+  }
+
+  .gl-profile {
+    grid-area: profile;
+    padding-top: 0;
+  }
+
+  .gl-usage {
+    grid-area: usage;
+  }
+
+  .gl-howto {
+    grid-area: howto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+  }
+
+  .gl-howto-title {
     display: none;
   }
 
-  .gal-back {
-    min-width: 40px;
+  .gl-howto-text {
+    flex: 1;
+    margin: 0;
+  }
+
+  .gl-side-foot {
+    display: none;
+  }
+
+  .gl-foot-note {
+    display: block;
+  }
+
+  .gl-intro {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "copy"
+      "reply"
+      "steps";
+    gap: 36px;
+    max-width: 640px;
+  }
+
+  .gl-intro .gl-dc {
+    max-width: 480px;
+  }
+}
+
+/* phones */
+@media (max-width: 640px) {
+  .gl {
+    --bar-h: 56px;
+    --gutter: 16px;
+    --tile-gap: 2px;
+    --tile-r: 0px;
+  }
+
+  .gl-side {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "brand"
+      "profile"
+      "usage"
+      "howto";
+    gap: 16px;
+    padding-bottom: 16px;
+  }
+
+  .gl-avatar {
+    width: 42px;
+    height: 42px;
+    font-size: 18px;
+  }
+
+  .gl-howto {
+    padding: 10px 10px 10px 14px;
+  }
+
+  .gl-howto-text {
+    font-size: 12.5px;
+  }
+
+  .gl-bar {
+    gap: 6px;
+    padding: 0 10px 0 var(--gutter);
+  }
+
+  .gl-search {
+    max-width: none;
+  }
+
+  /* sort: an icon that opens the phone's own picker */
+  .gl-sort {
     justify-content: center;
-    padding-right: 0;
+    width: 40px;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
   }
 
-  .gal-brand-name {
-    padding-left: 12px;
-    font-size: 14px;
+  .gl-sort select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    opacity: 0;
   }
 
-  .gal-user {
-    max-width: 130px;
+  .gl-seg {
+    display: none;
   }
 
-  .gal-username {
+  .gl-density-cycle {
+    display: inline-flex;
+  }
+
+  .gl-bar:has(.gl-search) .gl-pick {
+    width: 40px;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .gl-bar:has(.gl-search) .gl-pick span {
+    display: none;
+  }
+
+  .gl-bar-count b {
+    font-size: 17px;
+  }
+
+  .gl-bar-all {
+    margin-left: auto;
+    padding: 0 8px;
+  }
+
+  /* the selection actions sit at the bottom, where thumbs reach */
+  .gl-bar-actions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 0;
+    padding: 10px max(12px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    border-top: 1px solid var(--g-line-strong);
+    background: var(--g-panel);
+    box-shadow: 0 -14px 30px -18px var(--g-shadow);
+    animation: gl-sheet-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .gl-bar-actions .gl-btn {
+    min-height: 46px;
+  }
+
+  .gl[data-selecting] .gl-photos {
+    padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  }
+
+  /* photos run edge to edge, like the phone's own gallery */
+  .gl-photos {
+    padding: 0 0 56px;
+  }
+
+  .gl-day-h {
+    padding: 12px var(--gutter) 8px;
+    min-height: 50px;
+  }
+
+  .gl-day-h h2 {
+    font-size: 16px;
+  }
+
+  .gl-day-date {
     font-size: 12px;
   }
 
-  .gal-hint {
-    flex-basis: 100%;
-    margin-left: 0;
-  }
-
-  .gal-tools {
-    gap: 8px;
-  }
-
-  .gal-search {
-    flex-basis: 100%;
-  }
-
-  .gal-select {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .gal-select select {
-    width: 100%;
-  }
-
-  .gal-grid,
-  .gal-grid[data-density="m"] {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px 10px;
-  }
-
-  .gal-grid[data-density="s"] {
+  .gl-grid,
+  .gl-grid[data-density="m"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px 6px;
+    gap: var(--tile-gap);
   }
 
-  .gal-grid[data-density="l"] {
+  .gl-grid[data-density="s"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    --tile-gap: 2px;
+    --tile-r: 0px;
+  }
+
+  .gl-grid[data-density="l"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    --tile-gap: 2px;
+    --tile-r: 0px;
+  }
+
+  .gl-tile-check {
+    top: 6px;
+    left: 6px;
+    width: 22px;
+    height: 22px;
+  }
+
+  .gl-photos .gl-notice,
+  .gl-tip,
+  .gl-foot-note {
+    padding: 0 var(--gutter);
+  }
+
+  .gl-plain-top .gl-brandbar {
+    height: 56px;
+  }
+
+  .gl-steps {
     grid-template-columns: minmax(0, 1fr);
-    gap: 22px;
+    gap: 18px;
   }
 
-  .gal-footer-in {
-    flex-direction: column;
+  .gl-dc {
+    padding: 16px 16px 14px;
   }
 
-  .gal-lb-nav {
-    width: 40px;
-    height: 40px;
-    margin-top: -20px;
-    background: rgba(14, 14, 17, 0.55);
+  .gl-dialog-backdrop {
+    align-items: flex-end;
+    padding: 0;
   }
 
-  .gal-lb-nav.prev {
+  .gl-dialog {
+    max-width: none;
+    padding: 22px 18px calc(18px + env(safe-area-inset-bottom));
+    border-bottom: 0;
+    border-radius: 18px 18px 0 0;
+    animation: gl-sheet-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .gl-dialog-actions .gl-btn {
+    flex: 1;
+    min-height: 46px;
+  }
+
+  /* viewer: title on top, actions at the bottom, no strip */
+  .gl-view {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "close title"
+      "stage stage"
+      "acts acts";
+    column-gap: 4px;
+    padding: max(8px, env(safe-area-inset-top)) 8px 0;
+  }
+
+  .gl-view-stage {
+    padding: 6px 0;
+  }
+
+  .gl-view-nav {
+    width: 38px;
+    height: 38px;
+    margin-top: -19px;
+    background: rgba(24, 24, 28, 0.5);
+  }
+
+  .gl-view-nav.prev {
     left: 6px;
   }
 
-  .gal-lb-nav.next {
+  .gl-view-nav.next {
     right: 6px;
   }
 
-  .gal-lb-fig {
-    padding: 4px 0;
+  .gl-view-strip {
+    display: none;
   }
 
-  .gal-lb-bar {
-    padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+  .gl-view-acts {
+    justify-content: space-around;
+    padding: 6px 0 calc(8px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--g-line);
   }
 
-}
-
-/* very small phones: stack the viewer's info over its actions */
-@media (max-width: 380px) {
-  .gal-lb-bar {
+  .gl-view-acts .gl-icon {
     flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
+    gap: 3px;
+    width: auto;
+    min-width: 64px;
+    height: 56px;
   }
 
-  .gal-lb-actions {
-    justify-content: space-between;
+  .gl-view-acts .gl-icon > span {
+    display: block;
+    font-size: 11px;
   }
 }
 
 /* short landscape screens: give the photo the room */
 @media (max-height: 480px) and (orientation: landscape) {
-  .gal-lb-top {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 3;
+  .gl-view {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "close title acts"
+      "stage stage stage";
   }
 
-  .gal-lb-bar {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    max-width: none;
-    padding: 8px 16px;
-    background: linear-gradient(to top, rgba(8, 8, 10, 0.9), rgba(8, 8, 10, 0));
+  .gl-view-strip {
+    display: none;
+  }
+
+  .gl-view-acts {
+    padding: 0;
     border-top: 0;
-    z-index: 3;
   }
 
-  .gal-lb-fig {
-    padding: 0 64px;
-  }
-}
-
-@media (min-width: 1500px) {
-  .gal-wrap {
-    max-width: 1440px;
+  .gl-view-acts .gl-icon {
+    width: 40px;
+    min-width: 0;
+    height: 40px;
   }
 
-  .gal-grid {
-    --col: 230px;
-  }
-
-  .gal-grid[data-density="s"] {
-    --col: 150px;
-  }
-
-  .gal-grid[data-density="l"] {
-    --col: 380px;
+  .gl-view-acts .gl-icon > span {
+    display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gal *,
-  .gal *::before,
-  .gal *::after {
+  .gl *,
+  .gl *::before,
+  .gl *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 
-  .gal-card:hover .gal-thumb img {
+  .gl-tile:hover .gl-tile-btn img {
     transform: none;
   }
 }
 
-@media (min-width: 1900px) {
-  .gal-wrap {
-    max-width: 1680px;
+@media (forced-colors: active) {
+  .gl-tile[data-picked] .gl-tile-btn {
+    outline: 3px solid Highlight;
   }
 }
