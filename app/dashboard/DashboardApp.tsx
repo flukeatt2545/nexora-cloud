@@ -2,7 +2,7 @@
 
 import {
   Activity, ArrowRight, Ban, Bell, Calendar, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Clock, Cloud, Database, FileImage, Folder, KeyRound, LayoutDashboard,
-  Info, LogOut, Megaphone, Menu, Moon, Pencil, Save, Search, Send, Settings, ShieldAlert, ShieldCheck, SlidersHorizontal, Sun, Trash2, User, TriangleAlert, Star, Heart, Gift,
+  Circle, Diamond, Info, LogOut, Megaphone, Menu, Moon, Pencil, Save, Search, Send, Settings, ShieldAlert, ShieldCheck, SlidersHorizontal, Sun, Trash2, User, TriangleAlert, Star, Heart, Gift,
   UserCog, Users, UserPlus, X, Monitor, Smartphone, Globe, Copy, Upload, Maximize2, LayoutGrid, List, UploadCloud, FolderOpen, RefreshCw, FileText, Code, Download, Eye, Check, CheckCircle, CheckCircle2, Store, Package, PlayCircle, StopCircle, Zap, Plus, WalletCards, ReceiptText, TrendingUp, Share2, Server, ListChecks, CheckCheck, Link2, Mail, Bot, EyeOff, PauseCircle, Minus, SquareTerminal
 } from "lucide-react";
 import { FormEvent, Fragment, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -35,7 +35,7 @@ import SessionTtlField from "./SessionTtlField";
 import MailSettingsPanel from "./MailSettingsPanel";
 import SmartImage from "../components/SmartImage";
 import StoreClosedNotice from "../components/StoreClosedNotice";
-import UiShapeToggle from "../components/UiShapeToggle";
+import { applyUiShape, type UiShape } from "../uiShape";
 import Link from "next/link";
 
 // Admin pages about selling: they show a notice while the store is switched off.
@@ -51,6 +51,7 @@ type SettingsData = {
   brandName: string; siteTitle: string; siteTitleMode: "page" | "custom"; siteDescription: string; primaryColor: string;
   ogTitle?: string; ogDescription?: string; ogImageUrl?: string; ogCardType?: "summary_large_image" | "summary"; ogColor?: string;
   themeMode: "light" | "dark";
+  uiShape?: UiShape; // missing from an API older than the setting
   logoUrl: string; faviconUrl: string; authBackgroundUrl: string; authBackgroundTintEnabled: boolean;
   loginTitle: string; loginSubtitle: string; registerTitle: string; registerSubtitle: string;
   localLoginEnabled: boolean; registrationEnabled: boolean; discordEnabled: boolean;
@@ -258,7 +259,7 @@ const actionLabel: Record<string, string> = {
   "product.created": "เพิ่มสินค้า", "product.updated": "แก้ไขสินค้า", "product.deleted": "ลบสินค้า",
   "product.purchased": "ซื้อสินค้า", "product.downloaded": "ดาวน์โหลดสินค้า",
   "order.refunded": "คืนพอยท์คำสั่งซื้อ",
-  "settings.store_closed": "ปิดร้านค้า", "settings.store_opened": "เปิดร้านค้า",
+  "settings.store_closed": "ปิดร้านค้า", "settings.store_opened": "เปิดร้านค้า", "settings.ui_shape_changed": "เปลี่ยนรูปทรง UI",
 
   // ===== ไฟล์ =====
   "file.uploaded": "อัปโหลดไฟล์", "file.deleted": "ลบไฟล์",
@@ -851,7 +852,6 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
         <div className="sidebar-account">
           <span className="sidebar-avatar">{me.avatarUrl ? <SmartImage src={me.avatarUrl} alt="" compact fallback={<>{me.username.slice(0, 1).toUpperCase()}</>} /> : me.username.slice(0, 1).toUpperCase()}</span>
           <div><strong>{me.displayName || me.username}</strong>{roleBadge(me.role)}</div>
-          <UiShapeToggle />
           <button onClick={logout} aria-label="ออกจากระบบ"><LogOut size={18} /></button>
         </div>
       </aside>
@@ -4177,8 +4177,8 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
   const [lockdownReason, setLockdownReason] = useState("");
   const [loadFailed, setLoadFailed] = useState(false);
   const [uploading, setUploading] = useState("");
-  // The theme and colour last saved, to restore when leaving with unsaved previews.
-  const savedLook = useRef<{ themeMode?: string; primaryColor?: string }>({});
+  // The theme, colour and shape last saved, to restore when leaving with unsaved previews.
+  const savedLook = useRef<{ themeMode?: string; primaryColor?: string; uiShape?: UiShape }>({});
   
   useEffect(() => {
     if (activeTab !== "danger") return;
@@ -4188,7 +4188,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
   const fetchSettings = useCallback(() => api<SettingsData>("/api/admin/settings").then((loaded) => {
     // An API from before the idle time was kept in seconds only reports whole minutes.
     const value = { ...loaded, sessionTtlSeconds: loaded.sessionTtlSeconds ?? loaded.sessionTtlMinutes * 60 };
-    savedLook.current = { themeMode: value.themeMode, primaryColor: value.primaryColor };
+    savedLook.current = { themeMode: value.themeMode, primaryColor: value.primaryColor, uiShape: value.uiShape };
     setSettings(value);
     setSavedSettings(JSON.stringify(value));
   }).catch(() => setLoadFailed(true)), []);
@@ -4205,17 +4205,19 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
     }, 300);
     return () => window.clearTimeout(timer);
   }, [settingsLoaded, activeTab]);
-  // Show the theme and colour while editing, without caching them for the next page load
+  // Show the theme, colour and shape while editing, without caching them for the next page load
   // (that only happens on save). Leaving the page puts the saved look back.
   useEffect(() => {
     if (settings?.themeMode) document.documentElement.dataset.theme = settings.themeMode;
     applyThemeColor(settings?.primaryColor, false);
-  }, [settings?.themeMode, settings?.primaryColor]);
+    if (settings?.uiShape) applyUiShape(settings.uiShape, false);
+  }, [settings?.themeMode, settings?.primaryColor, settings?.uiShape]);
   useEffect(() => {
     const look = savedLook;
     return () => {
       if (look.current.themeMode) document.documentElement.dataset.theme = look.current.themeMode;
       if (look.current.primaryColor) applyThemeColor(look.current.primaryColor, false);
+      if (look.current.uiShape) applyUiShape(look.current.uiShape, false);
     };
   }, []);
   useScrollLock(Boolean(assetPreview));
@@ -4232,10 +4234,15 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
     }
     setSaveState("saving");
     try {
+      // The shape has its own route; the form's PATCH below returns it with everything else.
+      if (settings.uiShape && settings.uiShape !== savedLook.current.uiShape) {
+        await api("/api/admin/settings/ui-shape", { method: "PATCH", body: JSON.stringify({ uiShape: settings.uiShape }) });
+      }
       const value = await api<SettingsData>("/api/admin/settings", { method: "PATCH", body: JSON.stringify(settings) });
-      savedLook.current = { themeMode: value.themeMode, primaryColor: value.primaryColor };
+      savedLook.current = { themeMode: value.themeMode, primaryColor: value.primaryColor, uiShape: value.uiShape };
       try { window.localStorage.setItem("nexora-theme", value.themeMode); } catch { /* storage may be blocked */ }
       applyThemeColor(value.primaryColor);
+      if (value.uiShape) applyUiShape(value.uiShape);
       setSettings(value);
       setSavedSettings(JSON.stringify(value));
       window.dispatchEvent(new CustomEvent("nexora:settings-updated", { detail: value }));
@@ -4479,6 +4486,18 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                           <button type="button" role="radio" aria-checked={settings.themeMode === "dark"} className={settings.themeMode === "dark" ? "is-active" : ""} onClick={() => set("themeMode", "dark")}><Moon size={15} aria-hidden="true" /> มืด</button>
                         </div>
                       </div>
+                      {settings.uiShape && (
+                        <div className="msp-row is-inline">
+                          <div className="msp-label">
+                            <strong>รูปทรง UI</strong>
+                            <span>เหลี่ยม = มุมตัดเฉียงแบบหน้ายืนยันตัวตน ทุกคนเห็นเหมือนกัน</span>
+                          </div>
+                          <div className="gst-seg" role="radiogroup" aria-label="รูปทรง UI">
+                            <button type="button" role="radio" aria-checked={settings.uiShape === "round"} className={settings.uiShape === "round" ? "is-active" : ""} onClick={() => set("uiShape", "round")}><Circle size={15} aria-hidden="true" /> มน</button>
+                            <button type="button" role="radio" aria-checked={settings.uiShape === "square"} className={settings.uiShape === "square" ? "is-active" : ""} onClick={() => set("uiShape", "square")}><Diamond size={15} aria-hidden="true" /> เหลี่ยม</button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </section>
 

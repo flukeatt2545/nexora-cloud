@@ -47,6 +47,7 @@ type publicSettings struct {
 	OGColor             string   `json:"ogColor"`
 	PrimaryColor        string   `json:"primaryColor"`
 	ThemeMode           string   `json:"themeMode"`
+	UIShape             string   `json:"uiShape"` // "round" or "square"; saved by updateAdminUIShape
 	LogoURL             string   `json:"logoUrl"`
 	FaviconURL          string   `json:"faviconUrl"`
 	AuthBackgroundURL   string   `json:"authBackgroundUrl"`
@@ -440,7 +441,7 @@ func (s *server) loadSettings(ctx context.Context) (publicSettings, error) {
 		       github_enabled, session_ttl_seconds, site_title_mode, auth_background_tint_enabled,
 		       COALESCE(og_title, ''), COALESCE(og_description, ''), COALESCE(og_image_url, ''),
 		       COALESCE(og_card_type, 'summary_large_image'), COALESCE(og_color, '#5e5ee6'),
-		       store_enabled, store_closed_message
+		       store_enabled, store_closed_message, ui_shape
 		FROM system_settings WHERE id = 1
 	`).Scan(
 		&settings.BrandName, &settings.SiteTitle, &settings.SiteDescription, &settings.PrimaryColor, &settings.ThemeMode,
@@ -449,7 +450,7 @@ func (s *server) loadSettings(ctx context.Context) (publicSettings, error) {
 		&settings.LocalLoginEnabled, &settings.RegistrationEnabled, &settings.StoreSectionEnabled, &settings.QuickActionsEnabled, &settings.FooterEnabled, &settings.DiscordEnabled,
 		&settings.GoogleEnabled, &settings.GitHubEnabled, &settings.SessionTTLSeconds, &settings.SiteTitleMode, &settings.AuthBackgroundTint,
 		&settings.OGTitle, &settings.OGDescription, &settings.OGImageURL, &settings.OGCardType, &settings.OGColor,
-		&settings.StoreEnabled, &settings.StoreClosedMessage,
+		&settings.StoreEnabled, &settings.StoreClosedMessage, &settings.UIShape,
 	)
 	settings.SessionTTLMinutes = (settings.SessionTTLSeconds + 59) / 60
 	settings.DiscordConfigured = s.oauthConfigured(ctx, "discord")

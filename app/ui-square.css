@@ -1,9 +1,9 @@
 /*
  * Square UI: the verify page's look (sharp edges, top-right and bottom-left corners cut off) for
- * the whole site, switched per browser with the shape button (app/components/UiShapeToggle.tsx).
- * The corners come from build/postcss-square-ui.mjs, which gives every radius rule in app/**.css
- * a square-mode twin using the cut sizes below. This file holds those sizes and the few parts of
- * the look that are not a radius.
+ * the whole site. The admin picks it in Settings → General (app/uiShape.ts). The corners come
+ * from build/postcss-square-ui.mjs, which gives every radius rule in app/**.css a square-mode twin
+ * using the cut sizes below. This file holds those sizes and the few parts of the look that are
+ * not a radius.
  */
 
 /* Cut sizes. A browser without corner-shape draws plain square corners instead of rounded ones. */
@@ -25,36 +25,3 @@
     repeating-linear-gradient(115deg, transparent 0 18px, rgb(var(--primary-rgb) / .05) 18px 19px);
   background-size: auto;
 }
-
-/* The shape button. Each place it sits in adds its own spacing below. */
-.ui-shape-toggle {
-  flex: none;
-  width: 38px;
-  height: 38px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid var(--control-line);
-  border-radius: 10px;
-  background: var(--control-surface);
-  color: var(--theme-text-soft);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
-}
-.ui-shape-toggle:hover { color: var(--primary-ink); border-color: rgb(var(--primary-rgb) / .45); background: var(--control-surface-strong); }
-.ui-shape-toggle:focus-visible { outline: 2px solid rgb(var(--primary-rgb) / .6); outline-offset: 2px; }
-.ui-shape-toggle[aria-pressed="true"] { color: var(--primary-ink); border-color: rgb(var(--primary-rgb) / .35); }
-
-/* Public navbar: after the links at the right end (desktop), or just left of the menu button (phones, where the links drop down) */
-.nav-inner > .ui-shape-toggle { order: 1; margin-left: 14px; }
-@media (max-width: 900px) {
-  .nav-inner > .ui-shape-toggle { order: 0; width: 44px; height: 44px; margin-left: auto; margin-right: 8px; }
-}
-
-/* User dashboard top bar: as tall as the account button next to it */
-.utb-right > .ui-shape-toggle { width: 44px; height: 44px; }
-
-/* Admin sidebar: a fourth column beside the log-out button */
-.sidebar-account:has(> .ui-shape-toggle) { grid-template-columns: 40px minmax(0, 1fr) 34px 34px; }
-.sidebar-account > .ui-shape-toggle { width: 34px; height: 34px; border: 0; background: transparent; }

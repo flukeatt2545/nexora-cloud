@@ -1,5 +1,5 @@
 /*
- * Square UI (html[data-ui="square"], switched by app/uiShape.ts).
+ * Square UI (html[data-ui="square"], picked by the admin; see app/uiShape.ts).
  *
  * The site's 1,500-odd rounded corners are written as literal radii all over app/**.css, so
  * instead of a hand-kept list this PostCSS step adds, right after every rule that sets a radius,

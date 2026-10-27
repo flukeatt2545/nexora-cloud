@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { applyThemeColor } from "./themeColor";
+import { applyUiShape, type UiShape } from "./uiShape";
 import { getDocumentTitle, type SiteTitleMode } from "./pageTitle";
 import { API_BASE } from "./runtime";
 
@@ -18,6 +19,7 @@ type PublicSettings = {
   ogColor?: string;
   primaryColor?: string;
   themeMode?: "light" | "dark";
+  uiShape?: UiShape;
   logoUrl?: string;
   faviconUrl?: string;
 };
@@ -80,6 +82,8 @@ export default function ThemeLoader() {
           window.localStorage.setItem("nexora-theme", data.themeMode);
         }
         if (data?.primaryColor) applyThemeColor(data.primaryColor);
+        // An API from before the setting existed sends nothing: leave the shape as it is.
+        if (data?.uiShape) applyUiShape(data.uiShape);
         setSettings(data);
 
         // Dynamic Icon & Meta sync

@@ -20,7 +20,6 @@ import BotsView from "./BotsView";
 import SessionGuard, { EXPIRED_EVENT, useSessionEnded } from "../components/SessionGuard";
 import "./user-overview.css";
 import SmartImage from "../components/SmartImage";
-import UiShapeToggle from "../components/UiShapeToggle";
 import { POINTS_EVENT, broadcastPoints } from "../components/StorePurchase";
 import Link from "next/link";
 
@@ -525,8 +524,6 @@ export default function UserApp({ view }: { view: UserView }) {
               <span>เติมเงิน</span>
             </button>
           </div>}
-
-          <UiShapeToggle />
 
           <div className="utb-account-menu" ref={accountRef}>
             <button
