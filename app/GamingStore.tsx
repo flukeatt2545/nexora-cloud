@@ -4,9 +4,10 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import SmartImage from "./components/SmartImage";
 import NoCoverArt from "./components/NoCoverArt";
 import { coverCropStyle, type CoverCrop } from "./lib/coverCrop";
-import { ArrowRight, ArrowUpDown, Bell, Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Cloud, Eye, EyeOff, FolderOpen, Info, LayoutDashboard, LockKeyhole, Search, ShieldCheck, UserRound, X, Zap, TriangleAlert, Star, Heart, Gift, CheckCircle, Megaphone, Ban, ShoppingCart, Store } from "lucide-react";
+import { ArrowRight, ArrowUpDown, Bell, Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Cloud, Eye, EyeOff, FolderOpen, Info, LayoutDashboard, LockKeyhole, Search, ShieldCheck, UserRound, X, Zap, TriangleAlert, Star, Heart, Gift, CheckCircle, Megaphone, Ban, ShoppingCart, Store } from "lucide-react";
 import { applyThemeColor } from "./themeColor";
 import StoreClosedNotice, { STORE_CLOSED_DETAIL, STORE_CLOSED_TITLE, storeIsOpen } from "./components/StoreClosedNotice";
+import SystemNotice, { type SystemNoticeData } from "./components/SystemNotice";
 import SocialOAuthButton from "./SocialOAuthButton";
 import { asciiInputProps, hasNonAscii, latinAlphanumericInputProps } from "./lib/asciiInput";
 import SiteNavbar, { SESSION_EVENT } from "./components/SiteNavbar";
@@ -593,24 +594,6 @@ function ProductCard({ product, owned, onBuy }: { product: StoreProduct; owned: 
   );
 }
 
-function Toast({ notice, onClose }: { notice: Notice; onClose: () => void }) {
-  const Icon = notice.kind === "success" ? CircleCheck : notice.kind === "error" ? CircleAlert : Info;
-  useEffect(() => {
-    const close = (event: KeyboardEvent) => event.key === "Escape" && onClose();
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [onClose]);
-  return (
-    <div className="toast-region" role="status" aria-live="polite">
-      <div className={`toast ${notice.kind}`}>
-        <Icon size={20} aria-hidden="true" />
-        <span>{notice.message}</span>
-        <button type="button" className="toast-close" onClick={onClose} aria-label="ปิด"><X size={16} /></button>
-      </div>
-    </div>
-  );
-}
-
 /**
  * The ticker. `storeClosed` (the admin's closed message, "" for the default) adds the
  * store-closed notice to the queue, so pages say it in the ticker instead of a separate strip.
@@ -859,6 +842,8 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
   const [storeTab, setStoreTab] = useState<"shop" | "owned">("shop");
   const [accountOpen, setAccountOpen] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  // The same object until the notice changes, so the notice plays its entrance once.
+  const shownNotice = useMemo<SystemNoticeData | null>(() => (notice ? { kind: notice.kind, text: notice.message } : null), [notice]);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [settingsChecked, setSettingsChecked] = useState(false);
   const [homeAnnouncements, setHomeAnnouncements] = useState<Announcement[]>([]);
@@ -1047,12 +1032,6 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
       html.style.scrollBehavior = previousScrollBehavior;
     };
   }, [homePopupOpen, authOpen, menuOpen, homeAnnouncements]);
-
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(null), 4500);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
 
   // /api/auth/me has no numeric id, so the username identifies the signed-in account.
   const sessionUserKey = sessionUser?.username;
@@ -1419,7 +1398,7 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
           onNotify={notify}
         />
       )}
-      {notice && <Toast key={notice.id} notice={notice} onClose={() => setNotice(null)} />}
+      {shownNotice && <SystemNotice notice={shownNotice} onClose={() => setNotice(null)} />}
     </main>
   );
 }

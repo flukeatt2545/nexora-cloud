@@ -1,0 +1,245 @@
+/*
+ * The site's notice (SystemNotice.tsx): a card in the middle of the screen. It wipes in from the
+ * left with a light on its edge, the icon splits into red and cyan copies that snap back together,
+ * and the lines of text follow one after another; it wipes out to the right. The look follows the
+ * verify page (diagonal lines, colour split, a mono label). One tone per kind (--sn-tone) colours
+ * the edge, the tint, the bar, the icon and the button; everything else is a theme token, so it
+ * works in light and dark. In the square UI the 18px corners become cut corners like every card.
+ */
+
+.sn-overlay {
+  --sn-ghost-r: #ff2d6f;
+  --sn-ghost-b: #22d3ff;
+  --sn-blend: screen;
+  position: fixed;
+  inset: 0;
+  /* above every modal backdrop (the dashboard ones go up to 100060) */
+  z-index: 100500;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  pointer-events: none;
+}
+/* On white a screen blend disappears: the copies multiply, in deeper colours. */
+[data-theme="light"] .sn-overlay { --sn-ghost-r: #e0115f; --sn-ghost-b: #0891b2; --sn-blend: multiply; }
+
+.sn-success { --sn-tone: var(--success); --sn-rgb: var(--success-rgb); --sn-ink: var(--success-ink, var(--success)); }
+.sn-error { --sn-tone: var(--danger); --sn-rgb: var(--danger-rgb); --sn-ink: var(--danger); }
+.sn-info { --sn-tone: var(--primary); --sn-rgb: var(--primary-rgb); --sn-ink: var(--primary-ink); }
+
+/* Errors and persistent notices dim the page and wait; the others let the page be used. */
+.sn-overlay.is-waiting {
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--theme-overlay) 70%, transparent);
+  animation: sn-fade .12s ease-out both;
+}
+
+.sn-card {
+  position: relative;
+  width: min(540px, 100%);
+  min-height: 176px;
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgb(var(--sn-rgb) / .5);
+  border-radius: 18px;
+  background:
+    repeating-linear-gradient(115deg, transparent 0 14px, rgb(var(--sn-rgb) / .05) 14px 15px),
+    linear-gradient(90deg, rgb(var(--sn-rgb) / .2) 0%, transparent 48%),
+    var(--theme-elevated);
+  box-shadow: 0 30px 80px -24px var(--theme-shadow), 0 0 0 1px rgb(var(--sn-rgb) / .08);
+  color: var(--theme-text-strong);
+  font-family: var(--font-body);
+  pointer-events: auto;
+  animation: sn-wipe .26s cubic-bezier(.2, .8, .2, 1) .02s backwards;
+}
+.sn-overlay:not(.is-waiting) .sn-card { cursor: pointer; }
+/* The light riding the wipe's edge */
+.sn-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 90px;
+  transform: translateX(-100%);
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(var(--sn-rgb) / .7));
+  opacity: 0;
+  animation: sn-edge .26s cubic-bezier(.2, .8, .2, 1) .02s both;
+}
+/* One scan line down the card once it is in, like the verify card's */
+.sn-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 0;
+  height: 60px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, rgb(var(--sn-rgb) / .1) 70%, rgb(var(--sn-rgb) / .22) 99%, transparent);
+  transform: translateY(-100%);
+  animation: sn-scan .9s linear .3s both;
+}
+.sn-card > * { position: relative; z-index: 1; }
+
+/* The icon, with a red and a cyan copy that start apart and snap onto it */
+.sn-art {
+  border-right: 1px solid rgb(var(--sn-rgb) / .22);
+  background: radial-gradient(70% 70% at 50% 50%, rgb(var(--sn-rgb) / .18), transparent 70%);
+}
+.sn-layer { position: absolute; inset: 0; display: grid; place-items: center; }
+.sn-layer svg { width: 58px; height: 58px; stroke-width: 1.6; }
+.sn-base {
+  color: var(--sn-ink);
+  filter: drop-shadow(0 0 14px rgb(var(--sn-rgb) / .5));
+  animation: sn-art .44s ease-out .04s backwards;
+}
+.sn-ghost { opacity: 0; mix-blend-mode: var(--sn-blend); filter: blur(1px); }
+.sn-ghost.is-r { color: var(--sn-ghost-r); animation: sn-ghost-r .44s linear .04s both; }
+.sn-ghost.is-b { color: var(--sn-ghost-b); animation: sn-ghost-b .44s linear .04s both; }
+
+.sn-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 22px 22px 20px 20px;
+}
+.sn-code {
+  margin: 0;
+  color: var(--theme-text-soft);
+  font: 500 11px/1.4 "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: .18em;
+  animation: sn-up .2s ease-out .16s backwards;
+}
+.sn-title {
+  margin: 0;
+  color: var(--theme-text-strong);
+  font-family: var(--font-gaming, inherit);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  animation: sn-title .26s ease-out .18s backwards;
+}
+/* While a notice waits, its title twitches now and then like the verify page's headline. */
+.is-waiting .sn-title { animation: sn-title .26s ease-out .18s backwards, sn-tick 4.2s steps(1, end) 1.4s infinite; }
+.sn-bar {
+  display: block;
+  width: 56px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--sn-tone), color-mix(in srgb, var(--sn-tone) 45%, var(--primary)));
+  transform-origin: left center;
+  animation: sn-bar .2s ease-out .24s backwards;
+}
+.sn-text {
+  margin: 2px 0 0;
+  color: color-mix(in srgb, var(--theme-text-strong) 88%, transparent);
+  font-size: 15px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  animation: sn-up .2s ease-out .27s backwards;
+}
+.sn-actions { display: flex; justify-content: flex-end; margin-top: 8px; animation: sn-up .2s ease-out .32s backwards; }
+.sn-btn {
+  min-width: 96px;
+  min-height: 38px;
+  padding: 0 22px;
+  border: 1px solid rgb(var(--sn-rgb) / .55);
+  border-radius: 9px;
+  background: rgb(var(--sn-rgb) / .1);
+  color: var(--sn-ink);
+  font: 700 14px/1 var(--font-gaming, inherit);
+  letter-spacing: .04em;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), filter var(--transition-fast), transform .1s;
+}
+.sn-btn:hover { background: rgb(var(--sn-rgb) / .2); }
+.sn-btn:active { transform: translateY(1px); }
+.sn-btn:focus-visible { outline: 2px solid var(--sn-tone); outline-offset: 2px; }
+.sn-error .sn-btn { border-color: var(--danger); background: var(--danger); color: #fff; }
+.sn-error .sn-btn:hover { background: var(--danger); filter: brightness(1.1); }
+
+/* How long a notice that leaves by itself has left; the pointer on the card holds it */
+.sn-timer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--sn-tone);
+  transform-origin: left center;
+  animation: sn-timer var(--sn-hold, 2600ms) linear .5s both;
+}
+.sn-card:hover .sn-timer,
+.sn-card:focus-within .sn-timer { animation-play-state: paused; }
+
+.sn-overlay.is-leaving { animation: sn-fade-out .18s ease-in both; }
+.sn-overlay.is-leaving .sn-card { animation: sn-wipe-out .18s ease-in both; }
+.sn-overlay.is-leaving .sn-card::after,
+.sn-overlay.is-leaving .sn-card::before { display: none; }
+
+@media (max-width: 520px) {
+  .sn-card { grid-template-columns: 84px minmax(0, 1fr); min-height: 0; }
+  .sn-layer svg { width: 42px; height: 42px; }
+  .sn-body { padding: 18px 16px 16px 14px; }
+  .sn-title { font-size: 22px; }
+  .sn-text { font-size: 14px; }
+}
+
+@keyframes sn-fade { from { opacity: 0; } }
+@keyframes sn-fade-out { to { opacity: 0; } }
+@keyframes sn-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes sn-wipe-out { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 0 100%); } }
+@keyframes sn-edge { 0% { left: 0; opacity: 1; } 85% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+@keyframes sn-scan { to { transform: translateY(400%); } }
+@keyframes sn-art {
+  0% { opacity: 0; transform: translateX(-26px) scale(1.06); filter: blur(8px); }
+  30% { opacity: 1; filter: blur(4px); clip-path: inset(0 0 55% 0); }
+  38% { clip-path: inset(40% 0 0 0); transform: translateX(8px); }
+  50% { clip-path: inset(0 0 0 0); transform: translateX(-3px); filter: blur(1.5px); }
+  100% { opacity: 1; transform: none; filter: blur(0); clip-path: inset(0 0 0 0); }
+}
+@keyframes sn-ghost-r {
+  0% { opacity: .9; transform: translate(-22px, 3px); }
+  25% { transform: translate(14px, -4px); }
+  45% { opacity: .8; transform: translate(-8px, 2px); }
+  65% { transform: translate(4px, 0); }
+  100% { opacity: 0; transform: none; }
+}
+@keyframes sn-ghost-b {
+  0% { opacity: .9; transform: translate(22px, -3px); }
+  25% { transform: translate(-14px, 4px); }
+  45% { opacity: .8; transform: translate(8px, -2px); }
+  65% { transform: translate(-4px, 0); }
+  100% { opacity: 0; transform: none; }
+}
+@keyframes sn-title {
+  from { opacity: 0; transform: translateX(-12px); text-shadow: -5px 0 var(--sn-ghost-r), 5px 0 var(--sn-ghost-b); }
+  60% { opacity: 1; text-shadow: -2px 0 var(--sn-ghost-r), 2px 0 var(--sn-ghost-b); }
+  to { text-shadow: 0 0 0 transparent; }
+}
+@keyframes sn-tick {
+  0%, 4%, 100% { transform: none; text-shadow: none; }
+  1% { transform: translateX(-2px) skewX(-6deg); text-shadow: 2px 0 var(--sn-ghost-r), -2px 0 var(--sn-ghost-b); }
+  2% { transform: translateX(3px); text-shadow: -2px 0 var(--sn-ghost-r), 2px 0 var(--sn-ghost-b); }
+  3% { transform: translateX(-1px); text-shadow: none; }
+}
+@keyframes sn-bar { from { transform: scaleX(0); } }
+@keyframes sn-up { from { opacity: 0; transform: translateY(8px); } }
+@keyframes sn-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* Reduced motion: no wipe, glitch or twitch; the countdown still runs so the notice still goes. */
+@media (prefers-reduced-motion: reduce) {
+  .sn-overlay,
+  .sn-overlay *:not(.sn-timer),
+  .sn-card::after,
+  .sn-card::before { animation: none !important; }
+  .sn-ghost,
+  .sn-card::after,
+  .sn-card::before { display: none; }
+}

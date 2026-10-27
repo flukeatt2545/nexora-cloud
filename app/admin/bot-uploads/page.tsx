@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import SystemNotice, { type SystemNoticeData } from "../../components/SystemNotice";
 import "./bot-uploads.css";
 
 type Item = {
@@ -47,7 +48,7 @@ export default function AdminBotUploadsPage() {
   const [applied, setApplied] = useState({ q: "", guild_id: "" });
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<SystemNoticeData | null>(null);
 
   const load = useCallback(
     async (offset: number, append: boolean) => {
@@ -104,11 +105,9 @@ export default function AdminBotUploadsPage() {
       if (!res.ok) throw new Error("delete failed");
       setItems((prev) => prev.filter((it) => it.id !== id));
       setTotal((prev) => Math.max(0, prev - 1));
-      setNotice("ลบรูปเรียบร้อยแล้ว");
-      window.setTimeout(() => setNotice(""), 3000);
+      setNotice({ kind: "success", text: "ลบรูปเรียบร้อยแล้ว" });
     } catch {
-      setNotice("ลบไม่สำเร็จ ลองใหม่อีกครั้ง");
-      window.setTimeout(() => setNotice(""), 3000);
+      setNotice({ kind: "error", text: "ลบไม่สำเร็จ ลองใหม่อีกครั้ง" });
     } finally {
       setDeletingId(null);
       setConfirmId(null);
@@ -164,7 +163,7 @@ export default function AdminBotUploadsPage() {
         </button>
       </form>
 
-      {notice ? <p className="abu-notice" role="status">{notice}</p> : null}
+      {notice && <SystemNotice notice={notice} onClose={() => setNotice(null)} />}
 
       {forbidden ? (
         <div className="abu-empty">

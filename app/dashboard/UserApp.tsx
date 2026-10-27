@@ -2,7 +2,7 @@
 
 import {
   Cloud, Eye, EyeOff, FolderOpen, Info, LayoutDashboard, LogOut, Menu, ShieldCheck, User, X, Globe, Smartphone, Monitor, KeyRound, Check, Clock3, Zap, ChevronDown, Coins, Lock, Store, ReceiptText, RefreshCw, ChevronLeft, ChevronRight, Plus, ArrowUpRight, ExternalLink, Database, Mail, ShoppingCart, Undo2,
-  FileImage, FileVideo, FileAudio, FileText, FileArchive, File as FileIcon, CircleCheck, CircleAlert, Circle, Upload, Bot,
+  FileImage, FileVideo, FileAudio, FileText, FileArchive, File as FileIcon, CircleCheck, Circle, Upload, Bot,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -20,6 +20,7 @@ import BotsView from "./BotsView";
 import SessionGuard, { EXPIRED_EVENT, useSessionEnded } from "../components/SessionGuard";
 import "./user-overview.css";
 import SmartImage from "../components/SmartImage";
+import SystemNotice from "../components/SystemNotice";
 import { POINTS_EVENT, broadcastPoints } from "../components/StorePurchase";
 import Link from "next/link";
 
@@ -114,26 +115,6 @@ function parseUserAgent(ua: string) {
   else if (ua.includes("Firefox/")) browser = "Firefox";
   if (os === "Windows" || os === "macOS" || os === "Linux") Icon = Monitor;
   return { browser, os, icon: Icon };
-}
-
-function UserFeedbackToast({ notice, onClose }: { notice: FeedbackNotice; onClose: () => void }) {
-  useEffect(() => {
-    const close = (event: KeyboardEvent) => event.key === "Escape" && onClose();
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [onClose]);
-  return (
-    <div className="toast-region" role="status" aria-live="polite">
-      <div className={`toast ${notice.kind}`}>
-        {notice.kind === "success" ? <CircleCheck size={20} aria-hidden="true" /> : <CircleAlert size={20} aria-hidden="true" />}
-        <span>
-          {notice.title ? <strong>{notice.title}</strong> : null}
-          {notice.text}
-        </span>
-        <button type="button" className="toast-close" onClick={onClose} aria-label="ปิด"><X size={16} /></button>
-      </div>
-    </div>
-  );
 }
 
 function UserConfirmDialog({ request, busy, onClose, onConfirm }: { request: ConfirmRequest; busy: boolean; onClose: () => void; onConfirm: () => void }) {
@@ -433,12 +414,6 @@ export default function UserApp({ view }: { view: UserView }) {
       .catch(() => { if (!wasSignedIn.current) window.location.href = "/"; })
       .finally(() => setLoading(false));
   }, [view]);
-
-  useEffect(() => {
-    if (!notice || notice.persistent) return;
-    const timer = window.setTimeout(() => setNotice(null), 4000);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
 
   // The notice was read from the URL already (socialNotice); clear it from the address bar.
   useEffect(() => {
@@ -883,7 +858,7 @@ export default function UserApp({ view }: { view: UserView }) {
         />
       )}
 
-      {notice && <UserFeedbackToast notice={notice} onClose={() => setNotice(null)} />}
+      {notice && <SystemNotice notice={notice} onClose={() => setNotice(null)} />}
       <SessionGuard />
       {confirmRequest && <UserConfirmDialog request={confirmRequest} busy={confirmBusy} onClose={() => setConfirmRequest(null)} onConfirm={async () => {
         setConfirmBusy(true);

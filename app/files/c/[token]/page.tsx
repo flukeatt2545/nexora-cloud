@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AlertCircle,
   ArrowLeft,
   Calendar,
   Check,
@@ -40,6 +39,7 @@ import LinkGone, { SHARE_TOKEN, linkGoneKind, type LinkGoneKind } from "../../..
 import "../../../dashboard/file-library-122.css";
 import "../../file-category-share.css";
 import SmartImage from "../../../components/SmartImage";
+import SystemNotice, { type SystemNoticeData } from "../../../components/SystemNotice";
 import PdfPreview from "../../../components/PdfPreview";
 
 type SharedFolder = {
@@ -213,7 +213,7 @@ export default function PublicCategoryPage() {
   const [data, setData] = useState<SharedCategory | null>(null);
   const [failedKind, setErrorKind] = useState<LinkGoneKind>("gone");
   const [attempt, setAttempt] = useState(0);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<SystemNoticeData | null>(null);
   const [fetching, setLoading] = useState(true);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [query, setQuery] = useState("");
@@ -313,9 +313,7 @@ export default function PublicCategoryPage() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        if (notice) {
-          setNotice("");
-        } else if (preview) {
+        if (preview) {
           if (preview.url) URL.revokeObjectURL(preview.url);
           setPreview(null);
         } else if (folderUnlockTarget) {
@@ -327,7 +325,7 @@ export default function PublicCategoryPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, preview, notice, folderUnlockTarget]);
+  }, [active, preview, folderUnlockTarget]);
 
   const files = useMemo(() => data?.files ?? [], [data]);
   const folders = useMemo(() => data?.folders ?? [], [data]);
@@ -506,7 +504,7 @@ export default function PublicCategoryPage() {
     e.preventDefault();
     if (!folderUnlockTarget || folderUnlockBusy) return;
     setFolderUnlockBusy(true);
-    setNotice("");
+    setNotice(null);
     try {
       const res = await fetch(
         `${API_BASE}/api/public/file-categories/${encodeURIComponent(token)}/folders/${folderUnlockTarget.id}/unlock`,
@@ -528,7 +526,7 @@ export default function PublicCategoryPage() {
       setFolderUnlockTarget(null);
       setFolderPasswordInput("");
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "ปลดล็อกแฟ้มไม่สำเร็จ");
+      setNotice({ kind: "error", text: err instanceof Error ? err.message : "ปลดล็อกแฟ้มไม่สำเร็จ" });
     } finally {
       setFolderUnlockBusy(false);
     }
@@ -576,7 +574,7 @@ export default function PublicCategoryPage() {
     }
     inFlight.current = true;
     setPreviewBusyId(item.id);
-    setNotice("");
+    setNotice(null);
     try {
       const blob = await fetchFileBlob(item, true, usePassword);
       let textContent: string | undefined = undefined;
@@ -599,7 +597,7 @@ export default function PublicCategoryPage() {
       });
       closePassword();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "เปิดตัวอย่างไม่สำเร็จ");
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : "เปิดตัวอย่างไม่สำเร็จ" });
       if (item.passwordRequired) {
         setPasswordMode("preview");
         setActive(item);
@@ -620,7 +618,7 @@ export default function PublicCategoryPage() {
     }
     inFlight.current = true;
     setBusyId(item.id);
-    setNotice("");
+    setNotice(null);
     try {
       const blob = await fetchFileBlob(item, false, usePassword);
       const url = URL.createObjectURL(blob);
@@ -633,7 +631,7 @@ export default function PublicCategoryPage() {
       window.setTimeout(() => setDoneId((current) => (current === item.id ? null : current)), 2200);
       closePassword();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "ดาวน์โหลดไม่สำเร็จ");
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : "ดาวน์โหลดไม่สำเร็จ" });
       if (item.passwordRequired) {
         setPasswordMode("download");
         setActive(item);
@@ -658,7 +656,7 @@ export default function PublicCategoryPage() {
   async function downloadAll() {
     if (inFlight.current || batching || unlocked.length === 0) return;
     setBatching(true);
-    setNotice("");
+    setNotice(null);
     try {
       for (let index = 0; index < unlocked.length; index += 1) {
         const item = unlocked[index];
@@ -667,7 +665,7 @@ export default function PublicCategoryPage() {
         if (index < unlocked.length - 1) await sleep(450);
       }
       if (files.some((item) => item.passwordRequired)) {
-        setNotice("ดาวน์โหลดไฟล์ที่ไม่มีรหัสผ่านแล้ว ไฟล์ที่ล็อกยังต้องกดทีละไฟล์");
+        setNotice({ kind: "info", text: "ดาวน์โหลดไฟล์ที่ไม่มีรหัสผ่านแล้ว ไฟล์ที่ล็อกยังต้องกดทีละไฟล์", persistent: true });
       }
     } finally {
       setBatching(false);
@@ -1052,54 +1050,7 @@ export default function PublicCategoryPage() {
         </div>
       )}
 
-      {/* Notice / Alert Modal Popup */}
-      {notice && (
-        <div className="fcs-modal" onClick={() => setNotice("")} role="presentation">
-          <div
-            className="fcs-dialog fcs-notice-dialog"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="fcs-notice-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="fcs-dialog-head">
-              <div className="fcs-dialog-title-group">
-                <div className="fcs-dialog-badge alert" aria-hidden="true">
-                  <AlertCircle size={20} />
-                </div>
-                <div>
-                  <strong id="fcs-notice-title">การแจ้งเตือน</strong>
-                  <small className="fcs-dialog-subtitle">ข้อความจากระบบ</small>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="fcs-icon-btn"
-                onClick={() => setNotice("")}
-                aria-label="ปิด"
-                title="ปิด"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="fcs-notice-body">
-              <p>{notice}</p>
-            </div>
-
-            <div className="fcs-dialog-actions fcs-notice-actions">
-              <button
-                type="button"
-                autoFocus
-                className="fcs-primary fcs-notice-btn"
-                onClick={() => setNotice("")}
-              >
-                <span>ตกลง</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {notice && <SystemNotice notice={notice} onClose={() => setNotice(null)} />}
 
       {/* Rich Multi-Format Preview Modal */}
       {preview && (

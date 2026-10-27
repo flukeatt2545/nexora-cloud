@@ -13,6 +13,7 @@ import {
 import { ChangeEvent, DragEvent, FormEvent, type TouchEvent as ReactTouchEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { API_BASE } from "../runtime";
 import SmartImage from "../components/SmartImage";
+import SystemNotice from "../components/SystemNotice";
 import PdfPreview from "../components/PdfPreview";
 import ScopeShareDialog, { type ShareScope } from "./ScopeShareDialog";
 
@@ -333,20 +334,6 @@ export default function FileLibraryView({
   const [batchTargetCategory, setBatchTargetCategory] = useState<string>("none");
   const [batchDeleteModalOpen, setBatchDeleteModalOpen] = useState(false);
   const [batchBusy, setBatchBusy] = useState(false);
-
-  useEffect(() => {
-    if (!notice) return;
-    // A toast, not a dialog: it goes away by itself (errors stay a little longer to be read).
-    const t = setTimeout(() => setNotice(null), notice.kind === "success" ? 3500 : 7000);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setNotice(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [notice]);
 
   function flash(next: FileNotice) {
     setNotice(next);
@@ -4209,16 +4196,7 @@ export default function FileLibraryView({
         </div>
       )}
 
-      {/* Notice toast */}
-      {notice && (
-        <div className={`fl-toast is-${notice.kind}`} role={notice.kind === "success" ? "status" : "alert"} aria-live={notice.kind === "success" ? "polite" : "assertive"}>
-          <span className="fl-toast-icon" aria-hidden="true">
-            {notice.kind === "success" ? <CheckCircle2 size={19} /> : <AlertCircle size={19} />}
-          </span>
-          <p>{notice.text}</p>
-          <button type="button" onClick={() => setNotice(null)} aria-label="ปิดการแจ้งเตือน"><X size={16} /></button>
-        </div>
-      )}
+      {notice && <SystemNotice notice={notice} onClose={() => setNotice(null)} />}
     </div>
   );
 }

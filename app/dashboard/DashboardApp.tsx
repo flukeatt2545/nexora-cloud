@@ -35,6 +35,7 @@ import SessionTtlField from "./SessionTtlField";
 import MailSettingsPanel from "./MailSettingsPanel";
 import SmartImage from "../components/SmartImage";
 import StoreClosedNotice from "../components/StoreClosedNotice";
+import SystemNotice from "../components/SystemNotice";
 import { applyUiShape, type UiShape } from "../uiShape";
 import Link from "next/link";
 
@@ -905,7 +906,7 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
           {view === "topup-settings" && <TopupSettingsView notify={setNotice} />}
         </div>
       </section>
-      {notice && <FeedbackToast notice={notice} onClose={() => setNotice(null)} />}
+      {notice && <SystemNotice notice={notice} onClose={() => setNotice(null)} />}
       <SessionGuard />
       {confirmRequest && <ConfirmDialog request={confirmRequest} busy={confirmBusy} onClose={() => setConfirmRequest(null)} onConfirm={async () => {
         setConfirmBusy(true);
@@ -920,27 +921,6 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
 
 export function PageHeading({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
   return <div className="dash-heading"><p>{eyebrow}</p><h1>{title}</h1><span>{description}</span></div>;
-}
-
-function FeedbackToast({ notice, onClose }: { notice: { kind: "success" | "error"; text: string }; onClose: () => void }) {
-  useEffect(() => {
-    const close = (event: KeyboardEvent) => event.key === "Escape" && onClose();
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [onClose]);
-  useEffect(() => {
-    const timer = window.setTimeout(onClose, notice.kind === "success" ? 3200 : 5200);
-    return () => window.clearTimeout(timer);
-  }, [notice, onClose]);
-  return (
-    <div className="toast-region" role="status" aria-live="polite">
-      <div className={`toast ${notice.kind}`}>
-        {notice.kind === "success" ? <CircleCheck size={20} aria-hidden="true" /> : <CircleAlert size={20} aria-hidden="true" />}
-        <span>{notice.text}</span>
-        <button type="button" className="toast-close" onClick={onClose} aria-label="ปิด"><X size={16} /></button>
-      </div>
-    </div>
-  );
 }
 
 function ConfirmDialog({ request, busy, onClose, onConfirm }: { request: ConfirmRequest; busy: boolean; onClose: () => void; onConfirm: () => void }) {

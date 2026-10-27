@@ -6153,38 +6153,6 @@ button.fl-folder-tab {
   .fl-preview-image-stage img { max-height: calc(100dvh - 190px); }
 }
 
-/* Notices are a toast at the top, not a dialog: no backdrop, nothing to dismiss to carry on. */
-.fl-toast {
-  position: fixed;
-  top: max(16px, env(safe-area-inset-top));
-  left: 50%;
-  z-index: 13000;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: max-content;
-  max-width: min(480px, calc(100vw - 24px));
-  padding: 10px 8px 10px 14px;
-  border: 1px solid var(--control-line);
-  border-radius: 12px;
-  background: var(--theme-elevated);
-  box-shadow: 0 10px 30px rgb(0 0 0 / .18);
-  color: var(--theme-text-strong);
-  transform: translateX(-50%);
-  animation: fl-toast-in .2s ease-out;
-}
-.fl-toast.is-success { box-shadow: inset 3px 0 0 var(--success-ink, #34d399), 0 10px 30px rgb(0 0 0 / .18); }
-.fl-toast.is-error { box-shadow: inset 3px 0 0 var(--danger), 0 10px 30px rgb(0 0 0 / .18); }
-.fl-toast-icon { display: grid; place-items: center; flex: 0 0 auto; }
-.fl-toast.is-success .fl-toast-icon { color: var(--success-ink, #34d399); } /* theme-ok: the toast follows the theme */
-.fl-toast.is-error .fl-toast-icon { color: var(--danger); }
-.fl-toast p { margin: 0; flex: 1; min-width: 0; font-size: 14.5px; line-height: 1.45; }
-.fl-toast button { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; padding: 0; border: 0; border-radius: 7px; background: none; color: var(--theme-text-soft); cursor: pointer; }
-.fl-toast button:hover { background: var(--theme-hover); color: var(--theme-text-strong); }
-.fl-toast button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-@keyframes fl-toast-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
-@media (prefers-reduced-motion: reduce) { .fl-toast { animation: none; } }
-
 /* PDF pages are sized from the stage width before its scrollbar appears; never let one overflow. */
 .fl-preview-pdf-page { max-width: 100%; }
 .fl-preview-pdf-page canvas { display: block; max-width: 100%; height: auto !important; }
