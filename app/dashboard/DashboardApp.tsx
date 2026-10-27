@@ -35,6 +35,7 @@ import SessionTtlField from "./SessionTtlField";
 import MailSettingsPanel from "./MailSettingsPanel";
 import SmartImage from "../components/SmartImage";
 import StoreClosedNotice from "../components/StoreClosedNotice";
+import UiShapeToggle from "../components/UiShapeToggle";
 import Link from "next/link";
 
 // Admin pages about selling: they show a notice while the store is switched off.
@@ -850,6 +851,7 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
         <div className="sidebar-account">
           <span className="sidebar-avatar">{me.avatarUrl ? <SmartImage src={me.avatarUrl} alt="" compact fallback={<>{me.username.slice(0, 1).toUpperCase()}</>} /> : me.username.slice(0, 1).toUpperCase()}</span>
           <div><strong>{me.displayName || me.username}</strong>{roleBadge(me.role)}</div>
+          <UiShapeToggle />
           <button onClick={logout} aria-label="ออกจากระบบ"><LogOut size={18} /></button>
         </div>
       </aside>
