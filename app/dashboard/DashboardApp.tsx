@@ -687,12 +687,6 @@ export default function DashboardApp({ view: initialView }: { view: DashboardVie
   }, [view]);
 
   useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(null), 4000);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
-
-  useEffect(() => {
     if (!menuOpen || !window.matchMedia("(max-width: 980px)").matches) return;
 
     const scrollY = window.scrollY;
@@ -4324,7 +4318,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
 
   // One heading for the page: the tab's name, with the settings area as the small label above.
   const tabHeading: Record<string, [string, string]> = {
-    general: ["ตั้งค่าทั่วไป", "ชื่อเว็บไซต์ หน้าตา ร้านค้า และรูปแบรนด์"],
+    general: ["ตั้งค่าทั่วไป", "ชื่อเว็บ หน้าตา ร้านค้า และรูปของเว็บ"],
     auth: ["ตั้งค่าการเข้าสู่ระบบ", "ข้อความและนโยบายการเข้าสู่ระบบและสมัครสมาชิก"],
     social: ["ตั้งค่า Social Login", "เข้าสู่ระบบด้วย Discord, Google หรือ GitHub"],
     notifications: ["ตั้งค่าการแจ้งเตือน", "ส่งเหตุการณ์สำคัญเข้า Discord"],
@@ -4373,14 +4367,14 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                       <span className="msp-mark"><Globe size={18} /></span>
                       <div>
                         <h3>ข้อมูลเว็บไซต์</h3>
-                        <p>ชื่อและคำอธิบายของเว็บ</p>
+                        <p>ชื่อเว็บและคำอธิบายสั้นๆ</p>
                       </div>
                     </header>
                     <div className="msp-rows">
                       <div className="msp-row">
                         <label className="msp-label" htmlFor="brand-name">
                           <strong>ชื่อแบรนด์</strong>
-                          <span>ขึ้นบนแถบเมนู</span>
+                          <span>แสดงบนแถบเมนู</span>
                         </label>
                         <div className="gst-field">
                           <input id="brand-name" className="msp-input" maxLength={50} autoComplete="organization" value={settings.brandName} onChange={(e) => set("brandName", e.target.value)} />
@@ -4390,12 +4384,11 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                       <div className="msp-row is-top">
                         <label className="msp-label" htmlFor="site-title">
                           <strong>ชื่อบนแท็บเบราว์เซอร์</strong>
-                          <span>ต่อท้ายชื่อหน้า หรือใช้ชื่อเดียวทุกหน้า</span>
                         </label>
                         <div className="gst-field">
                           <div className="gst-seg" role="radiogroup" aria-label="รูปแบบชื่อบนแท็บ">
                             <button type="button" role="radio" aria-checked={settings.siteTitleMode === "page"} className={settings.siteTitleMode === "page" ? "is-active" : ""} onClick={() => set("siteTitleMode", "page")}>ต่อท้ายชื่อหน้า</button>
-                            <button type="button" role="radio" aria-checked={settings.siteTitleMode === "custom"} className={settings.siteTitleMode === "custom" ? "is-active" : ""} onClick={() => set("siteTitleMode", "custom")}>ชื่อเดียวทุกหน้า</button>
+                            <button type="button" role="radio" aria-checked={settings.siteTitleMode === "custom"} className={settings.siteTitleMode === "custom" ? "is-active" : ""} onClick={() => set("siteTitleMode", "custom")}>ใช้ชื่อเดียวทุกหน้า</button>
                           </div>
                           <input id="site-title" className="msp-input" maxLength={80} value={settings.siteTitle} onChange={(e) => set("siteTitle", e.target.value)} />
                           <div className="gst-tab" aria-label={`ตัวอย่างบนแท็บ: ${tabPreview}`}>
@@ -4411,7 +4404,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                       <div className="msp-row is-top">
                         <label className="msp-label" htmlFor="site-description">
                           <strong>คำอธิบายเว็บไซต์</strong>
-                          <span>ขึ้นใน Google และตอนแชร์ลิงก์</span>
+                          <span>แสดงใน Google และตอนแชร์ลิงก์</span>
                         </label>
                         <div className="gst-field">
                           <textarea id="site-description" className="msp-input gst-textarea" rows={3} maxLength={180} value={settings.siteDescription} onChange={(e) => set("siteDescription", e.target.value)} />
@@ -4427,14 +4420,14 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                       <span className="msp-mark"><SlidersHorizontal size={18} /></span>
                       <div>
                         <h3>หน้าตา</h3>
-                        <p>หน้านี้เปลี่ยนให้ดูก่อน คนอื่นเห็นหลังกดบันทึก</p>
+                        <p>ลองเลือกดูได้ก่อน ใช้จริงตอนกดบันทึก</p>
                       </div>
                     </header>
                     <div className="msp-rows">
                       <div className="msp-row is-inline">
                         <label className="msp-label" htmlFor="primary-color-hex">
                           <strong>สีหลัก</strong>
-                          <span>สีปุ่มและลิงก์</span>
+                          <span>ใช้กับปุ่มและลิงก์</span>
                         </label>
                         <div className="gst-color">
                           <label className="gst-swatch" style={{ background: settings.primaryColor }} title="เลือกสี">
@@ -4460,7 +4453,6 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                       <div className="msp-row is-inline">
                         <div className="msp-label">
                           <strong>ธีม</strong>
-                          <span>ทุกคนเห็นเหมือนกัน</span>
                         </div>
                         <div className="gst-seg" role="radiogroup" aria-label="ธีม">
                           <button type="button" role="radio" aria-checked={settings.themeMode === "light"} className={settings.themeMode === "light" ? "is-active" : ""} onClick={() => set("themeMode", "light")}><Sun size={15} aria-hidden="true" /> สว่าง</button>
@@ -4471,7 +4463,6 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                         <div className="msp-row is-inline">
                           <div className="msp-label">
                             <strong>รูปทรง UI</strong>
-                            <span>เหลี่ยม = มุมตัดเฉียงแบบหน้ายืนยันตัวตน ทุกคนเห็นเหมือนกัน</span>
                           </div>
                           <div className="gst-seg" role="radiogroup" aria-label="รูปทรง UI">
                             <button type="button" role="radio" aria-checked={settings.uiShape === "round"} className={settings.uiShape === "round" ? "is-active" : ""} onClick={() => set("uiShape", "round")}><Circle size={15} aria-hidden="true" /> มน</button>
@@ -4495,7 +4486,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                       <div className="msp-row is-switch">
                         <div className="msp-label">
                           <strong>เปิดร้านค้า</strong>
-                          <span>{settings.storeEnabled ? "ซื้อของและเติมเงินได้ตามปกติ" : "ซื้อและเติมเงินไม่ได้ เมนูร้านค้าถูกซ่อน ของที่ซื้อแล้วยังโหลดได้"}</span>
+                          <span>{settings.storeEnabled ? "ลูกค้าซื้อของและเติมเงินได้ตามปกติ" : "ลูกค้าซื้อและเติมเงินไม่ได้ เมนูร้านค้าจะถูกซ่อน แต่ของที่ซื้อไปแล้วยังโหลดได้"}</span>
                         </div>
                         <div><Toggle label={settings.storeEnabled ? "เปิด" : "ปิด"} checked={settings.storeEnabled} onChange={(value) => set("storeEnabled", value)} /></div>
                       </div>
@@ -4503,7 +4494,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                         <div className="msp-row">
                           <label className="msp-label" htmlFor="store-closed-message">
                             <strong>ข้อความแจ้งลูกค้า</strong>
-                            <span>ขึ้นในหน้าร้านค้า เว้นว่างได้</span>
+                            <span>แสดงในหน้าร้านค้า ไม่ใส่ก็ได้</span>
                           </label>
                           <div className="gst-field">
                             <input id="store-closed-message" className="msp-input" maxLength={200} value={settings.storeClosedMessage || ""} onChange={(e) => set("storeClosedMessage", e.target.value)} placeholder="ซื้อสินค้าและเติมเงินไม่ได้ในขณะนี้" />
@@ -4521,7 +4512,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                       <span className="msp-mark"><FileImage size={18} /></span>
                       <div>
                         <h3>รูปแบรนด์</h3>
-                        <p>ไม่เกิน 5MB อัปโหลดหรือลบแล้วใช้ทันที</p>
+                        <p>ไฟล์ละไม่เกิน 5MB เปลี่ยนหรือลบแล้วมีผลทันที</p>
                       </div>
                     </header>
                     <div className="gst-assets">
@@ -4575,7 +4566,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                       <span className="msp-mark"><Share2 size={18} /></span>
                       <div>
                         <h3>การ์ดตอนแชร์ลิงก์</h3>
-                        <p>ตอนแชร์ลิงก์ใน Discord, Facebook, X และ LINE เว้นว่างไว้จะใช้ชื่อและคำอธิบายเว็บ</p>
+                        <p>สิ่งที่ขึ้นตอนแชร์ลิงก์ใน Discord, Facebook, X และ LINE ช่องไหนเว้นว่างจะใช้ชื่อกับคำอธิบายของเว็บแทน</p>
                       </div>
                     </header>
                     <div className="gst-og">
@@ -4598,7 +4589,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                           <small className="gst-count">{(settings.ogDescription || "").length}/300</small>
                         </div>
                         <div className="gst-og-field is-inline">
-                          <span className="gst-og-label">สีแถบข้างการ์ด (Discord)</span>
+                          <span className="gst-og-label">สีแถบข้างการ์ด (เฉพาะ Discord)</span>
                           <div className="gst-color">
                             <label className="gst-swatch" style={{ background: settings.ogColor || "#5e5ee6" }} title="เลือกสี">
                               <input type="color" aria-label="เลือกสีแถบข้างการ์ด" value={settings.ogColor || "#5e5ee6"} onChange={(e) => set("ogColor", e.target.value)} />
@@ -4607,7 +4598,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                           </div>
                         </div>
                         <div className="gst-og-field">
-                          <span className="gst-og-label">รูปปก <small>1200 × 630 px ไม่ใส่จะใช้โลโก้</small></span>
+                          <span className="gst-og-label">รูปปก <small>1200 × 630 px ถ้าไม่ใส่จะใช้โลโก้</small></span>
                           <div className="gst-og-image">
                             {settings.ogImageUrl ? <img src={normalizeAssetUrl(settings.ogImageUrl)} alt="" /> : <span className="gst-og-image-empty"><FileImage size={18} aria-hidden="true" /></span>}
                             <div>
