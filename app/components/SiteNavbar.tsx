@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { POINTS_EVENT } from "./StorePurchase";
+import UiShapeToggle from "./UiShapeToggle";
 import Link from "next/link";
 
 /** Fired after signing in on the same page so the navbar reloads the session. */
@@ -114,6 +115,7 @@ export default function SiteNavbar({
             <img className="brand-logo" src={settings?.logoUrl || "/logo-v2.png"} alt="" />
             <span>{brandName || <>NEXORA <b>CLOUD</b></>}</span>
           </Link>
+          <UiShapeToggle />
           {hasNavLinks && (
             <button
               className="hamburger icon-button"
