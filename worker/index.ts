@@ -2,6 +2,15 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 
+// Cloudflare's runtime types (@cloudflare/workers-types) are not installed, so the bindings
+// this file touches are declared here, like ExecutionContext below.
+interface Fetcher {
+  fetch(request: Request): Promise<Response>;
+}
+
+/** The D1 binding: only handed on to the app with env, never queried here. */
+type D1Database = unknown;
+
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
