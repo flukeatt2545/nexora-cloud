@@ -202,6 +202,7 @@ const actionLabel: Record<string, string> = {
 
   // ===== เว็บไซต์ (Hosting) =====
   "hosting.site.created": "สร้างเว็บไซต์", "hosting.site.updated": "แก้ไขเว็บไซต์",
+  "hosting.domain.verified": "ยืนยันโดเมนของเว็บไซต์",
   "hosting.site.deleted": "ลบเว็บไซต์",
   "hosting.member.upserted": "เพิ่มหรือเปลี่ยนผู้ร่วมงาน",
   "hosting.member.removed": "นำผู้ร่วมงานออก", "hosting.owner.transferred": "โอนเจ้าของเว็บไซต์",
@@ -3414,7 +3415,7 @@ function AnnouncementsView({ notify, ask }: { notify: (notice: { kind: "success"
     setImagePreviewOpen(false);
     setEditing(item.id);
     setForm({
-      title: item.title || "", message: item.message || "", imageUrl: item.imageUrl || "", customColor: item.customColor || "",
+      title: item.title || "", message: item.message || "", imageUrl: item.imageUrl || "",
       kind: item.kind, placement: item.placement, severity: item.severity,
       buttonLabel: item.buttonLabel || "", buttonUrl: item.buttonUrl || "",
       active: item.active, startsAt: localDateInput(item.startsAt), endsAt: localDateInput(item.endsAt), meta: item.meta || {},
@@ -5481,7 +5482,7 @@ function CustomCategorySelect({
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
-                  justify: "space-between",
+                  justifyContent: "space-between",
                   transition: "background 0.12s",
                   marginBottom: "2px",
                 }}

@@ -130,7 +130,7 @@ const friendlyRuntimeAction: Record<string, string> = {
 };
 
 function formatRuntimeMessage(message: string): RuntimeLine[] {
-  return message.split(/\r?\n/).map((rawLine) => {
+  return message.split(/\r?\n/).map((rawLine): RuntimeLine => {
     const line = rawLine
       .trim()
       .replace(/^\d{4}-\d{2}-\d{2}T\S+\s*/, "")
@@ -508,6 +508,7 @@ export default function HostingView({
     setForm({
       name: site.name, subdomain: site.subdomain, customDomain: site.customDomain,
       projectType: site.projectType, packageManager: site.packageManager, ownerUsername: site.ownerUsername,
+      initialMethod: emptyForm.initialMethod, // only used when creating
     });
     detailOpenRef.current = false;
     setDetail(null);

@@ -90,7 +90,7 @@ type PreviewState = {
   password?: string;
 };
 
-type FileNotice = { kind: "success" | "error"; text: string };
+type FileNotice = { kind: "success" | "error" | "info"; text: string };
 type FileTransferState = {
   mode: "preview" | "download";
   item: FileItem;
@@ -1852,7 +1852,7 @@ export default function FileLibraryView({
     setCategoryForm({
       name: cat.name,
       isVisible: cat.isVisible,
-      passwordEnabled: cat.passwordEnabled,
+      passwordEnabled: cat.passwordEnabled ?? false,
       password: "",
     });
     setCategoryModal({ mode: "edit", category: cat });
