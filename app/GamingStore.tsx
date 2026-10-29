@@ -8,6 +8,7 @@ import { ArrowRight, ArrowUpDown, Bell, Check, ChevronDown, ChevronLeft, Chevron
 import { applyThemeColor } from "./themeColor";
 import StoreClosedNotice, { STORE_CLOSED_DETAIL, STORE_CLOSED_TITLE, storeIsOpen } from "./components/StoreClosedNotice";
 import SystemNotice, { type SystemNoticeData } from "./components/SystemNotice";
+import { PageLoadingScreen } from "./components/PageLoadingScreen";
 import SocialOAuthButton from "./SocialOAuthButton";
 import { asciiInputProps, hasNonAscii, latinAlphanumericInputProps } from "./lib/asciiInput";
 import SiteNavbar, { SESSION_EVENT } from "./components/SiteNavbar";
@@ -24,7 +25,33 @@ const MARQUEE_ICONS: Record<string, React.ElementType> = {
 
 type AuthMode = "login" | "register";
 type NoticeKind = "success" | "error" | "info";
-type Notice = { id: number; kind: NoticeKind; message: string };
+type Notice = { id: number; kind: NoticeKind; message: string; title?: string };
+
+const OAUTH_PROVIDER_NAMES: Record<string, string> = { discord: "Discord", google: "Google", github: "GitHub" };
+
+/** What the sign-in callback put in the address bar after a failed social sign-in, as a notice. */
+function oauthErrorNotice(params: URLSearchParams): Omit<Notice, "id"> | null {
+  const code = params.get("auth_error");
+  if (!code) return null;
+  const provider = OAUTH_PROVIDER_NAMES[params.get("provider") || ""] || "บัญชี Social";
+  const title = "เข้าสู่ระบบไม่สำเร็จ";
+  switch (code) {
+    case "registration_disabled":
+      return { kind: "error", title, message: `บัญชี ${provider} นี้ยังไม่ได้สมัครสมาชิก\nตอนนี้ปิดรับสมัครอยู่` };
+    case "account_link_required":
+      return { kind: "error", title, message: `อีเมลนี้มีบัญชีอยู่แล้ว\nเข้าสู่ระบบด้วยรหัสผ่าน แล้วเชื่อม ${provider} ที่หน้าโปรไฟล์` };
+    case "account_suspended":
+      return { kind: "error", title, message: "บัญชีนี้ถูกระงับการใช้งาน\nติดต่อผู้ดูแลหากคิดว่าผิดพลาด" };
+    case "oauth_cancelled":
+      return { kind: "info", message: `ยกเลิกการเข้าสู่ระบบด้วย ${provider} แล้ว` };
+    case "oauth_state":
+      return { kind: "error", title, message: "ลิงก์หมดอายุหรือถูกใช้ไปแล้ว\nกดเข้าสู่ระบบใหม่อีกครั้ง" };
+    case "oauth_exchange":
+      return { kind: "error", title, message: `เชื่อมต่อ ${provider} ไม่สำเร็จ\nลองใหม่อีกครั้ง` };
+    default:
+      return { kind: "error", title, message: "ระบบขัดข้องชั่วคราว\nลองใหม่อีกสักครู่" };
+  }
+}
 type UserRole = "user" | "admin" | "superadmin";
 type AuthUser = {
   id?: number;
@@ -843,7 +870,7 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
   const [accountOpen, setAccountOpen] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   // The same object until the notice changes, so the notice plays its entrance once.
-  const shownNotice = useMemo<SystemNoticeData | null>(() => (notice ? { kind: notice.kind, text: notice.message } : null), [notice]);
+  const shownNotice = useMemo<SystemNoticeData | null>(() => (notice ? { kind: notice.kind, text: notice.message, title: notice.title } : null), [notice]);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [settingsChecked, setSettingsChecked] = useState(false);
   const [homeAnnouncements, setHomeAnnouncements] = useState<Announcement[]>([]);
@@ -907,6 +934,24 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
       window.removeEventListener("pageshow", refreshSession);
       document.removeEventListener("visibilitychange", checkWhenVisible);
     };
+  }, []);
+
+  // Sign-in callbacks and the lockdown page come back here with the outcome in the address bar.
+  // Show it once, then drop it from the URL so a reload or a shared link doesn't show it again.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthError = oauthErrorNotice(params);
+    // Only known codes: the text itself never comes from the URL, so a link can't put words on the page.
+    const message = params.get("notice") === "unlocked" ? "ปลดล็อกเว็บไซต์แล้ว" : "";
+    if (!oauthError && !params.has("notice")) return;
+    const shown = oauthError || (message ? { kind: "success" as const, message } : null);
+    const timer = window.setTimeout(() => {
+      ["auth_error", "provider", "notice"].forEach((key) => params.delete(key));
+      const query = params.toString();
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+      if (shown) setNotice({ id: Date.now(), ...shown });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -1159,6 +1204,10 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
     broadcastPoints(newPoints);
   }
 
+  // The homepage waits for the site settings (name, theme, which sections are on) so it doesn't
+  // flash the defaults first. The store page gets its loading screen from UserOrPublicShell.
+  if (!isStorePage && !embedded && !settingsChecked) return <PageLoadingScreen label="กำลังโหลดหน้าเว็บ..." />;
+
   return (
     <main id="top" className={`gaming-store ${embedded ? "embedded " : ""}${isStorePage ? "store-page" : "home-page"}`}>
       {!embedded && (
@@ -1313,7 +1362,7 @@ export default function GamingStore({ mode = "home", embedded = false }: { mode?
         </>}
       </section>}
 
-      {footerVisible && <footer><div className="container footer-inner"><Brand settings={settings} /><p>&copy; 2026 {settings?.brandName || "NEXORA CLOUD"} · Infrastructure made simple</p><div><a href="#">Status</a><a href="#">Docs</a><a href="#">ช่วยเหลือ</a></div></div></footer>}
+      {footerVisible && <footer><div className="container footer-inner"><Brand settings={settings} /><p>&copy; 2026 {settings?.brandName || "NEXORA CLOUD"} · Infrastructure made simple</p><div><a href="#">Status</a><a href="#">Docs</a><Link href="/changelog">อัปเดต</Link><a href="#">ช่วยเหลือ</a></div></div></footer>}
       {!isStorePage && homePopupOpen && homeAnnouncements.find((item) => item.kind === "popup") && (() => {
         const popup = homeAnnouncements.find((item) => item.kind === "popup")!;
         const showImage = !!popup.imageUrl;

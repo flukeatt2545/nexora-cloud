@@ -1,7 +1,7 @@
 import { Collection, makeGuild, makeInteraction, makeMember, reply, requests, requestsTo, spy, useSettings, lastEmbed } from "./support";
 import assert from "node:assert/strict";
 import { beforeEach, mock, test } from "node:test";
-import { onVerify, VERIFY_MESSAGE_MS } from "../src/members";
+import { onVerify, VERIFY_MESSAGE_MS, verifyLinkMessage } from "../src/members";
 import { giveVerifiedRoles } from "../src/verifyweb";
 
 // Verifying on the website: the button hands out a link instead of the role, and the role comes
@@ -41,6 +41,21 @@ test("on the website levels the button gives a link and no role", async () => {
   const button = answer.components[0].toJSON().components[0];
   assert.equal(button.url, "https://nkn02.com/verify/abc");
   assert.ok(answer.flags, "the link is private to the member");
+});
+
+test("the link message lists the steps and counts down to when the link and the message end", () => {
+  const now = new Date("2026-10-28T04:16:00Z");
+  const message = verifyLinkMessage("https://nkn02.com/verify/abc", 600, now);
+  const embed = message.embeds[0].toJSON();
+  const fields = Object.fromEntries((embed.fields ?? []).map((field) => [field.name, field.value]));
+  const seconds = Math.floor(now.getTime() / 1000);
+  assert.match(fields["ขั้นตอน"], /\*\*1\.\*\*[\s\S]*\*\*2\.\*\*[\s\S]*\*\*3\.\*\*/);
+  assert.match(fields["ลิงก์"], new RegExp(`<t:${seconds + 600}:R>`));
+  assert.match(fields["ข้อความนี้"], new RegExp(`<t:${seconds + VERIFY_MESSAGE_MS / 1000}:R>`));
+  assert.match(embed.footer?.text ?? "", /อย่าส่งให้คนอื่น/);
+  const button = message.components[0].toJSON().components[0] as { url: string; label: string };
+  assert.equal(button.url, "https://nkn02.com/verify/abc");
+  assert.equal(button.label, "เปิดหน้ายืนยัน");
 });
 
 test("the link message disappears after ten seconds, and a second click removes the first one at once", async () => {

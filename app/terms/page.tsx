@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { applyThemeColor } from "../themeColor";
 import { getDocumentTitle, type SiteTitleMode } from "../pageTitle";
 import { API_BASE } from "../runtime";
+import { PageLoadingScreen } from "../components/PageLoadingScreen";
 import "./terms.css";
 
 interface PublicSettings {
@@ -21,6 +22,7 @@ interface PublicSettings {
 
 export default function TermsPage() {
   const [settings, setSettings] = useState<PublicSettings | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/settings/public`)
@@ -32,10 +34,13 @@ export default function TermsPage() {
         applyThemeColor(value.primaryColor);
         document.title = getDocumentTitle(value, window.location.pathname);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setReady(true));
   }, []);
 
   const brandName = settings?.brandName || "NEXORA CLOUD";
+
+  if (!ready) return <PageLoadingScreen label="กำลังโหลด..." />;
 
   return (
     <div className="terms-page-root">

@@ -425,7 +425,7 @@ func (s *server) lockdownControlDisable(c *fiber.Ctx) error {
 	}
 	s.audit(c, auditEvent{Category: "security", Action: "lockdown.disabled", Target: "system", Outcome: "success", Metadata: map[string]any{"discordActor": session.Actor, "source": "control"}})
 	_ = state
-	return c.Redirect("/?notice="+url.QueryEscape("ปลดล็อกเว็บไซต์แล้ว"), fiber.StatusSeeOther)
+	return c.Redirect("/?notice=unlocked", fiber.StatusSeeOther)
 }
 
 func lockdownDurationLabel(state lockdownState) string {

@@ -1,0 +1,10 @@
+{
+  "name": "nexora-uptime-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc -p .",
+    "deploy": "wrangler deploy --config wrangler.toml"
+  }
+}

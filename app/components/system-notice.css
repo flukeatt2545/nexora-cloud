@@ -141,6 +141,7 @@
   color: color-mix(in srgb, var(--theme-text-strong) 88%, transparent);
   font-size: 15px;
   line-height: 1.65;
+  white-space: pre-line;
   overflow-wrap: anywhere;
   animation: sn-up .2s ease-out .27s backwards;
 }
@@ -233,13 +234,3 @@
 @keyframes sn-up { from { opacity: 0; transform: translateY(8px); } }
 @keyframes sn-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
-/* Reduced motion: no wipe, glitch or twitch; the countdown still runs so the notice still goes. */
-@media (prefers-reduced-motion: reduce) {
-  .sn-overlay,
-  .sn-overlay *:not(.sn-timer),
-  .sn-card::after,
-  .sn-card::before { animation: none !important; }
-  .sn-ghost,
-  .sn-card::after,
-  .sn-card::before { display: none; }
-}

@@ -127,7 +127,7 @@
 .vf-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: clamp(16px, 4vw, 48px); }
 .vf-copy { display: grid; justify-items: start; gap: 12px; min-width: 0; }
 .vf-kicker { margin: 0; color: var(--vf-red-soft); font-family: var(--font-gaming, inherit); font-size: clamp(1.05rem, 2.4vw, 1.5rem); font-weight: 600; }
-.vf-title { margin: 0; max-width: 100%; color: var(--vf-ink); font-family: var(--font-gaming, inherit); font-size: clamp(2.5rem, 8.4vw, 4.9rem); font-weight: 800; line-height: 1.04; overflow-wrap: anywhere; }
+.vf-title { margin: 0; max-width: 100%; color: var(--vf-ink); font-family: var(--font-gaming, inherit); font-size: clamp(2.5rem, 8.4vw, 4.9rem); font-weight: 800; line-height: 1.04; overflow-wrap: anywhere; text-wrap: balance; }
 .vf-title.is-long { font-size: clamp(1.9rem, 6vw, 3.3rem); }
 /* One word with no spaces: keep it on one line, smaller if the column is narrow (--vf-n = letters that take width) */
 .vf-copy { container-type: inline-size; width: 100%; } /* width: containment stops it sizing to its text, so a centred grid would shrink it to nothing */
@@ -141,7 +141,7 @@
 .vf-facts dt { margin: 0 0 2px; color: var(--vf-dim); font-size: 13px; }
 .vf-facts dd { margin: 0; color: var(--vf-ink); font-family: var(--font-gaming, inherit); font-size: clamp(1.1rem, 2.6vw, 1.55rem); font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
 .vf-facts em { color: var(--vf-dim); font-style: normal; font-weight: 500; }
-.vf-lead { margin: 0; max-width: 46ch; color: var(--vf-text); font-size: clamp(.95rem, 1.9vw, 1.08rem); line-height: 1.75; }
+.vf-lead { margin: 0; max-width: 48ch; color: var(--vf-text); font-size: clamp(.95rem, 1.9vw, 1.08rem); line-height: 1.75; text-wrap: pretty; }
 
 /* The badge: a picture (or a shield) in a ring, with a dashed ring turning slowly around it */
 .vf-badge { --ra: var(--vf-red); --rb: var(--vf-orange); position: relative; width: var(--vf-badge); height: var(--vf-badge); flex: none; }
@@ -237,6 +237,15 @@
 .vf-btn:disabled { cursor: not-allowed; filter: grayscale(.7) brightness(.65); }
 .vf-btn:disabled::after { animation: none; opacity: 0; }
 
+/* The error screen in square mode (app/components/errors/ErrorScreen.tsx): the status code in the ring, and its buttons side by side (a quieter second one) */
+.vf-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.vf-actions .vf-btn { flex: 1 1 200px; max-width: 280px; }
+@media (max-width: 640px) { .vf-actions .vf-btn { max-width: none; } }
+.vf-code { font-size: calc(var(--vf-badge) * .22); letter-spacing: -.02em; font-feature-settings: "tnum"; }
+.vf-btn svg { flex: none; }
+.vf-btn.is-ghost { background: rgb(var(--vf-rgb) / .12); color: var(--vf-ink); }
+.vf-btn.is-ghost::after { display: none; }
+
 .vf-note { margin: 2px 0 0; color: var(--vf-dim); font-size: 12.5px; line-height: 1.7; text-align: center; }
 
 /* Wide screens: the steps on the left, what to do on the right */
@@ -291,9 +300,6 @@
 @keyframes vf-shine { 0%, 55% { left: -70%; } 100% { left: 140%; } }
 @keyframes vf-shake { 10%, 90% { transform: translateX(-1px); } 20%, 80% { transform: translateX(3px); } 30%, 50%, 70% { transform: translateX(-5px); } 40%, 60% { transform: translateX(5px); } }
 
-@media (prefers-reduced-motion: reduce) {
-  .vf *, .vf *::before, .vf *::after { animation: none !important; transition: none !important; }
-}
 
 /* Done: the whole headline turns green, like the ring */
 .vf[data-view="done"] .vf-kicker { color: var(--vf-ok); }
@@ -518,6 +524,3 @@ html[data-theme="light"] .vf-crt { background: repeating-linear-gradient(0deg, r
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .vf-title::before, .vf-title::after, .vf-panel > .vf-slice, .vf-bg .vf-wslice, .vf-crt { display: none; }
-}

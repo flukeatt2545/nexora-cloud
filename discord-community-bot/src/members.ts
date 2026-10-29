@@ -12,7 +12,7 @@ import { assignable } from "./access";
 import { api, apiMessage, logBotError } from "./api";
 import { welcomeCard } from "./image";
 import { fillTemplate, settings } from "./settings";
-import { brandEmbed, COLOR, errorEmbed, linkButton, okEmbed, row } from "./ui";
+import { brandEmbed, COLOR, errorEmbed, linkButton, okEmbed, row, when } from "./ui";
 
 const ephemeral = MessageFlags.Ephemeral as const;
 
@@ -88,19 +88,36 @@ export async function onMemberLeave(member: GuildMember | PartialGuildMember) {
 export const VERIFY_MESSAGE_MS = 10 * 1000;
 const openLinks = new Map<string, ButtonInteraction>();
 
+/** The private message with the link: the steps on the site, then how long the link and the message last. */
+export function verifyLinkMessage(url: string, expiresInSeconds = 600, now = new Date()) {
+  const linkEnds = new Date(now.getTime() + Math.max(60, expiresInSeconds) * 1000);
+  const messageEnds = new Date(now.getTime() + VERIFY_MESSAGE_MS);
+  const embed = brandEmbed()
+    .setTitle("🔐 ยืนยันตัวตนผ่านเว็บ")
+    .setDescription("ใช้เวลาไม่ถึงนาที ทำครั้งเดียวก็เห็นทุกห้องในเซิร์ฟ")
+    .addFields(
+      {
+        name: "ขั้นตอน",
+        value: [
+          "**1.** กดปุ่ม **เปิดหน้ายืนยัน** ด้านล่าง",
+          "**2.** เข้าสู่ระบบด้วย Discord บัญชีนี้ แล้วติ๊กช่องยืนยันว่าเป็นคน",
+          "**3.** กลับมาที่ Discord ยศสมาชิกจะขึ้นให้เอง",
+        ].join("\n"),
+      },
+      { name: "ลิงก์", value: `ใช้ได้ครั้งเดียว\nหมดอายุ ${when(linkEnds, "R")}`, inline: true },
+      { name: "ข้อความนี้", value: `หายไปเอง ${when(messageEnds, "R")}`, inline: true },
+    )
+    .setFooter({ text: "ลิงก์เป็นของคุณคนเดียว อย่าส่งให้คนอื่น · ขอลิงก์ใหม่ได้ด้วยการกดยืนยันตัวตนอีกครั้ง" });
+  return { embeds: [embed], components: [row(linkButton(url, "เปิดหน้ายืนยัน").setEmoji("🌐"))] };
+}
+
 /** Verify on the website: the member gets a one-time link in a private message. */
 async function sendVerifyLink(interaction: ButtonInteraction) {
   try {
-    const res = await api(interaction.user).post<{ url: string }>("/api/internal/bot/community/verify/start", {
+    const res = await api(interaction.user).post<{ url: string; expiresIn?: number }>("/api/internal/bot/community/verify/start", {
       userId: interaction.user.id, username: interaction.user.username,
     });
-    await interaction.reply({
-      embeds: [brandEmbed().setTitle("ยืนยันตัวตนผ่านเว็บ").setDescription(
-        "กดปุ่มด้านล่างเพื่อไปที่เว็บ ทำตามขั้นตอน (ไม่กี่วินาที) แล้วกลับมาที่ Discord ยศสมาชิกจะขึ้นให้เอง\n\nลิงก์ใช้ได้ครั้งเดียวภายใน 10 นาที ห้ามส่งให้คนอื่น",
-      ).setFooter({ text: "ข้อความนี้จะหายไปเองใน 10 วินาที" })],
-      components: [row(linkButton(res.data.url, "ไปยืนยันที่เว็บ"))],
-      flags: ephemeral,
-    });
+    await interaction.reply({ ...verifyLinkMessage(res.data.url, res.data.expiresIn), flags: ephemeral });
     // Only one message per member: the earlier one (if it is still there) goes now.
     const earlier = openLinks.get(interaction.user.id);
     openLinks.set(interaction.user.id, interaction);

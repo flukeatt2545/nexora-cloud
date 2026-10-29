@@ -148,10 +148,6 @@
 @media (max-width: 360px) {
   .aov-shortcuts { grid-template-columns: 1fr; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .aov-skel { animation: none; }
-  .aov-bar-fill, .aov-shortcut-arrow { transition: none; }
-}
 
 /* Top-up overview (/admin/topups) reuses the overview pieces above. */
 .topup-overview .topup-table-wrap { margin-top: 10px; border-top: 1px solid var(--aov-line); }
@@ -499,7 +495,6 @@
   .cfm-actions { padding: 12px 16px; }
   .cfm-btn { flex: 1; height: 42px; }
 }
-@media (prefers-reduced-motion: reduce) { .cfm { animation: none; } }
 
 /* Store admin dialogs (category, product editor, file/link picker, link in the description editor)
    share one frame: centred on every screen, plain card, same header, fields and footer. Theme tokens only. */
@@ -619,9 +614,6 @@
   .system-dialog-backdrop .spf-actions-note:empty { display: none; }
   .system-dialog-backdrop :is(.store-cat-dialog-actions, .store-prod-dialog-actions, .rte-link-actions) :is(.dash-primary, .store-cat-btn, .store-prod-btn, button) { flex: 1; min-width: 0; }
   .system-dialog-backdrop .rte-link-actions { display: flex; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .system-dialog-backdrop :is(.store-cat-dialog, .store-prod-dialog, .spp, .rte-link-dialog) { animation: none; }
 }
 
 /* Form dialogs built on .system-dialog (profile, password, user admin): the same plain card as the

@@ -2,7 +2,7 @@
 
 import {
   Cloud, Eye, EyeOff, FolderOpen, Info, LayoutDashboard, LogOut, Menu, ShieldCheck, User, X, Globe, Smartphone, Monitor, KeyRound, Check, Clock3, Zap, ChevronDown, Coins, Lock, Store, ReceiptText, RefreshCw, ChevronLeft, ChevronRight, Plus, ArrowUpRight, ExternalLink, Database, Mail, ShoppingCart, Undo2,
-  FileImage, FileVideo, FileAudio, FileText, FileArchive, File as FileIcon, CircleCheck, Circle, Upload, Bot,
+  FileImage, FileVideo, FileAudio, FileText, FileArchive, File as FileIcon, CircleCheck, Circle, Upload, Bot, Bell, History,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -23,6 +23,8 @@ import SmartImage from "../components/SmartImage";
 import SystemNotice from "../components/SystemNotice";
 import { POINTS_EVENT, broadcastPoints } from "../components/StorePurchase";
 import Link from "next/link";
+import { LATEST_RELEASE, markChangelogSeen, useChangelogUnseen } from "../changelog/seen";
+import "../components/changelog-link.css";
 
 // Keep types same for now
 type Role = "user" | "admin" | "superadmin";
@@ -198,6 +200,7 @@ export default function UserApp({ view }: { view: UserView }) {
   // Store switch from system settings: closed hides buying, top-ups and their cards.
   const [store, setStore] = useState<{ open: boolean; message: string }>({ open: true, message: "" });
   const [mailUnread, setMailUnread] = useState(0);
+  const updateUnseen = useChangelogUnseen();
   const [mailboxes, setMailboxes] = useState<OverviewMailbox[]>([]);
   const accountRef = useRef<HTMLDivElement>(null);
   const wasSignedIn = useRef(false);
@@ -456,6 +459,7 @@ export default function UserApp({ view }: { view: UserView }) {
             <p className="usb-nav-label">บัญชีและการเงิน</p>
             <Link href="/topups" className={view === "topups" ? "active" : ""} aria-current={view === "topups" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><ReceiptText size={18} /><span>ประวัติเติมเงิน</span></Link>
             <Link href="/profile" className={view === "profile" ? "active" : ""} aria-current={view === "profile" ? "page" : undefined} onClick={() => setMobileNavOpen(false)}><User size={18} /><span>บัญชีของฉัน</span></Link>
+            <Link href="/changelog" onClick={() => setMobileNavOpen(false)}><History size={18} /><span>อัปเดตของเว็บ</span>{updateUnseen && <b className="changelog-new-badge">ใหม่</b>}</Link>
             {me.role !== "user" && <Link href="/admin" className="usb-admin" onClick={() => setMobileNavOpen(false)}><ShieldCheck size={18} /><span>ระบบแอดมิน</span></Link>}
           </nav>
         </div>
@@ -560,6 +564,17 @@ export default function UserApp({ view }: { view: UserView }) {
           const showSetup = dashStats.loaded && setupDone < setupSteps.length;
           return (
           <div className="ud">
+            {updateUnseen && LATEST_RELEASE && (
+              <div className="changelog-banner" role="status">
+                <span className="changelog-banner-icon" aria-hidden="true"><Bell size={18} /></span>
+                <div className="changelog-banner-text">
+                  <strong>มีอัปเดตใหม่ v{LATEST_RELEASE.version}</strong>
+                  <span>{LATEST_RELEASE.changes[0]?.th}{LATEST_RELEASE.changes.length > 1 ? ` และอีก ${LATEST_RELEASE.changes.length - 1} รายการ` : ""}</span>
+                </div>
+                <Link href="/changelog" className="changelog-banner-link">ดูว่ามีอะไรใหม่<ChevronRight size={15} aria-hidden="true" /></Link>
+                <button type="button" className="changelog-banner-close" onClick={markChangelogSeen} aria-label="ซ่อนแจ้งเตือนอัปเดตนี้"><X size={16} aria-hidden="true" /></button>
+              </div>
+            )}
             <header className="ud-hero">
               <div className="ud-hero-top">
                 <div className="ud-who">

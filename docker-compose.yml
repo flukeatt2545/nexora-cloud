@@ -121,6 +121,8 @@ services:
       PMA_INTERNAL_SECRET: ${PMA_INTERNAL_SECRET:?PMA_INTERNAL_SECRET is required}
       # The Discord bots' secret for /api/internal/bot/*. Must differ from PMA_INTERNAL_SECRET.
       INTERNAL_BOT_SECRET: ${INTERNAL_BOT_SECRET:?INTERNAL_BOT_SECRET is required}
+      # The outside uptime checker (uptime-worker/) on /api/uptime-worker/*. Its own secret; empty turns it off.
+      UPTIME_WORKER_SECRET: ${UPTIME_WORKER_SECRET:-}
       PMA_PUBLIC_URL: ${PMA_PUBLIC_URL:-http://db.localhost:8088}
       CHECKSLIPS_API_TOKEN: ${CHECKSLIPS_API_TOKEN:-}
       CHECKSLIPS_TENANT_ID: ${CHECKSLIPS_TENANT_ID:-}

@@ -659,6 +659,3 @@
 }
 @keyframes bw-sheet-in { from { transform: translateY(24px); opacity: 0; } }
 
-@media (prefers-reduced-motion: reduce) {
-  .bt *, .bt-backdrop, .bt-backdrop * { animation: none !important; transition: none !important; }
-}

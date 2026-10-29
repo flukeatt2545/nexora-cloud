@@ -12,6 +12,8 @@ export const PUBLIC_APP_URL = (process.env.PUBLIC_APP_URL || "https://nkn02.com"
 export const SETTINGS_URL = `${PUBLIC_APP_URL}/admin/discord-bot`;
 export const STATUS_WEB_URL = process.env.COMMUNITY_STATUS_WEB_URL || PUBLIC_APP_URL;
 export const STATUS_API_URL = process.env.COMMUNITY_STATUS_API_URL || `${API_URL}/health`;
+// The web container itself, reached over the internal network; empty turns the second check off.
+export const STATUS_WEB_INTERNAL_URL = process.env.COMMUNITY_STATUS_WEB_INTERNAL_URL ?? "http://web:3000";
 
 const adminIds = (process.env.COMMUNITY_DISCORD_ADMIN_IDS || process.env.DISCORD_ADMIN_IDS || "")
   .split(",").map((id) => id.trim()).filter((id) => /^[0-9]{17,20}$/.test(id));

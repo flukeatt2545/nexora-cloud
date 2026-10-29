@@ -293,10 +293,3 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .abu-thumb img,
-  .abu-skeleton .abu-thumb {
-    animation: none !important;
-    transition: none !important;
-  }
-}

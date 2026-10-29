@@ -239,7 +239,7 @@ export function StoreCategoriesView({ notify, ask }: { notify: Notify; ask: Ask 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [autoAnimateList] = useAutoAnimate<HTMLUListElement>();
+  const [autoAnimateList] = useAutoAnimate<HTMLUListElement>({ disrespectUserMotionPreference: true });
 
   const load = useCallback(() => Promise.all([
     api<{ items: StoreCategory[] }>("/api/admin/store/categories"),
@@ -553,7 +553,7 @@ export function StoreProductsView({ notify, ask }: { notify: Notify; ask: Ask })
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<number | "all">("all");
   const [visibility, setVisibility] = useState<"all" | "visible" | "hidden">("all");
-  const [autoAnimateProducts] = useAutoAnimate<HTMLDivElement>();
+  const [autoAnimateProducts] = useAutoAnimate<HTMLDivElement>({ disrespectUserMotionPreference: true });
   
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Partial<StoreProduct>>({});

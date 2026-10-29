@@ -32,8 +32,7 @@ export default function SystemNotice({ notice, onClose }: { notice: SystemNotice
 
   useEffect(() => {
     if (!state.leaving) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const timer = window.setTimeout(onClose, reduced ? 0 : LEAVE_MS);
+    const timer = window.setTimeout(onClose, LEAVE_MS);
     return () => window.clearTimeout(timer);
   }, [state.leaving, state.round, onClose]);
 

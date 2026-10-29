@@ -559,17 +559,11 @@ export function DiscordCommunity({ notify, section }: { notify: Notice; section:
                   </Fields>
                 </Card>
 
-                <Card icon={Activity} title="แจ้งเว็บล่ม" text="เช็กเว็บกับ API ทุก 30 วินาที แจ้งเมื่อล่มติดกัน 2 ครั้ง และแจ้งอีกทีตอนกลับมา" flush
-                  toggle={{ label: "แจ้งเว็บล่ม", on: form.statusEnabled, onChange: (statusEnabled) => set({ statusEnabled }), disabled: off }}>
+                <Card icon={Activity} title="รูปสถานะเว็บ" text="รูปสถานะเว็บ API และบอท อัปเดตเองทุก 30 วินาที ส่วนข้อความแจ้งล่มย้ายไปอยู่ที่ เช็กเว็บล่ม" flush
+                  toggle={{ label: "รูปสถานะเว็บ", on: form.statusEnabled && form.statusImage, onChange: (on) => set({ statusEnabled: on, statusImage: on }), disabled: off }}>
                   <Fields>
-                    <ChannelPicker id="cm-status" label="ห้องแจ้งสถานะ" kind="text" value={form.statusChannelId} onChange={pick("statusChannelId")} guild={guild} disabled={off || !form.statusEnabled} />
-                    <RolePicker id="cm-status-role" label="ยศที่แท็กตอนล่ม" hint="ไม่เลือก = ไม่แท็กใคร ยศต้องเปิดให้ @mention ได้" value={form.statusMentionRoleId}
-                      onChange={pick("statusMentionRoleId")} guild={guild} disabled={off || !form.statusEnabled} />
+                    <ChannelPicker id="cm-status" label="ห้องที่ลงรูป" kind="text" value={form.statusChannelId} onChange={pick("statusChannelId")} guild={guild} disabled={off || !form.statusEnabled || !form.statusImage} />
                   </Fields>
-                  <Rows>
-                    <SwitchRow title="ภาพสถานะ" hint="ภาพสถานะเว็บ API และบอท มีเวลาตอบสนองกับ uptime อัปเดตเองในห้องนี้" on={form.statusImage}
-                      onChange={(statusImage) => set({ statusImage })} disabled={off || !form.statusEnabled} />
-                  </Rows>
                 </Card>
               </div>
 

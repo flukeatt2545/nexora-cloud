@@ -1,0 +1,96 @@
+/* "New update" marker next to links to /changelog (navbar, dashboard sidebar) */
+
+.changelog-dot {
+  position: relative;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: 1px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .18);
+}
+.changelog-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  animation: changelog-dot-ping 1.8s ease-out infinite;
+}
+@keyframes changelog-dot-ping {
+  0% { transform: scale(1); opacity: .7; }
+  80%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+.changelog-new-badge {
+  margin-left: auto;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+/* Dashboard overview: the newest release, until it has been opened */
+.changelog-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid rgba(var(--primary-rgb), .35);
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(var(--primary-rgb), .14), rgba(var(--primary-rgb), .04));
+  color: var(--theme-text-strong);
+}
+.changelog-banner-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(var(--primary-rgb), .16);
+  color: var(--primary-ink, var(--primary));
+}
+.changelog-banner-text { flex: 1; min-width: 0; }
+.changelog-banner-text strong { display: block; font-size: 14px; }
+.changelog-banner-text span { display: block; overflow: hidden; color: var(--theme-text-soft); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.changelog-banner-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.changelog-banner-link:hover { filter: brightness(1.08); }
+.changelog-banner-close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--theme-text-soft);
+  cursor: pointer;
+}
+.changelog-banner-close:hover { background: var(--theme-hover); color: var(--theme-text-strong); }
+
+@media (max-width: 560px) {
+  .changelog-banner { flex-wrap: wrap; }
+  .changelog-banner-text span { white-space: normal; }
+  .changelog-banner-link { margin-left: 48px; }
+}
+

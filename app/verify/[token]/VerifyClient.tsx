@@ -4,6 +4,7 @@ import { CircleAlert, ExternalLink, LoaderCircle } from "lucide-react";
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE } from "../../runtime";
 import "../verify.css";
+import { fitLength, Mark } from "../VerifyMark";
 
 // The page a member opens from the verify button in Discord. The API decides what is checked
 // (backend/discord_verify.go); this page only shows the steps and talks to it. The look follows
@@ -88,34 +89,6 @@ const OAUTH_FAILED = "เชื่อมต่อ Discord ไม่สำเร�
 
 // Only a picture from Discord's own CDN is shown.
 const safeAvatar = (url: string) => (url.startsWith("https://cdn.discordapp.com/") ? url : "");
-
-/**
- * The big outlined NEXORA behind the card, in three rows. Each row picks a place to drift to and
- * how long to take, then picks again, so the rows never move together or in the same pattern.
- */
-function Mark() {
-  const rows = useRef<(HTMLSpanElement | null)[]>([]);
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timers: number[] = [];
-    const move = (index: number) => {
-      const row = rows.current[index];
-      if (!row) return;
-      const reach = window.innerWidth * (0.1 + Math.random() * 0.18);
-      const seconds = 4 + Math.random() * 8;
-      row.style.setProperty("--dur", `${seconds}s`);
-      row.style.setProperty("--x", `${(Math.random() * 2 - 1) * reach}px`);
-      timers[index] = window.setTimeout(() => move(index), seconds * 1000 * (0.55 + Math.random() * 0.5));
-    };
-    [0, 1, 2].forEach((index) => { timers[index] = window.setTimeout(() => move(index), 300 + index * 900); });
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, []);
-  return (
-    <span className="vf-mark">
-      {[0, 1, 2].map((index) => <span key={index} ref={(row) => { rows.current[index] = row; }}>NEXORA NEXORA NEXORA</span>)}
-    </span>
-  );
-}
 
 const step = (index: number) => ({ "--i": index }) as CSSProperties;
 
@@ -267,10 +240,7 @@ export default function VerifyClient({ token }: { token: string }) {
     : view === "blocked" ? "ยังไม่ผ่าน"
     : view === "off" ? "ปิดอยู่"
     : "ไม่สำเร็จ";
-  // Thai has no spaces, so a one-word title would break in the middle of the phrase. Short single words are
-  // shrunk to fit on one line instead; vowels and tone marks sit above or below a letter and take no width.
-  const baseLen = title.replace(/[ัิ-ฺ็-๎]/g, "").length;
-  const fitLen = !/\s/.test(title) && baseLen <= 14 ? baseLen : 0;
+  const fitLen = fitLength(title);
 
   // What is checked, in order. Numbered steps are the ones the member does; the rest happen by themselves.
   const steps: { key: string; title: string; text: string; state: "done" | "now" | "todo"; auto?: boolean }[] = [];

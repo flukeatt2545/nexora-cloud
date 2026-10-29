@@ -6,6 +6,8 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { POINTS_EVENT } from "./StorePurchase";
 import Link from "next/link";
+import { useChangelogUnseen } from "../changelog/seen";
+import "./changelog-link.css";
 
 /** Fired after signing in on the same page so the navbar reloads the session. */
 export const SESSION_EVENT = "nexora:session";
@@ -42,6 +44,7 @@ export default function SiteNavbar({
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
+  const updateUnseen = useChangelogUnseen();
 
   useEffect(() => {
     fetch(`${API_BASE}/api/settings/public`)
@@ -96,11 +99,10 @@ export default function SiteNavbar({
   const storeVisible = settingsChecked && settings?.storeSectionEnabled !== false && settings?.storeEnabled !== false;
   const brandName = settings?.brandName;
   const showGuestActions = settingsChecked && sessionChecked && !sessionUser && Boolean(onLogin);
-  const hasNavLinks = storeVisible || Boolean(sessionUser) || showGuestActions;
 
   return (
     <>
-      {menuOpen && hasNavLinks && (
+      {menuOpen && (
         <button
           type="button"
           className="nav-menu-backdrop"
@@ -114,22 +116,19 @@ export default function SiteNavbar({
             <img className="brand-logo" src={settings?.logoUrl || "/logo-v2.png"} alt="" />
             <span>{brandName || <>NEXORA <b>CLOUD</b></>}</span>
           </Link>
-          {hasNavLinks && (
-            <button
-              className="hamburger icon-button"
-              aria-label={menuOpen ? "ปิดเมนู" : "เปิดเมนู"}
-              aria-expanded={menuOpen}
-              onClick={() => {
-                setMenuOpen((open) => {
-                  if (open) setAccountOpen(false);
-                  return !open;
-                });
-              }}
-            >
-              {menuOpen ? <X size={22} /> : <Menu size={23} />}
-            </button>
-          )}
-          {hasNavLinks && (
+          <button
+            className="hamburger icon-button"
+            aria-label={menuOpen ? "ปิดเมนู" : "เปิดเมนู"}
+            aria-expanded={menuOpen}
+            onClick={() => {
+              setMenuOpen((open) => {
+                if (open) setAccountOpen(false);
+                return !open;
+              });
+            }}
+          >
+            {menuOpen ? <X size={22} /> : <Menu size={23} />}
+          </button>
           <div className={`nav-links ${menuOpen ? "open" : ""}`}>
             {/* Home / share / login / register live in homepage cards — keep navbar light. */}
             {storeVisible && (
@@ -137,6 +136,10 @@ export default function SiteNavbar({
                 <span className="nav-link-with-icon"><ShoppingCart size={15} aria-hidden="true" />ร้านค้า</span>
               </Link>
             )}
+
+            <Link href="/changelog" className="nav-updates-link" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}>
+              <span className="nav-link-with-icon">{updateUnseen ? <>มีอัปเดตใหม่<i className="changelog-dot" aria-hidden="true" /></> : "อัปเดต"}</span>
+            </Link>
 
             {showGuestActions && (
               <div className="guest-nav-actions">
@@ -195,7 +198,6 @@ export default function SiteNavbar({
               </div>
             ) : null}
           </div>
-          )}
         </div>
       </nav>
     </>

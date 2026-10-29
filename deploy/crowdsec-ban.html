@@ -1,16 +1,18 @@
 {{ $rawStatus := placeholder "http.vars.nexora_error_status" }}{{ $status := "403" }}{{ if $rawStatus }}{{ $status = printf "%v" $rawStatus }}{{ end }}
 {{ $blocked := and (eq $status "403") (not (not (placeholder "http.vars.crowdsec.module"))) }}
 {{ $lockdown := eq (placeholder "http.vars.nexora_lockdown") "1" }}{{ $lockdownExpires := placeholder "http.vars.nexora_lockdown_expires" }}
-{{ $titles := dict "400" "คำขอไม่ถูกต้อง" "401" "กรุณาเข้าสู่ระบบ" "403" "ไม่มีสิทธิ์เข้าถึง" "404" "ไม่พบหน้าที่ต้องการ" "405" "คำขอนี้ไม่รองรับ" "408" "การเชื่อมต่อหมดเวลา" "410" "หน้านี้ไม่มีแล้ว" "413" "ข้อมูลมีขนาดใหญ่เกินไป" "429" "ส่งคำขอถี่เกินไป" "500" "ระบบมีปัญหา" "501" "ระบบยังไม่รองรับคำขอนี้" "502" "เชื่อมต่อบริการไม่ได้" "503" "บริการไม่พร้อมใช้งาน" "504" "ระบบตอบกลับช้า" "507" "พื้นที่ระบบไม่เพียงพอ" }}
-{{ $title := index $titles $status }}{{ if not $title }}{{ $title = "ไม่สามารถเปิดหน้านี้ได้" }}{{ end }}{{ if $blocked }}{{ $title = "ไม่สามารถเข้าถึงเว็บไซต์" }}{{ end }}{{ if $lockdown }}{{ $title = "ระบบปิดให้บริการชั่วคราว" }}{{ end }}
-{{ $message := "ลองอีกครั้งในอีกสักครู่" }}{{ if eq $status "404" }}{{ $message = "หน้านี้อาจถูกย้ายหรือลบไปแล้ว" }}{{ else if eq $status "401" }}{{ $message = "เข้าสู่ระบบเพื่อใช้งานต่อ" }}{{ else if eq $status "403" }}{{ $message = "คุณไม่มีสิทธิ์เปิดหน้านี้" }}{{ else if eq $status "429" }}{{ $message = "รอสักครู่แล้วลองอีกครั้ง" }}{{ else if eq $status "413" }}{{ $message = "ลดขนาดข้อมูลแล้วลองอีกครั้ง" }}{{ end }}{{ if $blocked }}{{ $message = "เครือข่ายนี้ถูกบล็อก" }}{{ end }}{{ if $lockdown }}{{ $message = "ระบบอยู่ระหว่างการปรับปรุง กรุณากลับมาใหม่อีกครั้ง" }}{{ end }}
+{{ $titles := dict "400" "ลิงก์นี้ใช้ไม่ได้" "401" "ต้องเข้าสู่ระบบก่อน" "403" "ไม่มีสิทธิ์เปิดหน้านี้" "404" "ไม่พบหน้านี้" "405" "เปิดแบบนี้ไม่ได้" "408" "รอนานเกินไป" "410" "หน้านี้ถูกลบแล้ว" "413" "ไฟล์ใหญ่เกินไป" "429" "เข้าถี่เกินไป" "500" "เว็บมีปัญหา" "501" "ยังไม่รองรับ" "502" "เชื่อมต่อไม่ได้" "503" "ใช้งานไม่ได้ชั่วคราว" "504" "เซิร์ฟเวอร์ตอบช้า" "507" "พื้นที่เต็ม" }}
+{{ $title := index $titles $status }}{{ if not $title }}{{ $title = "เปิดหน้านี้ไม่ได้" }}{{ end }}{{ if $blocked }}{{ $title = "ถูกบล็อกการเข้าถึง" }}{{ end }}{{ if $lockdown }}{{ $title = "ปิดปรับปรุงชั่วคราว" }}{{ end }}
+{{ $message := "ลองโหลดหน้าใหม่อีกครั้งในอีกสักครู่" }}{{ if eq $status "400" }}{{ $message = "ลองกลับไปหน้าก่อนแล้วทำใหม่อีกครั้ง" }}{{ else if eq $status "401" }}{{ $message = "เข้าสู่ระบบแล้วค่อยเปิดหน้านี้อีกครั้ง" }}{{ else if eq $status "403" }}{{ $message = "บัญชีนี้เปิดหน้านี้ไม่ได้ ถ้าคิดว่าผิดพลาด ติดต่อทีมงานได้เลย" }}{{ else if eq $status "404" }}{{ $message = "ลิงก์อาจพิมพ์ผิด หรือหน้านี้ถูกย้ายไปแล้ว" }}{{ else if eq $status "408" }}{{ $message = "การเชื่อมต่อหมดเวลา ลองโหลดหน้าใหม่" }}{{ else if eq $status "410" }}{{ $message = "หน้านี้ไม่มีให้เปิดแล้ว" }}{{ else if eq $status "413" }}{{ $message = "ลดขนาดไฟล์ แล้วลองส่งใหม่อีกครั้ง" }}{{ else if eq $status "429" }}{{ $message = "พักสักครู่ แล้วค่อยลองใหม่" }}{{ else if eq $status "502" }}{{ $message = "เซิร์ฟเวอร์ไม่ตอบ ลองโหลดหน้าใหม่ในอีกสักครู่" }}{{ end }}{{ if $blocked }}{{ $message = "เครือข่ายของคุณถูกบล็อกไว้ ส่ง IP ด้านล่างให้ทีมงานเพื่อขอปลดบล็อก" }}{{ end }}{{ if $lockdown }}{{ $message = "เว็บกำลังปรับปรุงอยู่ ลองกลับมาใหม่ภายหลัง" }}{{ end }}
+{{ $retry := or $lockdown (and (not $blocked) (eq (len $status) 3) (hasPrefix "5" $status)) }}
 <!doctype html>
 <html lang="th">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23101114'/%3E%3Cpath d='M9 23V9l14 14V9' fill='none' stroke='%23ececef' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23101114'/%3E%3Cpath d='M9 23V9l14 14V9' fill='none' stroke='%23ececef' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="shortcut icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23101114'/%3E%3Cpath d='M9 23V9l14 14V9' fill='none' stroke='%23ececef' stroke-width='3'/%3E%3C/svg%3E">
   <title>{{ $title | html }} | NEXORA</title>
   <style>
     @font-face {
@@ -25,118 +27,784 @@
       font-weight: 100 900;
       font-display: swap;
     }
-    :root { color-scheme: dark; font-family: "Nexora Thai", system-ui, sans-serif; background: #10151f; color: #f0f3f8; }
-    *, *::before, *::after { box-sizing: border-box; font-family: inherit; }
-    body { margin: 0; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding: max(32px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-left)) max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-right)); }
-    header, main, footer { width: 100%; max-width: 520px; margin-inline: auto; }
-    header { display: flex; justify-content: space-between; align-items: center; color: #929398; font-size: 12px; line-height: 1.5; font-family: inherit; }
-    .brand { display: inline-flex; align-items: center; gap: 10px; color: #f0f3f8; font-weight: 700; letter-spacing: .09em; }
-    .error-code-wrap { display: inline-flex; align-items: center; gap: 16px; margin: 0 0 16px; }
-    .error-code { margin: 0; color: #f08f87; font-family: inherit; font-size: clamp(64px, 15vw, 96px); font-weight: 650; line-height: 1; letter-spacing: -.055em; font-feature-settings: "tnum"; }
-    main { min-width: 0; padding-block: 40px; display: grid; gap: 32px; }
-    .message, .ip-details { min-width: 0; }
-    .symbol { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; color: #ea8588; flex-shrink: 0; }
-    .symbol svg { width: 38px; height: 38px; }
-    h1 { margin: 0; font-size: clamp(25px, 6vw, 32px); font-weight: 650; line-height: 1.45; letter-spacing: -.02em; }
-    p { margin: 16px 0 0; font-size: 15px; line-height: 1.8; color: #acb8cb; }
-    label { display: block; margin-bottom: 9px; font-size: 13px; color: #c3cfe2; }
-    input { display: block; width: 100%; min-width: 0; min-height: 52px; padding: 14px 16px; border: 1px solid #354867; border-radius: 8px; background: #19263c; color: #f0f3f8; font: 16px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
-    input:focus-visible { outline: 2px solid #94b1ff; outline-offset: 3px; }
-    #client-ip { cursor: pointer; transition: border-color .15s ease; }
-    #client-ip:hover { border-color: #759bff; background: #1d2e49; }
-    #client-ip::selection { background: #4269b2; color: #fff; }
-    .ip-box { position: relative; }
-    .ip-box input { padding-right: 58px; }
-    .copy-button { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 6px; color: #a2bdff; background: transparent; cursor: pointer; }
-    .copy-button:hover { background: #2b3e5d; color: #fff; }
-    .copy-button:focus-visible { outline: 2px solid #94b1ff; outline-offset: 1px; }
-    .copy-button svg { width: 20px; height: 20px; }
-    .copy-status { margin: 8px 0 0; font-size: 13px; color: #a2bdff; }
-    .copy-status:empty { margin: 0; }
-    .help { margin: 12px 0 0; font-size: 13px; color: #acb8cb; }
-    .error-actions { display: grid; gap: 12px; }
-    .error-actions a { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px 20px; border: 1px solid #354867; border-radius: 8px; background: #19263c; color: #f0f3f8; text-decoration: none; }
-    .error-actions a:hover { border-color: #759bff; background: #1d2e49; }
-    .error-actions a:focus-visible { outline: 2px solid #94b1ff; outline-offset: 3px; }
-    footer { border-top: 1px solid #2a2b30; padding-top: 16px; color: #929398; font-size: 12px; line-height: 1.6; }
-    @media (min-width: 900px) {
-      body { padding: 56px; }
-      header, main, footer { max-width: 960px; }
-      main { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 64px; align-items: center; padding-block: 72px; }
-      h1 { font-size: clamp(32px, 2.6vw, 42px); max-width: 520px; }
-      .ip-details { border-left: 1px solid #2c3a50; padding-left: 40px; }
-      input { font-size: 17px; }
+    /*
+     * Two looks, picked the way the site is (the admin's Settings -> General): the rounded card, or in
+     * square mode (html[data-ui="square"]) the Discord verify page's card. Light or dark follows
+     * html[data-theme], the accent follows the site's colour (--p). The script below reads the values
+     * the site saved in this browser, then asks /api/settings/public for the current ones.
+     */
+    :root {
+      --p: #ff1018;
+      --p-rgb: 255 16 24;
+      color-scheme: dark;
+      background: #090d16;
+      color: #f1f5f9;
+      font-family: "Nexora Thai", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    @media (max-width: 360px) { body { padding-inline: 20px; } main { padding-block: 28px; gap: 24px; } }
-    @media (max-height: 540px) { body { justify-content: flex-start; } main { padding-block: 28px; } }
-    @media (prefers-reduced-motion: reduce) { #client-ip { transition: none; } }
+    html[data-theme="light"] { color-scheme: light; background: #f4f6fa; color: #0f172a; }
+    html {
+      box-sizing: border-box;
+      -webkit-text-size-adjust: 100%;
+    }
+    *, *::before, *::after {
+      box-sizing: inherit;
+      font-family: inherit;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100svh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-left)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right));
+      background: radial-gradient(circle at 50% 20%, #151d2f 0%, #090d16 75%);
+    }
+
+    /* ---------- Rounded card ---------- */
+    .card {
+      --c-card: #111724; --c-line: #1e293b; --c-field: #0b0f19; --c-field-hover: #0d1424; --c-button: #151d2f; --c-button-hover: #1c273e;
+      --c-strong: #f8fafc; --c-soft: #94a3b8; --c-faint: #64748b; --c-edge: #293548; --c-code: #f87171; --c-link: #38bdf8;
+      width: 100%;
+      max-width: 480px;
+      margin: auto;
+      background: var(--c-card);
+      border: 1px solid var(--c-line);
+      border-radius: 16px;
+      padding: 36px 30px;
+      box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.6);
+    }
+    html[data-theme="light"] body { background: radial-gradient(circle at 50% 20%, #ffffff 0%, #eef1f6 75%); }
+    html[data-theme="light"] .card {
+      --c-card: #ffffff; --c-line: #e2e8f0; --c-field: #f8fafc; --c-field-hover: #f1f5f9; --c-button: #f8fafc; --c-button-hover: #f1f5f9;
+      --c-strong: #0f172a; --c-soft: #475569; --c-faint: #64748b; --c-edge: #cbd5e1; --c-code: #dc2626; --c-link: #0369a1;
+      box-shadow: 0 20px 45px -18px rgba(15, 23, 42, .18);
+    }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+      color: var(--c-soft);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .brand-mark {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 0 0 10px #ef4444;
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .status-code {
+      font-size: clamp(40px, 11vw, 54px);
+      font-weight: 700;
+      line-height: 1;
+      color: var(--c-code);
+      letter-spacing: -.03em;
+    }
+    .status-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--c-code);
+    }
+    .status-icon svg {
+      width: 28px;
+      height: 28px;
+    }
+    .card h1 {
+      margin: 0 0 8px;
+      font-size: clamp(19px, 4.8vw, 24px);
+      font-weight: 600;
+      line-height: 1.4;
+      color: var(--c-strong);
+      letter-spacing: -.01em;
+    }
+    .card p {
+      margin: 0 0 24px;
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--c-soft);
+    }
+    .ip-section {
+      border-top: 1px solid var(--c-line);
+      padding-top: 24px;
+      margin-top: 4px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--c-soft, #94a3b8);
+    }
+    .ip-box {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+    .card input {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      min-height: 48px;
+      padding: 12px 50px 12px 14px;
+      border: 1px solid var(--c-edge);
+      border-radius: 10px;
+      background: var(--c-field);
+      color: var(--c-link);
+      font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      cursor: pointer;
+      transition: border-color .15s ease, background-color .15s ease;
+    }
+    .card input:hover {
+      border-color: var(--c-link);
+      background: var(--c-field-hover);
+    }
+    .card input:focus-visible {
+      outline: 2px solid var(--c-link);
+      outline-offset: 2px;
+    }
+    .card .copy-btn {
+      position: absolute;
+      right: 5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--c-soft);
+      cursor: pointer;
+      transition: background-color .15s ease, color .15s ease;
+    }
+    .card .copy-btn:hover {
+      background: var(--c-line);
+      color: var(--c-strong);
+    }
+    .card .copy-btn:focus-visible {
+      outline: 2px solid var(--c-link);
+      outline-offset: 1px;
+    }
+    .copy-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+    .card .copy-status {
+      margin: 8px 0 0;
+      font-size: 13px;
+      color: var(--c-link);
+      min-height: 18px;
+    }
+    .copy-status:empty {
+      display: none;
+    }
+    .card .help-text {
+      margin: 4px 0 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--c-faint);
+    }
+    .error-actions {
+      border-top: 1px solid var(--c-line);
+      padding-top: 24px;
+      margin-top: 4px;
+      display: grid;
+      gap: 12px;
+    }
+    .card .reopen { margin-top: -12px; color: var(--c-strong); font-weight: 500; }
+    .error-actions:has(a + a) { grid-template-columns: 1fr 1fr; }
+    .error-actions a + a { background: transparent; }
+    .error-actions a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 12px 20px;
+      border: 1px solid var(--c-edge);
+      border-radius: 10px;
+      background: var(--c-button);
+      color: var(--c-strong);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: border-color .15s ease, background-color .15s ease;
+    }
+    .error-actions a:hover {
+      border-color: var(--c-link);
+      background: var(--c-button-hover);
+    }
+    .error-actions a:focus-visible {
+      outline: 2px solid var(--c-link);
+      outline-offset: 2px;
+    }
+    @media (max-width: 480px) {
+      body {
+        padding: max(16px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-right));
+      }
+      .card {
+        padding: 28px 18px;
+        border-radius: 14px;
+      }
+    }
+    @media (max-width: 340px) {
+      .card {
+        padding: 22px 14px;
+      }
+      .card input {
+        font-size: 13px;
+        padding-left: 10px;
+      }
+    }
+
+    /* ---------- Square mode: the verify page's card (app/verify/verify.css, trimmed) ---------- */
+    .vf { display: none; }
+    html[data-ui="square"] .card { display: none; }
+    html[data-ui="square"] body { display: block; padding: 0; background: var(--vf-page); }
+    html[data-ui="square"] .vf { display: grid; }
+    .vf {
+      --vf-red: var(--p);
+      --vf-red-soft: color-mix(in srgb, var(--p) 76%, #fff);
+      --vf-orange: color-mix(in srgb, var(--p) 62%, #ff9a3d);
+      --vf-deep: color-mix(in srgb, var(--p) 42%, #000);
+      --vf-ink: #fff;
+      --vf-text: #d3d3d8;
+      --vf-brand-ink: #e9e9ec;
+      --vf-dim: #a39da1;
+      --vf-page: #060508;
+      --vf-panel: linear-gradient(135deg, #0a0708 0%, #120609 58%, #1b070d 100%);
+      --vf-core: #050405;
+      --vf-well: rgba(0, 0, 0, .25);
+      --vf-well-edge: rgba(255, 255, 255, .2);
+      --vf-glitch-cool: #3fe6ff;
+      --vf-glitch-blend: screen;
+      --vf-glitch: 6s steps(1, end) 2s infinite;
+      --vf-mark-a: .15;
+      --vf-cut: clamp(18px, 4vw, 30px);
+      --vf-badge: clamp(112px, 24vw, 224px);
+      position: relative;
+      isolation: isolate;
+      min-height: 100vh;
+      min-height: 100dvh;
+      place-items: center;
+      padding: max(16px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+      overflow: hidden;
+      background: var(--vf-page);
+      color: var(--vf-ink);
+    }
+    html[data-theme="light"] .vf {
+      --vf-red-soft: color-mix(in srgb, var(--p) 88%, #000);
+      --vf-ink: #17090c;
+      --vf-text: #4c4044;
+      --vf-brand-ink: #2b1c20;
+      --vf-dim: #6c6064;
+      --vf-page: #f6f2f3;
+      --vf-panel: linear-gradient(135deg, #ffffff 0%, #fcf3f4 58%, #f8e6e9 100%);
+      --vf-core: #ffffff;
+      --vf-well: rgba(23, 9, 12, .04);
+      --vf-well-edge: rgba(23, 9, 12, .22);
+      --vf-glitch-cool: #0a9ab8;
+      --vf-glitch-blend: multiply;
+      --vf-mark-a: .22;
+    }
+    .vf-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+    .vf-glow {
+      position: absolute; inset: -20%;
+      background:
+        radial-gradient(48% 56% at 82% 18%, rgb(var(--p-rgb) / .30), transparent 62%),
+        radial-gradient(46% 58% at 8% 92%, color-mix(in srgb, var(--vf-deep) 60%, transparent), transparent 66%);
+      animation: vf-drift 18s ease-in-out infinite alternate, vf-g-bg var(--vf-glitch);
+    }
+    html[data-theme="light"] .vf-glow {
+      background:
+        radial-gradient(48% 56% at 82% 18%, rgb(var(--p-rgb) / .20), transparent 62%),
+        radial-gradient(46% 58% at 8% 92%, rgb(var(--p-rgb) / .12), transparent 66%);
+    }
+    .vf-lines {
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(115deg, transparent 0 18px, rgb(var(--p-rgb) / .07) 18px 19px);
+      -webkit-mask-image: linear-gradient(to left, #000 0%, transparent 72%);
+      mask-image: linear-gradient(to left, #000 0%, transparent 72%);
+      animation: vf-g-bg var(--vf-glitch);
+    }
+    .vf-mark {
+      position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: clamp(0px, .8vw, 12px); overflow: hidden;
+      color: transparent; -webkit-text-stroke: 2px rgb(var(--p-rgb) / var(--vf-mark-a));
+      user-select: none;
+      animation: vf-g-mark var(--vf-glitch);
+    }
+    .vf-mark span {
+      --x: 0px; --dur: 8s;
+      display: block; width: max-content; justify-self: center; white-space: nowrap; overflow-wrap: normal; word-break: normal;
+      font-weight: 900; line-height: .86; letter-spacing: -.02em;
+      font-size: clamp(88px, 18vw, 300px);
+      transform: translateX(var(--x)); transition: transform var(--dur) cubic-bezier(.45, .05, .3, 1);
+    }
+    .vf-mark span:nth-child(1) { --x: -9vw; }
+    .vf-mark span:nth-child(2) { --x: 7vw; }
+    .vf-mark span:nth-child(3) { --x: -3vw; }
+    .vf-bg .vf-wslice {
+      position: absolute; left: 0; right: 0; top: var(--y); height: var(--h); opacity: 0;
+      background: linear-gradient(90deg, transparent, rgb(var(--p-rgb) / .3) 12%, rgb(var(--p-rgb) / .12) 60%, transparent);
+      mix-blend-mode: var(--vf-glitch-blend); animation: vf-g-wbar var(--vf-glitch);
+    }
+    .vf-bg .vf-wslice.is-b { background: linear-gradient(270deg, transparent, rgb(63 230 255 / .22) 14%, rgb(63 230 255 / .08) 60%, transparent); animation-name: vf-g-wbar-b; }
+    .ws1 { --y: 9%; --h: 3%; } .ws2 { --y: 27%; --h: 6%; } .ws3 { --y: 52%; --h: 2%; } .ws4 { --y: 71%; --h: 7%; } .ws5 { --y: 90%; --h: 4%; }
+    .vf-crt {
+      position: fixed; inset: 0; z-index: 5; opacity: 0; pointer-events: none;
+      background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .28) 0 1px, transparent 1px 3px), radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(var(--p-rgb) / .16));
+      animation: vf-g-crt var(--vf-glitch);
+    }
+    html[data-theme="light"] .vf-crt { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .1) 0 1px, transparent 1px 3px), radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(var(--p-rgb) / .12)); }
+
+    .vf-frame {
+      --edge: polygon(0 0, calc(100% - var(--vf-cut)) 0, 100% var(--vf-cut), 100% 100%, var(--vf-cut) 100%, 0 calc(100% - var(--vf-cut)));
+      width: min(100%, 920px);
+      padding: 1px;
+      clip-path: var(--edge);
+      background: linear-gradient(135deg, rgb(var(--p-rgb) / .85), rgb(var(--p-rgb) / .14) 42%, color-mix(in srgb, var(--vf-orange) 40%, transparent));
+      background-size: 200% 200%;
+      animation: vf-rise .8s cubic-bezier(.2, .75, .2, 1) both, vf-edge 9s ease-in-out infinite alternate, vf-g-card var(--vf-glitch);
+    }
+    .vf-panel {
+      position: relative;
+      display: grid;
+      gap: clamp(18px, 3vw, 30px);
+      padding: clamp(20px, 4.2vw, 42px);
+      overflow: hidden;
+      clip-path: polygon(0 0, calc(100% - var(--vf-cut) + .41px) 0, 100% calc(var(--vf-cut) - .41px), 100% 100%, calc(var(--vf-cut) - .41px) 100%, 0 calc(100% - var(--vf-cut) + .41px));
+      background: radial-gradient(60% 80% at 92% 30%, rgb(var(--p-rgb) / .18), transparent 70%), var(--vf-panel);
+    }
+    .vf-panel::before {
+      content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+      background: repeating-linear-gradient(115deg, transparent 0 14px, rgb(var(--p-rgb) / .06) 14px 15px);
+      -webkit-mask-image: linear-gradient(to left, #000 0%, transparent 60%);
+      mask-image: linear-gradient(to left, #000 0%, transparent 60%);
+    }
+    .vf-panel::after {
+      content: ""; position: absolute; left: 0; right: 0; top: 0; z-index: 0; height: 90px; pointer-events: none;
+      background: linear-gradient(to bottom, transparent, rgb(var(--p-rgb) / .09) 60%, rgb(var(--p-rgb) / .22) 99%, transparent 100%);
+      transform: translateY(-100%);
+      animation: vf-scan 7s linear 1.2s infinite;
+    }
+    .vf-panel > * { position: relative; z-index: 1; }
+    .vf-panel > .vf-slice {
+      position: absolute; left: 0; right: 0; top: var(--y); height: var(--h); z-index: 2; opacity: 0; pointer-events: none;
+      background: linear-gradient(90deg, transparent 0%, rgb(var(--p-rgb) / .3) 18%, rgb(var(--p-rgb) / .14) 70%, transparent 100%);
+      mix-blend-mode: var(--vf-glitch-blend); animation: vf-g-bar var(--vf-glitch);
+    }
+    .vf-panel > .vf-slice.is-b { background: linear-gradient(270deg, transparent 0%, rgb(63 230 255 / .2) 22%, rgb(63 230 255 / .08) 70%, transparent 100%); animation-name: vf-g-bar-b; }
+    .ps1 { --y: 14%; --h: 5%; } .ps2 { --y: 38%; --h: 9%; } .ps3 { --y: 61%; --h: 4%; } .ps4 { --y: 83%; --h: 7%; }
+
+    .vf-in { animation: vf-in .65s cubic-bezier(.2, .75, .2, 1) both; animation-delay: calc(var(--i, 0) * 70ms + 140ms); }
+    .i1 { --i: 1; } .i2 { --i: 2; } .i3 { --i: 3; } .i4 { --i: 4; } .i5 { --i: 5; }
+
+    .vf-top { display: flex; align-items: center; gap: 12px; }
+    .vf-top b { color: var(--vf-brand-ink); font-size: 13px; font-weight: 700; letter-spacing: .32em; animation: vf-g-twitch var(--vf-glitch); }
+    .vf-top span { margin-left: auto; color: var(--vf-dim); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: .18em; animation: vf-g-twitch var(--vf-glitch); }
+    .vf-diamond { width: 12px; height: 12px; flex: none; background: var(--vf-red); transform: rotate(45deg); box-shadow: 0 0 14px rgb(var(--p-rgb) / .8); animation: vf-blink 2.6s ease-in-out infinite; }
+
+    .vf-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: clamp(16px, 4vw, 48px); }
+    .vf-copy { display: grid; justify-items: start; gap: 12px; min-width: 0; width: 100%; }
+    .vf-kicker { margin: 0; color: var(--vf-red-soft); font-size: clamp(1.05rem, 2.4vw, 1.5rem); font-weight: 600; }
+    .vf-title {
+      position: relative; margin: 0; max-width: 100%; color: var(--vf-ink);
+      font-size: clamp(2.1rem, 6.4vw, 3.8rem); font-weight: 800; line-height: 1.15;
+      overflow-wrap: normal; word-break: normal; text-wrap: balance;
+      animation: vf-g-jolt var(--vf-glitch);
+    }
+    .vf-title span { display: inline-block; animation: vf-reveal .95s cubic-bezier(.2, .8, .2, 1) .22s both; }
+    .vf-title::before, .vf-title::after {
+      content: attr(data-text); position: absolute; inset: 0; opacity: 0; pointer-events: none; user-select: none;
+      overflow-wrap: normal; word-break: normal; mix-blend-mode: var(--vf-glitch-blend);
+    }
+    .vf-title::before { color: var(--vf-red-soft); animation: vf-g-slice-a var(--vf-glitch); }
+    .vf-title::after { color: var(--vf-glitch-cool); animation: vf-g-slice-b var(--vf-glitch); }
+    .vf-bar { display: block; width: clamp(96px, 16vw, 150px); height: 5px; background: linear-gradient(90deg, var(--vf-red), var(--vf-orange)); transform-origin: left center; }
+    .vf-bar.vf-in { animation-name: vf-grow; }
+    .vf-lead { margin: 4px 0 0; max-width: 40ch; color: var(--vf-text); font-size: clamp(1rem, 2vw, 1.15rem); line-height: 1.75; overflow-wrap: normal; word-break: normal; text-wrap: pretty; max-width: 48ch; }
+    .vf-facts { display: flex; margin: 6px 0 0; padding: 10px 16px; border-left: 3px solid var(--vf-red); background: rgb(var(--p-rgb) / .08); }
+    .vf-facts dt { margin: 0 0 2px; color: var(--vf-dim); font-size: 13px; }
+    .vf-facts dd { margin: 0; color: var(--vf-ink); font-size: clamp(1.05rem, 2.4vw, 1.3rem); font-weight: 700; line-height: 1.3; }
+    .vf-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    .vf-actions .vf-btn { flex: 1 1 200px; max-width: 280px; }
+    .vf-btn.is-ghost { background: rgb(var(--p-rgb) / .12); color: var(--vf-ink); }
+    .vf-btn.is-ghost::after { display: none; }
+
+    .vf-badge { --ra: var(--vf-red); --rb: var(--vf-orange); position: relative; width: var(--vf-badge); height: var(--vf-badge); flex: none; }
+    .vf-fx { position: absolute; inset: 0; animation: vf-g-badge var(--vf-glitch); }
+    .vf-ring { position: absolute; border-radius: 50%; }
+    .vf-ring-dash { inset: 0; border: 2px dashed rgb(var(--p-rgb) / .36); animation: vf-turn 46s linear infinite; }
+    .vf-ring-arc { inset: 7%; border: 2px solid var(--ra); opacity: .55; }
+    .vf-dot { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--ra); box-shadow: 0 0 12px var(--ra); animation: vf-blink 2.4s ease-in-out infinite; }
+    .vf-dot-n { left: calc(50% - 4.5px); top: -4.5px; }
+    .vf-dot-e { right: -4.5px; top: calc(50% - 4.5px); animation-delay: .8s; }
+    .vf-dot-s { left: calc(50% - 4.5px); bottom: -4.5px; animation-delay: 1.6s; }
+    .vf-core {
+      position: absolute; inset: 17%; display: grid; place-items: center; overflow: hidden; border-radius: 50%;
+      border: 4px solid transparent;
+      background: linear-gradient(var(--vf-core), var(--vf-core)) padding-box, linear-gradient(135deg, var(--rb), var(--ra)) border-box;
+      box-shadow: 0 0 40px color-mix(in srgb, var(--ra) 38%, transparent);
+    }
+    .vf-code { color: var(--vf-red-soft); font-size: calc(var(--vf-badge) * .22); font-weight: 800; line-height: 1; letter-spacing: -.02em; font-feature-settings: "tnum"; }
+
+    .vf-flow { display: grid; gap: 12px; max-width: 420px; }
+    .vf-btn {
+      position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 56px; padding: 0 22px; overflow: hidden;
+      color: #fff; font-size: 1.08rem; font-weight: 700; letter-spacing: .02em; text-decoration: none;
+      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+      background: linear-gradient(100deg, var(--vf-red), var(--vf-orange));
+      transition: transform .2s ease, filter .2s ease;
+    }
+    .vf-btn::after {
+      content: ""; position: absolute; top: 0; bottom: 0; left: -70%; width: 40%; pointer-events: none;
+      background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .38), transparent); transform: skewX(-20deg);
+      animation: vf-shine 3.8s ease-in-out 1.4s infinite;
+    }
+    .vf-btn:hover { transform: translateY(-2px); filter: brightness(1.1) saturate(1.1); }
+    .vf-btn:focus-visible { outline: 2px solid var(--vf-ink); outline-offset: 3px; }
+    .vf label { color: var(--vf-dim); }
+    .vf .ip-box input {
+      display: block; width: 100%; min-width: 0; min-height: 52px; padding: 12px 54px 12px 16px;
+      border: 1px solid var(--vf-well-edge); border-radius: 0; background: var(--vf-well); color: var(--vf-ink);
+      font: 16px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; cursor: pointer;
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    }
+    .vf .ip-box input:hover { border-color: var(--vf-red); }
+    .vf .ip-box input:focus-visible { outline: 2px solid var(--vf-red); outline-offset: -2px; }
+    .vf .copy-btn {
+      position: absolute; right: 6px; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+      border: 0; background: transparent; color: var(--vf-red-soft); cursor: pointer;
+    }
+    .vf .copy-btn:hover { background: rgb(var(--p-rgb) / .14); }
+    .vf .copy-btn:focus-visible { outline: 2px solid var(--vf-red); outline-offset: 1px; }
+    .vf .copy-status { margin: 0; color: var(--vf-red-soft); font-size: 13px; }
+    .vf .help-text { margin: 0; color: var(--vf-dim); font-size: 13px; line-height: 1.6; }
+
+    @media (max-width: 640px) {
+      .vf { --vf-mark-a: .3; }
+      html[data-theme="light"] .vf { --vf-mark-a: .38; }
+      .vf-mark { align-content: space-between; padding-block: clamp(16px, 5vh, 56px); }
+      .vf-mark span { font-size: 24vw; }
+      .vf-body { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; gap: 22px; }
+      .vf-badge { order: -1; }
+      .vf-copy { justify-items: center; }
+      .vf-bar { transform-origin: center; }
+      .vf-flow { max-width: none; }
+      .vf-lead { text-align: center; }
+      .vf-actions .vf-btn { max-width: none; }
+    }
+    @media (max-width: 400px) {
+      .vf { padding-left: 10px; padding-right: 10px; }
+      .vf-top span { display: none; }
+    }
+    @media (max-height: 560px) {
+      .vf { place-items: start center; --vf-badge: clamp(96px, 20vh, 150px); }
+      .vf-panel { gap: 16px; }
+    }
+
+    @keyframes vf-rise { from { opacity: 0; transform: translateY(26px) scale(.985); } }
+    @keyframes vf-in { from { opacity: 0; transform: translateY(14px); } }
+    @keyframes vf-reveal { from { clip-path: inset(0 100% 0 0); opacity: 0; transform: translateX(-14px); } to { clip-path: inset(-40px -60px -40px -40px); opacity: 1; transform: none; } }
+    @keyframes vf-grow { from { opacity: 0; transform: scaleX(0); } }
+    @keyframes vf-turn { to { transform: rotate(360deg); } }
+    @keyframes vf-drift { from { transform: translate3d(-3%, -2%, 0) scale(1); } to { transform: translate3d(3%, 3%, 0) scale(1.08); } }
+    @keyframes vf-edge { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
+    @keyframes vf-scan { 0% { transform: translateY(-100%); } 55%, 100% { transform: translateY(1500%); } }
+    @keyframes vf-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+    @keyframes vf-shine { 0%, 55% { left: -70%; } 100% { left: 140%; } }
+    @keyframes vf-g-jolt {
+      0%, 4.8%, 52.8%, 100% { transform: none; }
+      0.4% { transform: translate(-3px, 0) skewX(-5deg); }
+      1.2% { transform: translate(4px, 1px); }
+      2% { transform: translate(-2px, 0) skewX(4deg); }
+      2.8% { transform: translate(3px, -1px); }
+      3.6% { transform: translate(-1px, 0); }
+      52% { transform: translate(2px, 0); }
+      52.4% { transform: translate(-2px, 0) skewX(-3deg); }
+    }
+    @keyframes vf-g-slice-a {
+      0%, 5%, 52.8%, 100% { opacity: 0; clip-path: inset(0 0 100% 0); transform: none; }
+      0.4% { opacity: 1; clip-path: inset(12% 0 68% 0); transform: translateX(-7px); }
+      1.2% { opacity: 1; clip-path: inset(55% 0 22% 0); transform: translateX(5px); }
+      2% { opacity: 1; clip-path: inset(30% 0 48% 0); transform: translateX(-9px); }
+      2.8% { opacity: 1; clip-path: inset(72% 0 6% 0); transform: translateX(4px); }
+      3.6% { opacity: 1; clip-path: inset(4% 0 82% 0); transform: translateX(-4px); }
+      52% { opacity: 1; clip-path: inset(34% 0 44% 0); transform: translateX(-4px); }
+    }
+    @keyframes vf-g-slice-b {
+      0%, 5%, 52.8%, 100% { opacity: 0; clip-path: inset(0 0 100% 0); transform: none; }
+      0.4% { opacity: 1; clip-path: inset(60% 0 14% 0); transform: translateX(8px); }
+      1.2% { opacity: 1; clip-path: inset(18% 0 62% 0); transform: translateX(-6px); }
+      2% { opacity: 1; clip-path: inset(80% 0 2% 0); transform: translateX(9px); }
+      2.8% { opacity: 1; clip-path: inset(38% 0 36% 0); transform: translateX(-5px); }
+      3.6% { opacity: 1; clip-path: inset(8% 0 74% 0); transform: translateX(4px); }
+      52% { opacity: 1; clip-path: inset(58% 0 20% 0); transform: translateX(4px); }
+    }
+    @keyframes vf-g-twitch {
+      0%, 4.6%, 52.6%, 100% { transform: none; text-shadow: none; }
+      0.6% { transform: translateX(-3px); text-shadow: 2px 0 var(--vf-red-soft), -2px 0 var(--vf-glitch-cool); }
+      1.6% { transform: translateX(4px); text-shadow: -2px 0 var(--vf-red-soft), 2px 0 var(--vf-glitch-cool); }
+      2.6% { transform: translateX(-2px); text-shadow: none; }
+      3.6% { transform: translateX(2px); text-shadow: 2px 0 var(--vf-red-soft), -2px 0 var(--vf-glitch-cool); }
+      52.2% { transform: translateX(2px); text-shadow: -1px 0 var(--vf-glitch-cool); }
+    }
+    @keyframes vf-g-badge {
+      0%, 4.4%, 52.6%, 100% { transform: none; filter: none; }
+      0.5% { transform: translateX(5px) skewX(-4deg); filter: drop-shadow(-4px 0 var(--vf-red)) drop-shadow(4px 0 var(--vf-glitch-cool)); }
+      1.4% { transform: translateX(-6px); filter: drop-shadow(4px 0 var(--vf-red)) drop-shadow(-4px 0 var(--vf-glitch-cool)); }
+      2.3% { transform: translateX(3px) skewX(3deg); filter: hue-rotate(40deg) saturate(1.6); }
+      3.2% { transform: translateX(-3px); filter: drop-shadow(-3px 0 var(--vf-red)) drop-shadow(3px 0 var(--vf-glitch-cool)); }
+      52.2% { transform: translateX(3px); filter: drop-shadow(-3px 0 var(--vf-glitch-cool)); }
+    }
+    @keyframes vf-g-card {
+      0%, 4.4%, 52.6%, 100% { transform: none; }
+      0.4% { transform: translateX(-5px) skewX(-.6deg); }
+      1.2% { transform: translateX(6px); }
+      2% { transform: translate(-3px, 1px) skewX(.5deg); }
+      2.8% { transform: translateX(4px); }
+      3.6% { transform: translateX(-2px); }
+      52% { transform: translateX(-3px); }
+    }
+    @keyframes vf-g-bg {
+      0%, 4.6%, 52.6%, 100% { translate: 0 0; filter: none; }
+      0.4% { translate: -16px 0; filter: brightness(1.8); }
+      1.2% { translate: 22px 0; filter: hue-rotate(28deg) brightness(1.4); }
+      2% { translate: -10px 0; filter: brightness(2); }
+      2.8% { translate: 12px 0; filter: none; }
+      3.6% { translate: -5px 0; filter: brightness(1.5); }
+      52% { translate: 8px 0; filter: brightness(1.5); }
+    }
+    @keyframes vf-g-wbar {
+      0%, 5%, 52.8%, 100% { opacity: 0; transform: none; }
+      0.4%, 2.4% { opacity: 1; transform: translateX(-14%); }
+      1.2%, 3.2% { opacity: 0; }
+      1.6% { opacity: .9; transform: translateX(18%); }
+      52% { opacity: .7; transform: translateX(10%); }
+    }
+    @keyframes vf-g-wbar-b {
+      0%, 5%, 52.8%, 100% { opacity: 0; transform: none; }
+      0.8%, 2.8% { opacity: 1; transform: translateX(16%); }
+      1.6%, 3.6% { opacity: 0; }
+      2% { opacity: .9; transform: translateX(-20%); }
+      52.4% { opacity: .6; transform: translateX(-12%); }
+    }
+    @keyframes vf-g-crt {
+      0%, 5%, 52.8%, 100% { opacity: 0; }
+      0.4%, 1.6%, 2.8% { opacity: 1; }
+      1.2%, 2.2%, 3.6% { opacity: .35; }
+      52% { opacity: .7; }
+    }
+    @keyframes vf-g-mark {
+      0%, 5%, 52.8%, 100% { -webkit-text-stroke-color: rgb(var(--p-rgb) / var(--vf-mark-a)); translate: 0 0; }
+      0.4% { -webkit-text-stroke-color: rgb(var(--p-rgb) / .55); translate: -26px 0; }
+      1.2% { -webkit-text-stroke-color: rgb(63 230 255 / .35); translate: 34px 0; }
+      2% { -webkit-text-stroke-color: rgb(var(--p-rgb) / .55); translate: -14px 0; }
+      2.8% { -webkit-text-stroke-color: rgb(63 230 255 / .3); translate: 16px 0; }
+      3.6% { translate: -6px 0; }
+      52% { -webkit-text-stroke-color: rgb(var(--p-rgb) / .4); translate: 12px 0; }
+    }
+    @keyframes vf-g-bar {
+      0%, 5%, 52.8%, 100% { opacity: 0; transform: none; }
+      0.4%, 2.4% { opacity: 1; transform: translateX(-8%); }
+      1.2%, 3.2% { opacity: 0; }
+      1.6% { opacity: .8; transform: translateX(10%); }
+      52% { opacity: .6; transform: translateX(6%); }
+    }
+    @keyframes vf-g-bar-b {
+      0%, 5%, 52.8%, 100% { opacity: 0; transform: none; }
+      0.8%, 2.8% { opacity: 1; transform: translateX(9%); }
+      1.6%, 3.6% { opacity: 0; }
+      2% { opacity: .9; transform: translateX(-12%); }
+      52.4% { opacity: .5; transform: translateX(-7%); }
+    }
   </style>
-</head>
-<body>
-  <header><span class="brand">NEXORA</span></header>
-  <main>
-    <section class="message" aria-labelledby="page-title">
-    <div class="error-code-wrap">
-      <span class="error-code" aria-label="ข้อผิดพลาด {{ $status | html }}">{{ $status | html }}</span>
-      <span class="symbol" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/><path d="M12 14v3"/></svg>
-      </span>
-    </div>
-    <h1 id="page-title">{{ $title | html }}</h1>
-    <p>{{ $message | html }}</p>
-    {{ if and $lockdown $lockdownExpires }}<p>กำหนดเปิดอัตโนมัติ: {{ $lockdownExpires | html }}</p>{{ end }}
-    </section>
-    {{ if $blocked }}
-    <section class="ip-details" aria-label="ข้อมูลสำหรับติดต่อผู้ดูแล">
-    <label for="client-ip">IP ของคุณ</label>
-    <div class="ip-box">
-      <input id="client-ip" type="text" value="{{ .ClientIP | html }}" readonly spellcheck="false" aria-label="IP ของคุณ กดเพื่อคัดลอก" aria-describedby="ip-help copy-status">
-      <button class="copy-button" id="copy-ip" type="button" aria-label="คัดลอก IP" title="คัดลอก IP">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
-      </button>
-    </div>
-    <p class="copy-status" id="copy-status" role="status" aria-live="polite"></p>
-    <p class="help" id="ip-help">ส่ง IP นี้ให้ผู้ดูแลเพื่อขอปลดบล็อก</p>
-    </section>
-    {{ else if not $lockdown }}
-    <nav class="ip-details error-actions" aria-label="ตัวเลือกเมื่อพบปัญหา"><a href="/">กลับหน้าหลัก</a></nav>
-    {{ end }}
-  </main>
-  {{ if $blocked }}
   <script nonce="uZNlw9M3Lise3gcAqB34ZmY8D3mnLEvh">
 (() => {
-  const input = document.getElementById('client-ip');
-  const status = document.getElementById('copy-status');
-  let busy = false;
-  async function copyIp() {
-    if (busy) return;
-    busy = true;
-    let copied = false;
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(input.value);
-        copied = true;
-      }
-    } catch {}
-    if (!copied) {
-      input.focus();
-      input.select();
-      input.setSelectionRange(0, input.value.length);
-      try { copied = document.execCommand('copy'); } catch {}
+  // The site's look, as the admin set it: square or round, light or dark, and the accent colour.
+  const root = document.documentElement;
+  const apply = (look) => {
+    if (look.ui === 'square') root.dataset.ui = 'square';
+    else if (look.ui === 'round') delete root.dataset.ui;
+    if (look.theme === 'light' || look.theme === 'dark') root.dataset.theme = look.theme;
+    const hex = /^#?([0-9a-f]{6})$/i.exec(look.primary || '');
+    if (hex) {
+      const n = parseInt(hex[1], 16);
+      root.style.setProperty('--p', '#' + hex[1]);
+      root.style.setProperty('--p-rgb', (n >> 16) + ' ' + ((n >> 8) & 255) + ' ' + (n & 255));
     }
-    status.textContent = copied ? 'คัดลอกแล้ว' : 'คัดลอกอัตโนมัติไม่ได้ กดค้างหรือใช้ Ctrl/Cmd+C';
-    busy = false;
-  }
-  input.addEventListener('click', copyIp);
-  document.getElementById('copy-ip').addEventListener('click', copyIp);
-  input.addEventListener('keydown', event => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      void copyIp();
-    }
+  };
+  // What the site saved in this browser (app/layout.tsx, ThemeLoader.tsx): known before the first paint.
+  try {
+    apply({ ui: localStorage.getItem('nexora-ui'), theme: localStorage.getItem('nexora-theme'), primary: localStorage.getItem('nexora-primary') });
+  } catch (error) {}
+  // Then the current settings, unless the API is the thing that is down.
+  fetch('/api/settings/public', { cache: 'no-store', credentials: 'omit' })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((data) => { if (data) apply({ ui: data.uiShape, theme: data.themeMode, primary: data.primaryColor }); })
+    .catch(() => {});
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // The API sends the reopen time in UTC (RFC 3339); show it as Thai time, e.g. "30 ต.ค. 18:00 น.".
+    document.querySelectorAll('time.lock-until').forEach((node) => {
+      const when = new Date(node.getAttribute('datetime'));
+      if (Number.isNaN(when.getTime())) return;
+      const parts = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(when);
+      const part = (type) => (parts.find((item) => item.type === type) || {}).value || '';
+      node.textContent = part('day') + ' ' + part('month') + ' ' + part('hour') + ':' + part('minute') + ' น.';
+    });
+    // The big outlined NEXORA rows each drift to a new place on their own (like the verify page).
+    document.querySelectorAll('.vf-mark span').forEach((row, index) => {
+      const move = () => {
+        const reach = window.innerWidth * (0.1 + Math.random() * 0.18);
+        const seconds = 4 + Math.random() * 8;
+        row.style.setProperty('--dur', seconds + 's');
+        row.style.setProperty('--x', ((Math.random() * 2 - 1) * reach) + 'px');
+        setTimeout(move, seconds * 1000 * (0.55 + Math.random() * 0.5));
+      };
+      setTimeout(move, 300 + index * 900);
+    });
+
+    // Blocked visitors: click the IP (or the button next to it) to copy it.
+    document.querySelectorAll('.ip-section').forEach((section) => {
+      const input = section.querySelector('input');
+      const status = section.querySelector('.copy-status');
+      let busy = false;
+      const copyIp = async () => {
+        if (busy) return;
+        busy = true;
+        let copied = false;
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(input.value);
+            copied = true;
+          }
+        } catch (error) {}
+        if (!copied) {
+          input.focus();
+          input.select();
+          input.setSelectionRange(0, input.value.length);
+          try { copied = document.execCommand('copy'); } catch (error) {}
+        }
+        status.textContent = copied ? 'คัดลอกแล้ว' : 'คัดลอกอัตโนมัติไม่ได้ กดค้างหรือใช้ Ctrl/Cmd+C';
+        busy = false;
+      };
+      input.addEventListener('click', copyIp);
+      section.querySelector('.copy-btn').addEventListener('click', copyIp);
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          void copyIp();
+        }
+      });
+    });
   });
 })();
   </script>
-  {{ end }}
+</head>
+<body>
+  <div class="card">
+    <div class="brand-row">
+      <span class="brand-mark"></span>
+      <span>NEXORA</span>
+    </div>
+    <div class="status-row">
+      <span class="status-code" aria-label="ข้อผิดพลาด {{ $status | html }}">{{ $status | html }}</span>
+      <span class="status-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/><circle cx="12" cy="15.5" r="1.5"/></svg>
+      </span>
+    </div>
+    <h1>{{ $title | html }}</h1>
+    <p>{{ $message | html }}</p>
+    {{ if and $lockdown $lockdownExpires }}<p class="reopen">เปิดอีกครั้ง <time class="lock-until" datetime="{{ $lockdownExpires | html }}">{{ $lockdownExpires | html }}</time></p>{{ end }}
+
+    {{ if $blocked }}
+    <div class="ip-section" aria-label="ข้อมูลสำหรับติดต่อผู้ดูแล">
+      <label for="client-ip">IP ของคุณ</label>
+      <div class="ip-box">
+        <input id="client-ip" type="text" value="{{ .ClientIP | html }}" readonly spellcheck="false" aria-label="IP ของคุณ กดเพื่อคัดลอก" aria-describedby="ip-help copy-status">
+        <button class="copy-btn" type="button" aria-label="คัดลอก IP" title="คัดลอก IP">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
+      <div class="copy-status" id="copy-status" role="status" aria-live="polite"></div>
+      <div class="help-text" id="ip-help">กดที่ IP เพื่อคัดลอก</div>
+    </div>
+    {{ else }}
+    <nav class="error-actions" aria-label="ตัวเลือกเมื่อพบปัญหา">
+      {{ if $retry }}<a href="">โหลดหน้าใหม่</a>{{ end }}
+      {{ if not $lockdown }}<a href="/">กลับหน้าแรก</a>{{ end }}
+    </nav>
+    {{ end }}
+  </div>
+
+  <main class="vf">
+    <div class="vf-bg" aria-hidden="true">
+      <i class="vf-glow"></i>
+      <i class="vf-lines"></i>
+      <span class="vf-mark"><span>NEXORA NEXORA NEXORA</span><span>NEXORA NEXORA NEXORA</span><span>NEXORA NEXORA NEXORA</span></span>
+      <i class="vf-wslice ws1"></i><i class="vf-wslice is-b ws2"></i><i class="vf-wslice ws3"></i><i class="vf-wslice is-b ws4"></i><i class="vf-wslice ws5"></i>
+    </div>
+    <i class="vf-crt" aria-hidden="true"></i>
+    <div class="vf-frame">
+      <section class="vf-panel">
+        <header class="vf-top vf-in">
+          <i class="vf-diamond" aria-hidden="true"></i>
+          <b>NEXORA CLOUD</b>
+          <span>{{ if $blocked }}BLOCKED{{ else if $lockdown }}MAINTENANCE{{ else }}ERROR {{ $status | html }}{{ end }}</span>
+        </header>
+        <span class="vf-slice ps1" aria-hidden="true"></span><span class="vf-slice is-b ps2" aria-hidden="true"></span><span class="vf-slice ps3" aria-hidden="true"></span><span class="vf-slice is-b ps4" aria-hidden="true"></span>
+        <div class="vf-body">
+          <div class="vf-copy">
+            <h1 class="vf-title" data-text="{{ $title | html }}"><span>{{ $title | html }}</span></h1>
+            <i class="vf-bar vf-in i3" aria-hidden="true"></i>
+            <p class="vf-lead vf-in i4">{{ $message | html }}</p>
+            {{ if and $lockdown $lockdownExpires }}<dl class="vf-facts vf-in i4"><div><dt>เปิดอีกครั้ง</dt><dd><time class="lock-until" datetime="{{ $lockdownExpires | html }}">{{ $lockdownExpires | html }}</time></dd></div></dl>{{ end }}
+          </div>
+          <div class="vf-badge vf-in i2" role="img" aria-label="ข้อผิดพลาด {{ $status | html }}">
+            <div class="vf-fx">
+              <i class="vf-ring vf-ring-dash"></i>
+              <i class="vf-ring vf-ring-arc"></i>
+              <i class="vf-dot vf-dot-n"></i><i class="vf-dot vf-dot-e"></i><i class="vf-dot vf-dot-s"></i>
+              <div class="vf-core"><span class="vf-code">{{ $status | html }}</span></div>
+            </div>
+          </div>
+        </div>
+        {{ if $blocked }}
+        <div class="vf-flow ip-section vf-in i5" aria-label="ข้อมูลสำหรับติดต่อผู้ดูแล">
+          <label for="client-ip-square">IP ของคุณ</label>
+          <div class="ip-box">
+            <input id="client-ip-square" type="text" value="{{ .ClientIP | html }}" readonly spellcheck="false" aria-label="IP ของคุณ กดเพื่อคัดลอก" aria-describedby="ip-help-square copy-status-square">
+            <button class="copy-btn" type="button" aria-label="คัดลอก IP" title="คัดลอก IP">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+          <div class="copy-status" id="copy-status-square" role="status" aria-live="polite"></div>
+          <div class="help-text" id="ip-help-square">กดที่ IP เพื่อคัดลอก</div>
+        </div>
+        {{ else }}
+        <nav class="vf-actions vf-in i5" aria-label="ตัวเลือกเมื่อพบปัญหา">
+          {{ if $retry }}<a class="vf-btn" href="">โหลดหน้าใหม่</a>{{ end }}
+          {{ if not $lockdown }}<a class="vf-btn{{ if $retry }} is-ghost{{ end }}" href="/">กลับหน้าแรก</a>{{ end }}
+        </nav>
+        {{ end }}
+      </section>
+    </div>
+  </main>
 </body>
 </html>

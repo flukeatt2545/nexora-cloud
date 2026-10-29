@@ -1,0 +1,27 @@
+# The outside uptime checker (see src/index.ts). A Worker of its own, apart from worker/
+# (the vinext site preview), so deploying or breaking one never touches the other.
+name = "nexora-uptime"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+# No public address: it only runs on the cron below.
+workers_dev = false
+preview_urls = false
+
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+API_BASE = "https://api.nkn02.com"
+
+# Create it with: npx wrangler kv namespace create UPTIME_KV
+# then put the id it prints here.
+[[kv_namespaces]]
+binding = "UPTIME_KV"
+id = "e71d465617d94ef6bb1544e5bca4eec1"
+
+[observability]
+enabled = true
+
+# Secrets (never in this file):
+#   npx wrangler secret put UPTIME_WORKER_SECRET   same value as UPTIME_WORKER_SECRET in the server's .env
+#   npx wrangler secret put DISCORD_WEBHOOK_URL

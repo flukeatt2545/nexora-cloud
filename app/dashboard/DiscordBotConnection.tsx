@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CircleAlert, CircleCheck, ExternalLink, Eye, EyeOff, KeyRound, UserPlus, X } from "lucide-react";
-import { ago, type Notice } from "./DiscordBotParts";
+import { ago, BotAvatar, type Notice } from "./DiscordBotParts";
 import { api, type BotKey } from "./DiscordMailBotSettings";
 import { useEscape, useScrollLock } from "./useScrollLock";
 
@@ -211,7 +211,7 @@ function TokenDialog({ botKey, botName, replacing, onClose, onSaved }: {
             <div className="hv-dialog-body">
               <div className="bp-identity">
                 <span className="bp-hero-avatar" aria-hidden="true">
-                  {saved.botAvatarUrl ? <img src={saved.botAvatarUrl} alt="" /> : (saved.botUsername || "B").slice(0, 1).toUpperCase()}
+                  <BotAvatar src={saved.botAvatarUrl} fallback={(saved.botUsername || "B").slice(0, 1).toUpperCase()} />
                 </span>
                 <div className="bp-identity-copy">
                   <strong>{saved.botUsername}</strong>

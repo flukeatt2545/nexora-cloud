@@ -448,10 +448,3 @@
   .wm-discard .wm-btn { flex: 1; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .wm-spin, .wm-spinner, .wm-skeleton span { animation: none; }
-  .wm-backdrop, .wm-dialog { animation: none; }
-  .wm-btn, .wm-icon-btn, .wm-row, .wm-folders button, .wm-copy, .wm-files a { transition: none; }
-  .wm-picker-pop { animation: none; }
-  .wm-picker-end svg { transition: none; }
-}

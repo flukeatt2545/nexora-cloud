@@ -56,7 +56,7 @@ h1{margin:0;color:#f4f4f5;font-size:clamp(27px,4.3vw,42px);font-weight:650;line-
 @media(max-width:640px){.shell{padding:max(19px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom))}.stage{padding:36px 0}.clock{font-size:clamp(39px,11vw,70px);letter-spacing:-.085em}.days{margin-top:31px}.clock-labels{width:min(370px,82%)}.rule{margin-top:35px}.footer{font-size:11px}}
 @media(max-width:340px){.clock{font-size:38px}.clock-labels{width:88%}.status{letter-spacing:0}}
 @media(max-height:560px){.stage{padding:30px 0}.days{margin-top:18px}.rule{margin:23px auto 16px}}
-@media(prefers-reduced-motion:reduce){.access-button{transition:none}}
+
 `
 
 const vpsUptimeJS = `(() => {

@@ -276,6 +276,3 @@
   .hv-invite-row > .custom-role-select { flex: 1 1 100%; }
   .hv-invite-row > .hv-btn { flex: 1 1 100%; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .hv-backdrop, .hv-dialog, .hv-row.is-skeleton span { animation: none; }
-}

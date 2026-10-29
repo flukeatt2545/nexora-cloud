@@ -3,46 +3,47 @@
 import Link from "next/link";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import {
-  AudioLines, Bot, Check, ExternalLink, Eye, Gamepad2, Headphones, LayoutDashboard, Mail, PenLine, Radio, Trophy, Users, type LucideIcon,
+  Activity, AudioLines, Bot, Check, ExternalLink, Eye, Gamepad2, Headphones, LayoutDashboard, Mail, PenLine, Radio, Trophy, Users, type LucideIcon,
 } from "lucide-react";
 import { type BotConnectionState, ConnectionActions, connectionFacts, useBotConnection } from "./DiscordBotConnection";
-import { Card, LoadError, type Notice, SaveBar } from "./DiscordBotParts";
+import { BotAvatar, Card, LoadError, type Notice, SaveBar } from "./DiscordBotParts";
 import { ACTIVITY_TEXT_MAX, type ActivityType, MailBotSelfServiceSettings, useBotPresence } from "./DiscordMailBotSettings";
 import { DiscordCommunity, type CommunitySection } from "./DiscordCommunity";
 import { DiscordProtect } from "./DiscordProtect";
+import { DiscordUptime, type UptimeSection } from "./DiscordUptime";
 import { DiscordVoiceMessages } from "./DiscordVoiceMessages";
 import { DiscordVoiceRooms } from "./DiscordVoiceRooms";
 import { DiscordVoiceSessions } from "./DiscordVoiceSessions";
 import "./hosting-view.css";
 import "./discord-bot-page.css";
 
-// One bot does everything. The page has the bot on top (who it is, online or not, its token),
-// a menu on the left with the parts of the bot, and the settings of the chosen part on the right.
+// One Discord bot does several jobs. The page has the bot on top (who it is, online or not, its
+// token), then a row to pick the job ("bot") to work on, then only that job's tabs and settings.
 
 const BOT = { key: "community" as const, name: "บอทดูแลเซิร์ฟ", defaultText: "เซิร์ฟเวอร์" };
 
 type Part = { key: string; label: string; title: string; text: string; commands?: string[]; superadminOnly?: boolean };
-type Group = { key: string; label: string | null; icon: LucideIcon; text: string; parts: Part[]; superadminOnly?: boolean };
+type Group = { key: string; label: string; icon: LucideIcon; text: string; parts: Part[]; superadminOnly?: boolean };
 
 const GROUPS: Group[] = [
   {
-    key: "home", label: null, icon: LayoutDashboard, text: "",
+    key: "home", label: "ภาพรวม", icon: LayoutDashboard, text: "สถานะบอท และข้อความใต้ชื่อ",
     parts: [{ key: "overview", label: "ภาพรวม", title: "ภาพรวม", text: "สถานะของบอท และทางลัดไปแต่ละส่วน" }],
   },
   {
     key: "server", label: "ดูแลเซิร์ฟ", icon: Users, superadminOnly: true,
-    text: "ต้อนรับคนใหม่ ยืนยันตัวตน Ticket ห้องสถิติ บูสต์ และกันคนทำลายเซิร์ฟ",
+    text: "ต้อนรับ ยืนยันตัวตน Ticket และกันคนป่วน",
     parts: [
       { key: "server", label: "ทั่วไป", title: "ทั่วไป", text: "เซิร์ฟที่บอทดูแล หน้าตาของชื่อห้อง และคนที่ตั้งค่าบอทได้", commands: ["/setup", "/create", "/ticket", "/protect"] },
       { key: "server-members", label: "สมาชิก", title: "สมาชิก", text: "ข้อความต้อนรับ ข้อความตอนมีคนออก ยืนยันตัวตน และเช็กยศ" },
-      { key: "server-rooms", label: "ห้องต่างๆ", title: "ห้องต่างๆ", text: "Ticket ห้องเสียงชั่วคราว แจ้งเว็บล่ม บูสต์ และห้องสถิติ" },
+      { key: "server-rooms", label: "ห้องต่างๆ", title: "ห้องต่างๆ", text: "Ticket ห้องเสียงชั่วคราว รูปสถานะเว็บ บูสต์ และห้องสถิติ" },
       { key: "server-security", label: "ความปลอดภัย", title: "ความปลอดภัย", text: "ห้องแจ้งเตือน กันคนลบห้อง และกันสแปม" },
       { key: "server-history", label: "ประวัติ", title: "ประวัติ", text: "Ticket ล่าสุด และช่วงที่เว็บล่ม" },
     ],
   },
   {
     key: "voice", label: "ห้องเสียงมีรหัส", icon: AudioLines, superadminOnly: true,
-    text: "ห้องเสียงที่ตั้งรหัสล็อกได้ พร้อมประวัติคนเข้าออก",
+    text: "ห้องเสียงล็อกรหัสได้ มีประวัติเข้าออก",
     parts: [
       { key: "voice", label: "ห้องเสียง", title: "ห้องเสียง", text: "กติกาของห้อง และห้องที่เปิดอยู่ตอนนี้",
         commands: ["/room", "/setup-join-to-create", "/setup-room-log", "/setup-voice-log", "/voice-history", "/setup-stop", "/setup-room-panel"] },
@@ -52,8 +53,16 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    key: "uptime", label: "เช็กเว็บล่ม", icon: Activity, superadminOnly: true,
+    text: "เช็กจาก Cloudflare แจ้งได้แม้เครื่องดับ",
+    parts: [
+      { key: "uptime", label: "สถานะ", title: "สถานะเว็บ", text: "ตอนนี้เป็นยังไง และล่มไปช่วงไหนบ้าง" },
+      { key: "uptime-settings", label: "ตั้งค่า", title: "ตั้งค่าการเช็ก", text: "เว็บที่จะเช็ก และการแจ้งเตือนใน Discord" },
+    ],
+  },
+  {
     key: "mail", label: "เมล", icon: Mail,
-    text: "อ่านเมล เขียนเมล และรับแจ้งเมลใหม่ใน Discord ใช้ /mail ใน DM ได้",
+    text: "อ่าน เขียน และรับแจ้งเมลใน Discord",
     parts: [
       { key: "mail", label: "สร้างเมลเอง", title: "เมล", text: "อ่านเมล เขียนเมล และรับแจ้งเมลใหม่ใน Discord ใช้ /mail ใน DM ได้",
         commands: ["/mail", "/mail-admin", "/mail-bind", "/mail-unbind", "/setup-mail-panel", "/setup-mail-admin-panel"] },
@@ -61,7 +70,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "nexora", label: "NEXORA", icon: Bot,
-    text: "ฐานข้อมูลนักศึกษา อัปโหลดรูป แกลเลอรี และปุ่มล็อกเว็บฉุกเฉิน",
+    text: "ฐานข้อมูลนักศึกษา อัปโหลดรูป ล็อกเว็บ",
     parts: [
       { key: "nexora", label: "คำสั่ง", title: "NEXORA", text: "ฐานข้อมูลนักศึกษา อัปโหลดรูป แกลเลอรี และปุ่มล็อกเว็บฉุกเฉิน",
         commands: ["/db", "/code", "/upload", "/my-uploads", "/gallery", "/lockdown", "/crowdsec", "/bot-control", "/bot-panel", "/setup-panel", "/admin-map"] },
@@ -72,6 +81,8 @@ const GROUPS: Group[] = [
 const SERVER_PARTS: Record<string, CommunitySection> = {
   server: "general", "server-members": "members", "server-rooms": "rooms", "server-security": "security", "server-history": "history",
 };
+
+const UPTIME_PARTS: Record<string, UptimeSection> = { uptime: "results", "uptime-settings": "settings" };
 
 const ACTIVITY_TYPES: { value: ActivityType; label: string; icon: LucideIcon }[] = [
   { value: "playing", label: "กำลังเล่น", icon: Gamepad2 },
@@ -128,8 +139,10 @@ export default function DiscordBotView({ notify, isSuperadmin }: { notify: Notic
   }
 
   const part = parts.find((item) => item.key === active) ?? parts[0];
+  const group = groups.find((item) => item.parts.includes(part)) ?? groups[0];
   const seen = (key: string) => opened.includes(key);
   const inServer = active in SERVER_PARTS;
+  const inUptime = active in UPTIME_PARTS;
 
   return (
     <div className="bp hv">
@@ -140,63 +153,76 @@ export default function DiscordBotView({ notify, isSuperadmin }: { notify: Notic
 
       <Hero conn={conn} presence={presence} canManage={isSuperadmin} notify={notify} />
 
-      <div className="bp-layout">
-        <nav className="bp-rail" aria-label="ส่วนของบอท">
-          {groups.map((group) => (
-            <div className="bp-rail-group" key={group.key}>
-              {group.label && <p className="bp-rail-label"><group.icon size={14} aria-hidden="true" />{group.label}</p>}
-              {group.parts.map((item) => (
-                <button key={item.key} type="button" className={`bp-nav${item.key === part.key ? " is-active" : ""}`}
-                  aria-current={item.key === part.key ? "page" : undefined} onClick={() => choose(item.key)}>
-                  {!group.label && <group.icon size={16} aria-hidden="true" />}
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          ))}
-        </nav>
+      <nav className="bp-bots" aria-label="เลือกบอท">
+        {groups.map((item) => (
+          <button key={item.key} type="button" className={`bp-bot${item === group ? " is-active" : ""}`}
+            aria-current={item === group ? "page" : undefined} onClick={() => choose(item.parts[0].key)}>
+            <span className="bp-icon" aria-hidden="true"><item.icon size={17} /></span>
+            <span className="bp-bot-copy">
+              <b>{item.label}</b>
+              <small>{item.text}</small>
+            </span>
+          </button>
+        ))}
+      </nav>
 
-        <main className="bp-main" id="bp-main">
-          <header className="bp-head">
-            <div>
-              <h2>{part.title}</h2>
-              <p>{part.text}</p>
-            </div>
-            {part.commands && (
-              <div className="bp-commands" aria-label="คำสั่งใน Discord">
-                {part.commands.map((command) => <code key={command}>{command}</code>)}
-              </div>
-            )}
-          </header>
-
-          <div className="bp-pane" hidden={active !== "overview"}>
-            <Overview presence={presence} groups={groups} canManage={isSuperadmin} onOpen={choose}
-              avatarUrl={conn.connection?.botAvatarUrl || ""} online={isSuperadmin && conn.connection ? conn.status?.text === "ออนไลน์" : true} />
+      <main className="bp-main" id="bp-main">
+        {group.parts.length > 1 && (
+          <div className="bp-tabs" role="tablist" aria-label={group.label}>
+            {group.parts.map((item) => (
+              <button key={item.key} type="button" role="tab" aria-selected={item === part}
+                className={`bp-tab${item === part ? " is-active" : ""}`} onClick={() => choose(item.key)}>
+                {item.label}
+              </button>
+            ))}
           </div>
+        )}
 
-          {isSuperadmin && (seen("server") || inServer) && (
-            <div className="bp-pane" hidden={!inServer}>
-              <DiscordCommunity notify={notify} section={SERVER_PARTS[serverPart] ?? "general"} />
+        <header className="bp-head">
+          <div>
+            <h2>{part.title}</h2>
+            <p>{part.text}</p>
+          </div>
+          {part.commands && (
+            <div className="bp-commands" aria-label="คำสั่งใน Discord">
+              {part.commands.map((command) => <code key={command}>{command}</code>)}
             </div>
           )}
+        </header>
 
-          {isSuperadmin && seen("voice") && <div className="bp-pane" hidden={active !== "voice"}><DiscordVoiceRooms notify={notify} /></div>}
-          {isSuperadmin && seen("voice-protect") && <div className="bp-pane" hidden={active !== "voice-protect"}><DiscordProtect notify={notify} /></div>}
-          {isSuperadmin && seen("voice-history") && <div className="bp-pane" hidden={active !== "voice-history"}><DiscordVoiceSessions /></div>}
-          {isSuperadmin && seen("voice-messages") && <div className="bp-pane" hidden={active !== "voice-messages"}><DiscordVoiceMessages notify={notify} /></div>}
+        <div className="bp-pane" hidden={active !== "overview"}>
+          <Overview presence={presence} canManage={isSuperadmin}
+            avatarUrl={conn.connection?.botAvatarUrl || ""} online={isSuperadmin && conn.connection ? conn.status?.text === "ออนไลน์" : true} />
+        </div>
 
-          {seen("mail") && <div className="bp-pane" hidden={active !== "mail"}><MailBotSelfServiceSettings notify={notify} /></div>}
+        {isSuperadmin && (seen("server") || inServer) && (
+          <div className="bp-pane" hidden={!inServer}>
+            <DiscordCommunity notify={notify} section={SERVER_PARTS[serverPart] ?? "general"} />
+          </div>
+        )}
 
-          {seen("nexora") && (
-            <div className="bp-pane" hidden={active !== "nexora"}>
-              <Card icon={Bot} title="ตั้งค่าผ่านคำสั่งใน Discord" text="ส่วนนี้ไม่มีหน้าตั้งค่าบนเว็บ">
-                <p className="bp-note">ตั้งสิทธิ์ใช้คำสั่งด้วย /bot-control หรือแผง /bot-panel ใน Discord ส่วนรูปที่สมาชิกอัปโหลดผ่านบอท ดูได้ที่หน้าประวัติอัปโหลด</p>
-                <div><Link className="hv-btn" href="/admin/bot-uploads"><ExternalLink size={16} aria-hidden="true" /> ประวัติอัปโหลดจากบอท</Link></div>
-              </Card>
-            </div>
-          )}
-        </main>
-      </div>
+        {isSuperadmin && (seen("uptime") || seen("uptime-settings")) && (
+          <div className="bp-pane" hidden={!inUptime}>
+            <DiscordUptime notify={notify} section={UPTIME_PARTS[active] ?? "results"} />
+          </div>
+        )}
+
+        {isSuperadmin && seen("voice") && <div className="bp-pane" hidden={active !== "voice"}><DiscordVoiceRooms notify={notify} /></div>}
+        {isSuperadmin && seen("voice-protect") && <div className="bp-pane" hidden={active !== "voice-protect"}><DiscordProtect notify={notify} /></div>}
+        {isSuperadmin && seen("voice-history") && <div className="bp-pane" hidden={active !== "voice-history"}><DiscordVoiceSessions /></div>}
+        {isSuperadmin && seen("voice-messages") && <div className="bp-pane" hidden={active !== "voice-messages"}><DiscordVoiceMessages notify={notify} /></div>}
+
+        {seen("mail") && <div className="bp-pane" hidden={active !== "mail"}><MailBotSelfServiceSettings notify={notify} /></div>}
+
+        {seen("nexora") && (
+          <div className="bp-pane" hidden={active !== "nexora"}>
+            <Card icon={Bot} title="ตั้งค่าผ่านคำสั่งใน Discord" text="ส่วนนี้ไม่มีหน้าตั้งค่าบนเว็บ">
+              <p className="bp-note">ตั้งสิทธิ์ใช้คำสั่งด้วย /bot-control หรือแผง /bot-panel ใน Discord ส่วนรูปที่สมาชิกอัปโหลดผ่านบอท ดูได้ที่หน้าประวัติอัปโหลด</p>
+              <div><Link className="hv-btn" href="/admin/bot-uploads"><ExternalLink size={16} aria-hidden="true" /> ประวัติอัปโหลดจากบอท</Link></div>
+            </Card>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
@@ -209,7 +235,7 @@ function Hero({ conn, presence, canManage, notify }: { conn: BotConnectionState;
   return (
     <section className="bp-hero" aria-labelledby="bp-bot-name">
       <span className="bp-hero-avatar" aria-hidden="true">
-        {avatarUrl ? <img src={avatarUrl} alt="" /> : <Users size={26} />}
+        <BotAvatar src={avatarUrl} fallback={<Users size={26} />} />
       </span>
       <div className="bp-hero-copy">
         <div className="bp-hero-name">
@@ -245,26 +271,12 @@ function StatusPill({ canManage, conn, savedType }: { canManage: boolean; conn: 
 
 type Presence = ReturnType<typeof useBotPresence>;
 
-function Overview({ presence, groups, canManage, onOpen, avatarUrl, online }: {
-  presence: Presence; groups: Group[]; canManage: boolean; onOpen: (key: string) => void; avatarUrl: string; online: boolean;
+function Overview({ presence, canManage, avatarUrl, online }: {
+  presence: Presence; canManage: boolean; avatarUrl: string; online: boolean;
 }) {
   return (
     <>
       <PresenceCard presence={presence} avatarUrl={avatarUrl} online={online} />
-
-      <Card icon={Radio} title="ส่วนที่ตั้งค่าได้" text="เลือกส่วนที่อยากเข้าไปแก้" flush>
-        <div className="bp-jumps">
-          {groups.filter((group) => group.label).map((group) => (
-            <button key={group.key} type="button" className="bp-jump" onClick={() => onOpen(group.parts[0].key)}>
-              <span className="bp-icon" aria-hidden="true"><group.icon size={17} /></span>
-              <span>
-                <b>{group.label}</b>
-                <small>{group.text}</small>
-              </span>
-            </button>
-          ))}
-        </div>
-      </Card>
 
       {canManage && (
         <Card icon={Check} title="ตั้งบอทครั้งแรก" text="ทำตามลำดับนี้ ครั้งเดียวก็พอ">
@@ -405,7 +417,7 @@ function DiscordPreview({ name, avatarUrl, online, loading, type, text }: {
         <p className="bp-dc-group" aria-hidden="true">{online ? "ออนไลน์" : "ออฟไลน์"} — 1</p>
         <div className={`bp-dc-member${online ? "" : " is-offline"}`}>
           <span className="bp-dc-avatar" aria-hidden="true">
-            {avatarUrl ? <img src={avatarUrl} alt="" /> : name.slice(0, 1).toUpperCase()}
+            <BotAvatar src={avatarUrl} fallback={name.slice(0, 1).toUpperCase()} />
             <i />
           </span>
           <span className="bp-dc-copy">

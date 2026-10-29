@@ -5481,7 +5481,7 @@ function FilesView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"grid"|"list">("list");
-  const [autoAnimateRef] = useAutoAnimate<HTMLDivElement>();
+  const [autoAnimateRef] = useAutoAnimate<HTMLDivElement>({ disrespectUserMotionPreference: true });
   const [uploadCategory, setUploadCategory] = useState("");
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);

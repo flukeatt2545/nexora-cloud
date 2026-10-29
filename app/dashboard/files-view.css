@@ -281,9 +281,6 @@ button.fx-crumb:hover { background: var(--theme-hover); color: var(--theme-text-
 @media (max-width: 340px) {
   .fx-grid { grid-template-columns: minmax(0, 1fr); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .fx *, .fx *::before { transition: none !important; }
-}
 
 /* File dialogs (upload, share, rename, password, move, delete…): the same plain card as the other
    dialogs. file-library-122.css styles them with !important and fixed colours, so these rules use

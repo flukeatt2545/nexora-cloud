@@ -70,6 +70,7 @@ type config struct {
 	hostingServerIP          string
 	phpMyAdminInternalSecret string
 	botInternalSecret        string // Discord bots on /api/internal/bot/*; must differ from phpMyAdminInternalSecret
+	uptimeWorkerSecret       string // the outside uptime checker on /api/uptime-worker/*; empty turns it off
 	phpMyAdminPublicURL      string
 	checkSlipsAPIBaseURL     string
 	checkSlipsAPIToken       string
@@ -304,6 +305,10 @@ func main() {
 	})
 
 	app.Get("/health", s.health)
+	// The outside uptime checker (a Cloudflare Worker) comes in through api.nkn02.com, so these
+	// are not under /api/internal/; its own secret guards them.
+	app.Get("/api/uptime-worker/config", s.uptimeWorkerConfig)
+	app.Post("/api/uptime-worker/report", s.uptimeWorkerReport)
 	app.Get("/api/internal/lockdown/gate", s.lockdownGate)
 	app.Get("/api/status-page", s.apiStatusPage)
 	app.Get("/api/settings/public", s.publicSettingsHandler)
@@ -580,6 +585,9 @@ func main() {
 	admin.Get("/discord-voice-messages/:key/image", requireRoles("superadmin"), s.adminVoiceMessageImage)
 	admin.Get("/discord-community", requireRoles("superadmin"), s.adminDiscordCommunity)
 	admin.Put("/discord-community", requireRoles("superadmin"), s.updateAdminDiscordCommunity)
+	admin.Get("/uptime", requireRoles("superadmin"), s.adminUptime)
+	admin.Put("/uptime", requireRoles("superadmin"), s.updateAdminUptime)
+	admin.Post("/uptime/test", requireRoles("superadmin"), s.adminUptimeTest)
 	admin.Put("/discord-voice-messages/:key", requireRoles("superadmin"), s.updateAdminVoiceMessage)
 	admin.Get("/discord-bots/:botKey", requireRoles("admin", "superadmin"), s.getAdminDiscordBotPresence)
 	admin.Put("/discord-bots/:botKey", requireRoles("admin", "superadmin"), s.updateAdminDiscordBotPresence)
@@ -766,6 +774,7 @@ func loadConfig() config {
 		hostingServerIP:          env("HOSTING_SERVER_IP", "165.101.65.23"),
 		phpMyAdminInternalSecret: env("PMA_INTERNAL_SECRET", "local-only-change-this-pma-internal-secret"),
 		botInternalSecret:        env("INTERNAL_BOT_SECRET", "local-only-change-this-bot-internal-secret"),
+		uptimeWorkerSecret:       env("UPTIME_WORKER_SECRET", ""),
 		phpMyAdminPublicURL:      strings.TrimRight(env("PMA_PUBLIC_URL", "http://db.localhost:8088"), "/"),
 		checkSlipsAPIBaseURL:     strings.TrimRight(env("CHECKSLIPS_API_BASE_URL", "https://api.checkslips.com"), "/"),
 		checkSlipsAPIToken:       env("CHECKSLIPS_API_TOKEN", ""),
@@ -819,6 +828,9 @@ func validateConfig(cfg config) error {
 	}
 	if cfg.botInternalSecret == cfg.phpMyAdminInternalSecret {
 		return fmt.Errorf("INTERNAL_BOT_SECRET must differ from PMA_INTERNAL_SECRET")
+	}
+	if err := validateUptimeWorkerSecret(cfg); err != nil {
+		return err
 	}
 	return nil
 }

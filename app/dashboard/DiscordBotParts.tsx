@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { CircleAlert, type LucideIcon } from "lucide-react";
 
 // Pieces every part of the Discord bot page is built from, so the cards, rows and save bar look
@@ -129,4 +129,14 @@ export function ago(value: string | null | undefined) {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours} ชั่วโมงก่อน`;
   return `${Math.round(hours / 24)} วันก่อน`;
+}
+
+/**
+ * The bot's picture from Discord, or `fallback` when there is none or it will not load
+ * (an old picture link stops working once the bot's avatar is changed in Discord).
+ */
+export function BotAvatar({ src, fallback }: { src: string; fallback: ReactNode }) {
+  const [failed, setFailed] = useState("");
+  if (!src || failed === src) return <>{fallback}</>;
+  return <img src={src} alt="" referrerPolicy="no-referrer" onError={() => setFailed(src)} />;
 }

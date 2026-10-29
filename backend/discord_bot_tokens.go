@@ -140,11 +140,42 @@ func discordBotIdentity(ctx context.Context, token string) (id, username, avatar
 	return me.ID, me.Username, avatar, http.StatusOK, nil
 }
 
+// How long a bot's name and picture read from Discord are trusted before asking again.
+const discordBotIdentityMaxAge = time.Hour
+
+// refreshDiscordBotIdentity reads the bot's name and picture from Discord again when the saved
+// ones are older than discordBotIdentityMaxAge. A picture id saved with the token stops working
+// (404 on cdn.discordapp.com) once the avatar is changed in the Developer Portal. Any failure
+// keeps what is saved; the attempt is still recorded, so Discord is asked at most once an hour.
+func (s *server) refreshDiscordBotIdentity(ctx context.Context, key string) {
+	var ciphertext, applicationID string
+	var checkedAt *time.Time
+	err := s.db.QueryRow(ctx, `SELECT token_ciphertext, application_id, identity_checked_at FROM discord_bot_tokens WHERE bot_key=$1`, key).
+		Scan(&ciphertext, &applicationID, &checkedAt)
+	if err != nil || (checkedAt != nil && time.Since(*checkedAt) < discordBotIdentityMaxAge) {
+		return
+	}
+	if _, err := s.db.Exec(ctx, `UPDATE discord_bot_tokens SET identity_checked_at=NOW() WHERE bot_key=$1`, key); err != nil {
+		return
+	}
+	token, err := decryptSecret(ciphertext, s.cfg.webhookKey)
+	if err != nil {
+		return
+	}
+	id, username, avatar, status, err := discordBotIdentity(ctx, token)
+	// Only the same bot: a token that now answers as someone else is the admin's to replace.
+	if err != nil || status != http.StatusOK || id != applicationID {
+		return
+	}
+	_, _ = s.db.Exec(ctx, `UPDATE discord_bot_tokens SET bot_username=$2, bot_avatar=$3 WHERE bot_key=$1`, key, cleanText(username, 64), avatar)
+}
+
 func (s *server) getAdminDiscordBotConnection(c *fiber.Ctx) error {
 	key, err := webTokenBotKey(c)
 	if err != nil {
 		return err
 	}
+	s.refreshDiscordBotIdentity(c.Context(), key)
 	connection, err := s.loadDiscordBotConnection(c.Context(), key)
 	if err != nil {
 		return err
@@ -188,7 +219,7 @@ func (s *server) updateAdminDiscordBotToken(c *fiber.Ctx) error {
 		ON CONFLICT (bot_key) DO UPDATE
 		SET token_ciphertext=EXCLUDED.token_ciphertext, token_hint=EXCLUDED.token_hint, application_id=EXCLUDED.application_id,
 		    bot_username=EXCLUDED.bot_username, bot_avatar=EXCLUDED.bot_avatar, version=EXCLUDED.version,
-		    updated_by=EXCLUDED.updated_by, updated_at=NOW()
+		    updated_by=EXCLUDED.updated_by, updated_at=NOW(), identity_checked_at=NOW()
 	`, key, ciphertext, token[len(token)-4:], id, cleanText(username, 64), avatar, time.Now().UnixMilli(), actor.ID); err != nil {
 		return err
 	}

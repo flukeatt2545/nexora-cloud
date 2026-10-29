@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func (s *server) adminSummary(c *fiber.Ctx) error {
@@ -243,6 +245,12 @@ func (s *server) deleteAdminUser(c *fiber.Ctx) error {
 	}
 	s.revokeUserSessions(c, targetID)
 	if _, err := s.db.Exec(c.Context(), `DELETE FROM users WHERE id=$1`, targetID); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			log.Printf("[WARN] delete user %d blocked by %s: %s", targetID, pgErr.TableName, pgErr.ConstraintName)
+			return c.Status(fiber.StatusConflict).JSON(apiError{Error: "ลบบัญชีไม่ได้ เพราะยังมีข้อมูลอื่นผูกกับบัญชีนี้อยู่", Code: "user_in_use"})
+		}
+		log.Printf("[ERROR] delete user %d: %v", targetID, err)
 		return fiber.NewError(fiber.StatusInternalServerError)
 	}
 	s.audit(c, auditEvent{Actor: actor, Category: "admin", Action: "user.deleted", Target: "user", TargetID: strconv.FormatInt(targetID, 10), Metadata: map[string]any{"username": username, "role": targetRole}})

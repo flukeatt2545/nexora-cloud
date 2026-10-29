@@ -18,3 +18,8 @@
 @media (max-height: 540px) { .nexora-error-screen { justify-content: flex-start; } .nexora-error-screen main { padding-block: 28px; } }
 @font-face { font-family: 'Nexora Thai'; src: url('/fonts/noto-sans-thai-latin.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; }
 @font-face { font-family: 'Nexora Thai'; src: url('/fonts/noto-sans-thai-thai.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; unicode-range: U+0E00-0E7F; }
+
+/* Square mode (html[data-ui="square"], the admin's choice): the verify page's card instead (ErrorScreen.tsx, app/verify/verify.css) */
+.vf.nexora-error-square { display: none; }
+:root[data-ui="square"] .vf.nexora-error-square { display: grid; }
+:root[data-ui="square"] .nexora-error-screen { display: none; }

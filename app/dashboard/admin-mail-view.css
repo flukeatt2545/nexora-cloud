@@ -271,7 +271,3 @@
   .mx-settings { grid-column: 1; justify-self: start; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .mx-skeleton span { animation: none; }
-  .mx-progress b, .mx-domain, .mx-chevron, .mx-box { transition: none; }
-}

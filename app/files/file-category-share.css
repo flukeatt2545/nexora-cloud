@@ -2054,9 +2054,6 @@
   .sf-card-dl span { display: none; }
   .sf-card-hover { display: none; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .sf-card-hover { transition: none; }
-}
 
 /* List pager: < 1 2 3 … 9 > */
 .sf-pager { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; padding: 12px 16px 14px; border-top: 1px solid var(--sf-line); }

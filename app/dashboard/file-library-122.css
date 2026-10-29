@@ -6174,9 +6174,6 @@ button.fl-folder-tab {
   .fl-preview-nav.is-prev { left: 6px; }
   .fl-preview-nav.is-next { right: 6px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .fl-preview-switching .fcs-btn-spin { animation-duration: 1.4s; }
-}
 
 /* Share button in the folder bar and its dialog (ScopeShareDialog). */
 .fl-share-scope-btn.is-shared { border-color: var(--primary-border); background: var(--primary-soft); color: var(--primary-ink); }

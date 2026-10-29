@@ -1370,7 +1370,8 @@ footer { border-top: 1px solid rgba(255,255,255,.07); color: var(--muted); font-
 }
 .toast-region {
   position: fixed;
-  z-index: 100000;
+  /* above every modal backdrop (the dashboard ones go up to 100060), which render later in the DOM */
+  z-index: 100500;
   top: max(14px, env(safe-area-inset-top, 0px));
   left: 50%;
   width: max-content;
@@ -2566,10 +2567,6 @@ footer { border-top: 1px solid rgba(255,255,255,.07); color: var(--muted); font-
   --si-error-fg: #8a90a0;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .smart-img-skeleton { animation: none; background-position: 50% 0; }
-  .smart-img > img { transition: none; }
-}
 
 /* Store: purchase dialog, owned products */
 .badge.owned { color: #fff; background: color-mix(in srgb, var(--primary) 70%, #000); }
@@ -2659,9 +2656,6 @@ footer { border-top: 1px solid rgba(255,255,255,.07); color: var(--muted); font-
   .owned-list li .buy-btn { margin-left: 62px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .buy-backdrop, .buy-dialog, .buy-spin { animation: none; }
-}
 .product-image-placeholder { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; color: rgba(255,255,255,.26); background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.05), transparent 62%); }
 .product-image-placeholder .placeholder-text { font-size: 12px; font-weight: 700; color: var(--soft-ink, rgba(255,255,255,.5)); }
 [data-theme="light"] .product-image-placeholder { color: rgba(0,0,0,.22); background: radial-gradient(circle at 50% 42%, rgba(0,0,0,.04), transparent 62%); }
@@ -2772,9 +2766,6 @@ footer { border-top: 1px solid rgba(255,255,255,.07); color: var(--muted); font-
   0%, 100% { opacity: 1; }
   50% { opacity: .78; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .no-cover-mark svg { animation: none; }
-}
 .buy-cover-empty, .owned-thumb-empty { position: relative; overflow: hidden; }
 
 /* Product details: large cover on top of the purchase dialog */
@@ -2856,10 +2847,6 @@ footer { border-top: 1px solid rgba(255,255,255,.07); color: var(--muted); font-
 .home-page .quick-grid.user-action-grid a.is-primary { border-color: var(--primary-border); background: color-mix(in srgb, var(--theme-elevated) 88%, var(--primary)); }
 .home-page .quick-grid.user-action-grid a.is-primary .quick-action-icon { background: var(--primary); color: #fff; }
 .home-page .quick-grid.user-action-grid a.is-primary .quick-action-arrow { color: var(--primary); opacity: 1; }
-@media (prefers-reduced-motion: reduce) {
-  .home-page .quick-grid.user-action-grid .quick-action-arrow { transition: none; }
-  .home-page .quick-grid.user-action-grid a:hover .quick-action-arrow { transform: none; }
-}
 /* Phones: one grouped list instead of separate floating cards. */
 @media (max-width: 650px) {
   .home-page .quick-grid.user-action-grid { grid-template-columns: 1fr; gap: 0; overflow: hidden; border: 1px solid var(--theme-line-soft); border-radius: 12px; background: var(--theme-elevated); }

@@ -204,6 +204,3 @@ a.ud-step:hover .ud-step-arrow { opacity: 1; }
   .ud-empty { flex-wrap: wrap; }
   .ud-empty .ud-btn { width: 100%; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .ud *, .ud *::before { transition: none !important; animation: none !important; }
-}

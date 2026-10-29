@@ -422,7 +422,12 @@ func (s *server) loginOAuthIdentity(c *fiber.Ctx, provider string, identity oaut
 	}
 	if err != nil {
 		settings, settingsErr := s.loadSettings(c.Context())
-		if settingsErr != nil || !settings.RegistrationEnabled {
+		if settingsErr != nil {
+			s.audit(c, auditEvent{Category: "auth", Action: "auth.oauth", Outcome: "failure", Metadata: map[string]any{"provider": provider, "reason": "settings_lookup"}})
+			return c.Redirect(oauthErrorLocation("account_create", provider), fiber.StatusFound)
+		}
+		if !settings.RegistrationEnabled {
+			s.audit(c, auditEvent{Category: "auth", Action: "auth.oauth", Outcome: "failure", Metadata: map[string]any{"provider": provider, "reason": "registration_disabled"}})
 			return c.Redirect(oauthErrorLocation("registration_disabled", provider), fiber.StatusFound)
 		}
 		if identity.Email != "" {
@@ -476,6 +481,7 @@ func (s *server) loginOAuthIdentity(c *fiber.Ctx, provider string, identity oaut
 		}
 	}
 	if user.Status != "active" {
+		s.audit(c, auditEvent{Actor: &user, Category: "auth", Action: "auth.oauth", Outcome: "failure", Metadata: map[string]any{"provider": provider, "reason": "account_suspended"}})
 		return c.Redirect(oauthErrorLocation("account_suspended", provider), fiber.StatusFound)
 	}
 	user.Permissions = permissionsForRole(user.Role)

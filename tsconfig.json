@@ -31,5 +31,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "audio", "discord-community-bot"]
+  "exclude": ["node_modules", "audio", "discord-community-bot", "uptime-worker"]
 }

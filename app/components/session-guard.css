@@ -86,8 +86,3 @@ html.sg-expired :is(.toast-region, .fl-toast, .gal-toasts, .dashboard-toast) { d
 @keyframes sg-rise { from { opacity: 0; transform: translateY(14px) scale(.97); } }
 @keyframes sg-shake { 20%, 60% { transform: rotate(-8deg); } 40%, 80% { transform: rotate(8deg); } }
 @keyframes sg-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-  .sg-backdrop, .sg-dialog, .sg-dialog.is-expired .sg-icon { animation: none; }
-  .sg-ghost > span, .sg-ghost > span::after { animation: none; }
-  .sg-ghost > span::after { display: none; }
-}
