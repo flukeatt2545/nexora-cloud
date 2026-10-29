@@ -30,6 +30,7 @@ export const RELEASES: Release[] = [
     changes: [
       { type: "changed", th: "หน้าแจ้งข้อผิดพลาด เช่น ไม่พบหน้า ระบบมีปัญหา ถูกบล็อก และปิดปรับปรุง ใช้หน้าตาตามที่ตั้งไว้ในหน้าแอดมิน ถ้าตั้งเป็นแบบเหลี่ยมจะเป็นการ์ดแบบเดียวกับหน้ายืนยันตัวตน Discord และใช้โหมดสว่างหรือมืดกับสีหลักของเว็บด้วย", en: "Error pages (not found, server error, blocked, maintenance) follow the look set by the admin: in square mode they use the Discord verify page's card, along with the site's light or dark mode and main colour" },
       { type: "changed", th: "เขียนข้อความในหน้าแจ้งข้อผิดพลาดใหม่ให้สั้นและอ่านง่าย หัวข้อไม่ตัดกลางคำ มีปุ่มโหลดหน้าใหม่ตอนเว็บมีปัญหา และตอนปิดปรับปรุงจะบอกเวลาที่เปิดอีกครั้งเป็นเวลาไทย", en: "Shorter, plainer wording on error pages, titles that don't break mid-word, a reload button when the site has a problem, and the reopening time shown in Thai time during maintenance" },
+      { type: "fixed", th: "ตัวหนังสือ NEXORA ด้านหลังหน้ายืนยันตัวตนและหน้าแจ้งข้อผิดพลาด บางแถวเลื่อนช้ากว่าแถวอื่นมาก ตอนนี้ทั้งสามแถวเลื่อนเร็วพอ ๆ กัน", en: "The big NEXORA rows behind the verify and error pages: one row could crawl while the others moved; all three now move at a similar speed" },
       { type: "fixed", th: "ปิด Animation effects ใน Windows แล้วตัวหนังสือและแอนิเมชันบนเว็บหยุดนิ่ง ตอนนี้แอนิเมชันทำงานเหมือนเดิมทั้งเว็บ", en: "Turning off Animation effects in Windows froze text and animations on the site; they now run as usual everywhere" },
     ],
   },

@@ -668,16 +668,24 @@
       const part = (type) => (parts.find((item) => item.type === type) || {}).value || '';
       node.textContent = part('day') + ' ' + part('month') + ' ' + part('hour') + ':' + part('minute') + ' น.';
     });
-    // The big outlined NEXORA rows each drift to a new place on their own (like the verify page).
+    // The big outlined NEXORA rows each swing to a random place on the other side (like the verify
+    // page, app/verify/VerifyMark.tsx). A swing's time comes from its length and one shared speed
+    // range, so no row crawls while the others move.
+    const start = [-0.09, 0.07, -0.03];
     document.querySelectorAll('.vf-mark span').forEach((row, index) => {
+      let at = start[index] * window.innerWidth;
       const move = () => {
-        const reach = window.innerWidth * (0.1 + Math.random() * 0.18);
-        const seconds = 4 + Math.random() * 8;
+        const width = window.innerWidth;
+        const side = at > 0 ? -1 : 1;
+        const x = side * width * (0.08 + Math.random() * 0.2);
+        const speed = width * (0.03 + Math.random() * 0.012);
+        const seconds = Math.min(12, Math.max(3, Math.abs(x - at) / speed));
+        at = x;
         row.style.setProperty('--dur', seconds + 's');
-        row.style.setProperty('--x', ((Math.random() * 2 - 1) * reach) + 'px');
-        setTimeout(move, seconds * 1000 * (0.55 + Math.random() * 0.5));
+        row.style.setProperty('--x', x + 'px');
+        setTimeout(move, seconds * 1000 + Math.random() * 600);
       };
-      setTimeout(move, 300 + index * 900);
+      setTimeout(move, 200 + index * 300);
     });
 
     // Blocked visitors: click the IP (or the button next to it) to copy it.
