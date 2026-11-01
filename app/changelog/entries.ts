@@ -25,6 +25,23 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.8",
+    date: "2026-11-01",
+    changes: [
+      { type: "changed", th: "จัดหน้าต่างเข้าสู่ระบบใหม่ คำไม่ซ้ำ ปุ่มโซเชียลกว้างเท่ากัน และเปลี่ยนไปสมัครสมาชิกจากลิงก์ด้านล่าง", en: "A simpler sign-in dialog: no repeated wording, equal-width social buttons and a link below to switch to sign-up" },
+      { type: "added", th: "เตือนเมื่อ Caps Lock เปิดอยู่ตอนกรอกรหัสผ่าน และกรอกผิดแล้วเคอร์เซอร์ไปที่ช่องนั้นทันที", en: "A Caps Lock warning while typing a password, and the cursor jumps to the field with a mistake" },
+      { type: "fixed", th: "ปิดรับสมัครแล้วแท็บเข้าสู่ระบบกินแค่ครึ่งแถว และกด Tab แล้วเคอร์เซอร์หลุดออกนอกหน้าต่าง", en: "With sign-ups closed the sign-in tab filled only half its row, and Tab could move focus out of the dialog" },
+    ],
+  },
+  {
+    version: "1.2.7",
+    date: "2026-11-01",
+    changes: [
+      { type: "changed", th: "กิจกรรมล่าสุดในหน้าภาพรวมแอดมินอ่านง่ายขึ้น เวลาสั้นลง จำนวนครั้งเขียนเป็นคำ และแต่ละแถวมีไอคอนบอกประเภทแทนจุดสีเขียว รายการที่ไม่สำเร็จไอคอนและตัวหนังสือเป็นสีแดง", en: "Recent activity on the admin overview is easier to read: shorter times, counts in words and an icon for each kind of entry instead of a green dot; failed entries show in red" },
+      { type: "changed", th: "นำไอคอนกลับมาในหน้าภาพรวมแอดมิน ทั้งตัวเลขสรุป หัวข้อการ์ด และสถานะระบบ", en: "Icons are back on the admin overview: figures, card headings and system status" },
+    ],
+  },
+  {
     version: "1.2.6",
     date: "2026-11-01",
     changes: [

@@ -201,6 +201,10 @@ body,
   color: #62666c;
 }
 
+[data-theme="light"] .auth-modal {
+  border-color: var(--theme-line-soft);
+}
+
 [data-theme="light"] .auth-modal,
 [data-theme="light"] .feedback-modal {
   background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--primary) 3%, #fff));
@@ -212,10 +216,6 @@ body,
   background: transparent;
   color: inherit;
   box-shadow: none;
-}
-
-[data-theme="light"] .auth-modal::before {
-  background: linear-gradient(rgba(255, 255, 255, .18), rgba(255, 255, 255, .42));
 }
 
 /* Neutral, not brand-tinted: a red or green brand mixed into the page reads as a pink or mint
@@ -239,10 +239,6 @@ body,
   background: #fff;
   color: #171717;
   border-color: rgba(0, 0, 0, .12);
-}
-
-[data-theme="light"] .tabs {
-  border-color: rgba(0, 0, 0, .1);
 }
 
 /* Dashboard */
@@ -559,14 +555,6 @@ body,
   color: #17181b;
 }
 
-[data-theme="light"] .tabs button {
-  color: #71757b;
-}
-
-[data-theme="light"] .tabs button[aria-selected="true"] {
-  color: #17181b;
-}
-
 [data-theme="light"] .field > span:first-child {
   color: #41444a;
 }
@@ -598,13 +586,11 @@ body,
   border-color: var(--theme-line-soft);
   background: #fff;
   color: #36393f;
-  box-shadow: 0 5px 16px rgba(25, 30, 38, .07);
 }
 
 [data-theme="light"] .social-login:hover {
   border-color: var(--primary-border);
   background: color-mix(in srgb, var(--primary) 4%, #fff);
-  box-shadow: 0 8px 22px rgba(25, 30, 38, .1);
 }
 
 [data-theme="light"] .github-icon {

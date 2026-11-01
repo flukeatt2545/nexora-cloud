@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SmartImage from "./components/SmartImage";
 import NoCoverArt from "./components/NoCoverArt";
 import { coverCropStyle, type CoverCrop } from "./lib/coverCrop";
@@ -384,8 +384,10 @@ function AuthModal({
     setMode(wantedMode);
   }
   const [showPassword, setShowPassword] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const dialogRef = useRef<HTMLElement>(null);
   const [announcementOpen, setAnnouncementOpen] = useState(true);
   const [wasOpen, setWasOpen] = useState(open);
   if (wasOpen !== open) {
@@ -401,11 +403,15 @@ function AuthModal({
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
+    const opener = document.activeElement as HTMLElement | null;
     document.body.classList.add("modal-open");
     window.addEventListener("keydown", onKey);
+    // With no form to autofocus, keyboard users still start inside the dialog.
+    if (!dialogRef.current?.contains(document.activeElement)) dialogRef.current?.focus();
     return () => {
       document.body.classList.remove("modal-open");
       window.removeEventListener("keydown", onKey);
+      opener?.focus?.();
     };
   }, [open, onClose]);
 
@@ -439,14 +445,16 @@ function AuthModal({
     if (!usernamePattern.test(username)) {
       nextErrors.username = mode === "register"
         ? "ใช้ได้เฉพาะ A–Z และ 0–9 จำนวน 4–30 ตัว"
-        : "กรุณากรอกชื่อผู้ใช้ให้ถูกต้อง";
+        : username ? "ชื่อผู้ใช้ใช้ได้เฉพาะ A–Z และ 0–9" : "กรอกชื่อผู้ใช้";
     }
-    if (!password) nextErrors.password = "กรุณากรอกรหัสผ่าน";
+    if (!password) nextErrors.password = "กรอกรหัสผ่าน";
     else if (hasNonAscii(password)) nextErrors.password = "รหัสผ่านใช้ได้เฉพาะตัวอักษรภาษาอังกฤษ ตัวเลข และสัญลักษณ์";
     else if (mode === "register" && Array.from(password).length < 8) nextErrors.password = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
     if (mode === "register" && data.get("confirm") !== password) nextErrors.confirm = "รหัสผ่านไม่ตรงกัน";
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length) {
+    const firstInvalid = Object.keys(nextErrors)[0];
+    if (firstInvalid) {
+      (event.currentTarget.elements.namedItem(firstInvalid) as HTMLElement | null)?.focus();
       return;
     }
 
@@ -466,7 +474,7 @@ function AuthModal({
       });
       const payload = (await response.json().catch(() => ({}))) as AuthResponse;
       if (!response.ok || !payload.user) {
-        const message = payload.error || "ระบบไม่สามารถดำเนินการได้ในขณะนี้";
+        const message = payload.error || "ตอนนี้ทำรายการไม่ได้ ลองใหม่อีกครั้ง";
         if (payload.code === "account_exists") setErrors({ username: message });
         else setErrors({ form: message });
         setLoading(false);
@@ -475,65 +483,83 @@ function AuthModal({
 
       const user = payload.user;
       await rememberSignIn(username, password);
-      onNotify("success", mode === "register" ? "สร้างบัญชีสำเร็จ ยินดีต้อนรับสู่ NEXORA CLOUD" : `เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${user.username}`);
+      onNotify("success", mode === "register" ? "สร้างบัญชีแล้ว" : "เข้าสู่ระบบแล้ว");
       onAuthenticated(user);
     } catch {
-      onNotify("error", "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+      setErrors({ form: "เชื่อมต่อไม่ได้ ลองใหม่อีกครั้ง" });
       setLoading(false);
     }
   }
 
+  function switchMode(next: AuthMode) {
+    setMode(next);
+    setErrors({});
+    setCapsLock(false);
+    window.setTimeout(() => document.getElementById("auth-username")?.focus(), 0);
+  }
+
+  // Tab stays inside the dialog while it is open.
+  function keepFocusInside(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.key !== "Tab") return;
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("a[href], button:not(:disabled), input:not(:disabled)"));
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || active === event.currentTarget)) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
+  }
+
+  const canRegister = settings?.registrationEnabled !== false;
+  const hasForm = mode === "login" ? settings?.localLoginEnabled !== false : canRegister;
+  const verb = mode === "register" ? "สมัครสมาชิก" : "เข้าสู่ระบบ";
+
   return (
     <div className={`modal-backdrop auth-backdrop${settings?.authBackgroundTintEnabled ? " tint-enabled" : ""}`} role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <section className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <section ref={dialogRef} className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" tabIndex={-1} onKeyDown={keepFocusInside}>
         <button className="icon-button close" onClick={onClose} aria-label="ปิดหน้าต่าง"><X size={19} strokeWidth={2} /></button>
         <div className="auth-brand"><img className="auth-logo" src={settings?.logoUrl || "/logo-v2.png"} alt={settings?.brandName || "NEXORA CLOUD"} /></div>
-        <p className="eyebrow">{mode === "login" ? "เข้าสู่ระบบ" : "สร้างบัญชีใหม่"}</p>
-        <h2 id="auth-title">{mode === "login" ? settings?.loginTitle || "ยินดีต้อนรับกลับมา" : settings?.registerTitle || "เริ่มต้นกับ NEXORA"}</h2>
-        <p className="modal-subtitle">{mode === "login" ? settings?.loginSubtitle || "ลงชื่อเข้าใช้ NEXORA CLOUD" : settings?.registerSubtitle || "สร้างบัญชีเพื่อเริ่มใช้งาน Cloud"}</p>
+        <h2 id="auth-title">{mode === "login" ? settings?.loginTitle || "เข้าสู่ระบบ" : settings?.registerTitle || "สมัครสมาชิก"}</h2>
+        <p className="modal-subtitle">{mode === "login" ? settings?.loginSubtitle || "NEXORA CLOUD" : settings?.registerSubtitle || "NEXORA CLOUD"}</p>
         {mode === "login" && announcementOpen && announcements[0] && <div className={`auth-announcement ${announcements[0].severity}`} role="status">
           <Bell size={18} /><div><strong>{announcements[0].title}</strong><p>{announcements[0].message}</p>{announcements[0].buttonUrl && <a href={announcements[0].buttonUrl}>{announcements[0].buttonLabel || "ดูรายละเอียด"}</a>}</div>
           <button type="button" onClick={() => setAnnouncementOpen(false)} aria-label="ปิดประกาศ"><X size={15} /></button>
         </div>}
-        <div className="tabs" role="tablist">
-          <button role="tab" aria-selected={mode === "login"} onClick={() => { setMode("login"); setErrors({}); }}>เข้าสู่ระบบ</button>
-          {settings?.registrationEnabled !== false && <button role="tab" aria-selected={mode === "register"} onClick={() => { setMode("register"); setErrors({}); }}>สมัครสมาชิก</button>}
-        </div>
-        {mode === "login" && settings?.localLoginEnabled === false && (
-          <div className="auth-notice-card warning">
-            <LockKeyhole size={20} className="anc-icon" />
-            <div>
-              <strong>ปิดการเข้าระบบด้วยชื่อผู้ใช้และรหัสผ่าน</strong>
-              <p>โปรดเข้าสู่ระบบด้วย Social ด้านล่าง</p>
-            </div>
-          </div>
-        )}
-        {((mode === "login" && settings?.localLoginEnabled !== false) || (mode === "register" && settings?.registrationEnabled !== false)) && <form onSubmit={submit} method="post" action={`/api/auth/${mode}`} noValidate>
+        {!hasForm && <p className="auth-note"><LockKeyhole size={17} aria-hidden="true" />{socialProviders.length > 0 ? "ตอนนี้เข้าด้วยชื่อผู้ใช้และรหัสผ่านไม่ได้ ใช้บัญชีด้านล่างแทน" : "ตอนนี้ปิดการเข้าสู่ระบบอยู่ ติดต่อผู้ดูแลเว็บ"}</p>}
+        {hasForm && <form onSubmit={submit} method="post" action={`/api/auth/${mode}`} noValidate
+          onChange={(event) => {
+            const name = (event.target as unknown as HTMLInputElement).name;
+            if (errors[name] || errors.form) setErrors((current) => { const next = { ...current }; delete next[name]; delete next.form; return next; });
+          }}
+          onKeyUp={(event) => { if ((event.target as HTMLElement).tagName === "INPUT") setCapsLock(event.getModifierState("CapsLock")); }}>
           <label className="field" htmlFor="auth-username">
             <span>ชื่อผู้ใช้</span>
             <span className="input-wrap"><UserRound className="field-icon" size={18} aria-hidden="true" /><input autoFocus id="auth-username" type="text" name="username" autoComplete="username" placeholder={mode === "register" ? "ตัวอักษรอังกฤษหรือตัวเลข 4–30 ตัว" : "กรอกชื่อผู้ใช้"} maxLength={30} aria-invalid={!!errors.username} {...latinAlphanumericInputProps()} /></span>
-            {errors.username && <small className="error">{errors.username}</small>}
+            {errors.username && <small className="error" role="alert">{errors.username}</small>}
           </label>
           <label className="field" htmlFor="auth-password">
             <span>รหัสผ่าน</span>
-            <span className="input-wrap"><LockKeyhole className="field-icon" size={18} aria-hidden="true" /><input id="auth-password" name="password" type={showPassword ? "text" : "password"} autoComplete={mode === "login" ? "current-password" : "new-password"} placeholder={mode === "register" ? "อย่างน้อย 8 ตัวอักษร (ภาษาอังกฤษ)" : "กรอกรหัสผ่าน"} minLength={mode === "register" ? 8 : undefined} maxLength={128} aria-invalid={!!errors.password} {...asciiInputProps()} /><button type="button" className="show-pass" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span>
-            {errors.password && <small className="error">{errors.password}</small>}
+            <span className="input-wrap"><LockKeyhole className="field-icon" size={18} aria-hidden="true" /><input id="auth-password" name="password" type={showPassword ? "text" : "password"} autoComplete={mode === "login" ? "current-password" : "new-password"} placeholder={mode === "register" ? "อย่างน้อย 8 ตัวอักษร (ภาษาอังกฤษ)" : "กรอกรหัสผ่าน"} minLength={mode === "register" ? 8 : undefined} maxLength={128} aria-invalid={!!errors.password} {...asciiInputProps()} /><button type="button" className="show-pass" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"} aria-pressed={showPassword}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span>
+            {errors.password ? <small className="error" role="alert">{errors.password}</small> : capsLock && <small className="field-hint">Caps Lock เปิดอยู่</small>}
           </label>
           {mode === "register" && <label className="field" htmlFor="auth-confirm">
             <span>ยืนยันรหัสผ่าน</span>
             <span className="input-wrap"><LockKeyhole className="field-icon" size={18} aria-hidden="true" /><input id="auth-confirm" name="confirm" type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="กรอกรหัสผ่านอีกครั้ง" aria-invalid={!!errors.confirm} {...asciiInputProps()} /></span>
-            {errors.confirm && <small className="error">{errors.confirm}</small>}
+            {errors.confirm && <small className="error" role="alert">{errors.confirm}</small>}
           </label>}
           {errors.form && <div className="form-error" role="alert"><CircleAlert size={16} />{errors.form}</div>}
-          <button className="button primary full" type="submit" disabled={loading}>{loading ? <><span className="spinner" />กำลังดำเนินการ...</> : <>{mode === "login" ? "เข้าสู่ระบบ" : "สร้างบัญชี"}<ArrowRight size={17} aria-hidden="true" /></>}</button>
+          <button className="button primary full" type="submit" disabled={loading}>{loading ? <><span className="spinner" />{mode === "login" ? "กำลังเข้าสู่ระบบ" : "กำลังสร้างบัญชี"}</> : <>{mode === "login" ? "เข้าสู่ระบบ" : "สร้างบัญชี"}<ArrowRight size={17} aria-hidden="true" /></>}</button>
         </form>}
-        {socialProviders.length > 0 && <div className="social-auth">
-          <div className="divider">{mode === "register" ? "หรือสมัครสมาชิกด้วย" : "หรือเข้าสู่ระบบด้วย"}</div>
+        {socialProviders.length > 0 && <div className={`social-auth${hasForm ? "" : " is-only"}`}>
+          {hasForm && <div className="divider">หรือ</div>}
           <div className="social-auth-grid">{socialProviders.map(({ provider, label }) =>
-            <SocialOAuthButton key={provider} provider={provider as "discord" | "google" | "github"} mode={mode} className={`social-login ${provider}`} ariaLabel={`${mode === "register" ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}ด้วย ${label}`}><SocialProviderIcon provider={provider} /><span>{label}</span></SocialOAuthButton>
+            <SocialOAuthButton key={provider} provider={provider as "discord" | "google" | "github"} mode={mode} className={`social-login ${provider}`} ariaLabel={`${verb}ด้วย ${label}`}><SocialProviderIcon provider={provider} /><span>{hasForm ? label : `${verb}ด้วย ${label}`}</span></SocialOAuthButton>
           )}</div>
         </div>}
-        <p className="auth-terms">การดำเนินการต่อถือว่าคุณยอมรับ <a href="/terms" target="_blank" rel="noreferrer">ข้อกำหนดการใช้งาน</a></p>
+        {canRegister && <p className="auth-switch">{mode === "login"
+          ? <>ยังไม่มีบัญชี? <button type="button" onClick={() => switchMode("register")}>สมัครสมาชิก</button></>
+          : <>มีบัญชีแล้ว? <button type="button" onClick={() => switchMode("login")}>เข้าสู่ระบบ</button></>}</p>}
+        <p className="auth-terms">เมื่อ{verb} ถือว่ายอมรับ<a href="/terms" target="_blank" rel="noreferrer">ข้อกำหนดการใช้งาน</a></p>
       </section>
     </div>
   );

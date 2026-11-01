@@ -4755,7 +4755,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                       className="premium-input"
                       value={settings.loginTitle}
                       onChange={(e) => set("loginTitle", e.target.value)}
-                      placeholder="ยินดีต้อนรับกลับมา"
+                      placeholder="เข้าสู่ระบบ"
                     />
                   </SettingRow>
 
@@ -4764,7 +4764,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
                       className="premium-input"
                       value={settings.loginSubtitle}
                       onChange={(e) => set("loginSubtitle", e.target.value)}
-                      placeholder="ลงชื่อเข้าใช้ NEXORA CLOUD"
+                      placeholder="NEXORA CLOUD"
                     />
                   </SettingRow>
 
