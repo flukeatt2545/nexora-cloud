@@ -245,17 +245,6 @@ body,
   border-color: rgba(0, 0, 0, .1);
 }
 
-[data-theme="light"] .account-dropdown {
-  background: #fff;
-  color: #171717;
-  border-color: rgba(0, 0, 0, .1);
-  box-shadow: 0 20px 45px rgba(0, 0, 0, .14);
-}
-
-[data-theme="light"] .account-link {
-  color: #333;
-}
-
 /* Dashboard */
 [data-theme="light"] .dashboard-root {
   background:
@@ -446,11 +435,6 @@ body,
   background: #f3f4f6;
 }
 
-[data-theme="light"] .user-pill-avatar {
-  background: rgba(0, 168, 104, .08);
-  color: #00a868;
-}
-
 [data-theme="light"] .hamburger {
   border-color: var(--theme-line-soft);
   background: var(--theme-elevated);
@@ -465,20 +449,8 @@ body,
   color: var(--theme-text-strong);
 }
 
-[data-theme="light"] .account-summary small,
-[data-theme="light"] .account-logout,
-[data-theme="light"] .account-link {
-  color: #62666d;
-}
-
 [data-theme="light"] .account-divider {
   background: var(--theme-line-soft);
-}
-
-[data-theme="light"] .account-logout:hover,
-[data-theme="light"] .account-link:hover {
-  background: rgb(var(--danger-rgb) / 0.065);
-  color: #17181b;
 }
 
 [data-theme="light"] .hero-copy > p:not(.eyebrow) {
@@ -943,11 +915,6 @@ body,
 
   [data-theme="light"] .mobile-account-head {
     background: rgba(20, 20, 25, .04);
-  }
-
-  [data-theme="light"] .mobile-account-head .user-pill-avatar {
-    color: #5c6068;
-    background: rgba(20, 20, 25, .06);
   }
 
   [data-theme="light"] .mobile-account-meta strong {

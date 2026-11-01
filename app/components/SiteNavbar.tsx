@@ -3,9 +3,10 @@
 import {
   ChevronDown, FolderOpen, Home, LayoutDashboard, LogOut, Menu, ShieldCheck, ShoppingCart, UserRound, X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { POINTS_EVENT } from "./StorePurchase";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useChangelogUnseen } from "../changelog/seen";
 import "./changelog-link.css";
 
@@ -44,7 +45,10 @@ export default function SiteNavbar({
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
+  // Opened from the keyboard: focus goes into the menu, as a mouse user's would not.
+  const focusFirstItem = useRef(false);
   const updateUnseen = useChangelogUnseen();
+  const pathname = usePathname();
 
   useEffect(() => {
     fetch(`${API_BASE}/api/settings/public`)
@@ -81,12 +85,53 @@ export default function SiteNavbar({
   }, []);
 
   useEffect(() => {
-    function onDocClick(event: MouseEvent) {
+    function onPointerDown(event: PointerEvent) {
       if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false);
     }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
+    function onEscape(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setMenuOpen(false);
+      setAccountOpen((open) => {
+        if (open) accountRef.current?.querySelector<HTMLButtonElement>(".user-pill")?.focus();
+        return false;
+      });
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onEscape);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onEscape);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!accountOpen || !focusFirstItem.current) return;
+    focusFirstItem.current = false;
+    accountRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+  }, [accountOpen]);
+
+  // Up, down, Home and End move through the menu and wrap around.
+  function onAccountKey(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "ArrowDown" && !accountOpen && !menuOpen) {
+      event.preventDefault();
+      focusFirstItem.current = true;
+      setAccountOpen(true);
+      return;
+    }
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    const items = [...(accountRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') || [])];
+    if (!items.length) return;
+    event.preventDefault();
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const next = event.key === "Home" ? 0
+      : event.key === "End" ? items.length - 1
+      : event.key === "ArrowDown" ? (at + 1) % items.length
+      : (at <= 0 ? items.length : at) - 1;
+    items[next].focus();
+  }
+
+  const closeMenus = () => { setMenuOpen(false); setAccountOpen(false); };
+  const here = (href: string) => (pathname === href ? "page" as const : undefined);
 
   async function logout() {
     await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" }).catch(() => undefined);
@@ -99,6 +144,9 @@ export default function SiteNavbar({
   const storeVisible = settingsChecked && settings?.storeSectionEnabled !== false && settings?.storeEnabled !== false;
   const brandName = settings?.brandName;
   const showGuestActions = settingsChecked && sessionChecked && !sessionUser && Boolean(onLogin);
+  const roleName = sessionUser?.role === "superadmin" ? "ผู้ดูแลระบบ" : sessionUser?.role === "admin" ? "แอดมิน" : "ผู้ใช้";
+  const profileHref = sessionUser?.role === "user" ? "/profile" : "/admin/profile";
+  const userInitial = (sessionUser?.username || "?").charAt(0).toUpperCase();
 
   return (
     <>
@@ -155,44 +203,47 @@ export default function SiteNavbar({
             )}
 
             {sessionUser ? (
-              <div className={`session-actions account-menu ${accountOpen || menuOpen ? "account-open" : ""}`} ref={accountRef}>
+              <div className={`session-actions account-menu ${accountOpen || menuOpen ? "account-open" : ""}`} ref={accountRef} onKeyDown={onAccountKey}>
                 <button
                   className="user-pill user-pill-desktop"
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={accountOpen}
-                  onClick={() => setAccountOpen((open) => !open)}
+                  onClick={(event) => {
+                    focusFirstItem.current = event.detail === 0;
+                    setAccountOpen((open) => !open);
+                  }}
                 >
-                  <span className="user-pill-avatar" aria-hidden="true"><UserRound size={16} /></span>
+                  <span className="user-pill-avatar" aria-hidden="true">{userInitial}</span>
                   <span className="user-pill-name" title={sessionUser.username}>{sessionUser.username}</span>
                   <ChevronDown className={accountOpen ? "rotate" : ""} size={15} aria-hidden="true" />
                 </button>
                 <div className="mobile-account-head">
-                  <span className="user-pill-avatar" aria-hidden="true"><UserRound size={18} /></span>
+                  <span className="user-pill-avatar" aria-hidden="true">{userInitial}</span>
                   <div className="mobile-account-meta">
                     <strong title={sessionUser.username}>{sessionUser.username}</strong>
-                    <small>{sessionUser.role === "superadmin" ? "ผู้ดูแลระบบ" : sessionUser.role === "admin" ? "แอดมิน" : "ผู้ใช้"}</small>
+                    <small>{roleName}</small>
                   </div>
                 </div>
                 {(accountOpen || menuOpen) && (
-                  <div className="account-dropdown" role="menu">
+                  <div className="account-dropdown" role="menu" aria-label="เมนูบัญชี">
                     <div className="account-summary">
-                      <span className="account-avatar"><UserRound size={18} /></span>
+                      <span className="user-pill-avatar" aria-hidden="true">{userInitial}</span>
                       <div>
                         <strong title={sessionUser.username}>{sessionUser.username}</strong>
-                        <small><ShieldCheck size={13} />{sessionUser.role === "superadmin" ? "ผู้ดูแลระบบ" : sessionUser.role === "admin" ? "แอดมิน" : "ผู้ใช้"}</small>
+                        <small>{roleName}</small>
                       </div>
                     </div>
                     <div className="account-divider" />
-                    <Link role="menuitem" className="account-link" href="/" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><Home size={17} />หน้าหลัก</Link>
-                    <a role="menuitem" className="account-link" href={sessionUser.role === "user" ? "/profile" : "/admin/profile"} onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><UserRound size={17} />โปรไฟล์ของฉัน</a>
-                    <Link role="menuitem" className="account-link" href="/dashboard" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><LayoutDashboard size={17} />แดชบอร์ด</Link>
-                    <Link role="menuitem" className="account-link" href="/files" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><FolderOpen size={17} />ไฟล์ของฉัน</Link>
+                    <Link role="menuitem" className="account-link" href="/" aria-current={here("/")} onClick={closeMenus}><Home size={17} aria-hidden="true" />หน้าหลัก</Link>
+                    <Link role="menuitem" className="account-link" href="/dashboard" aria-current={here("/dashboard")} onClick={closeMenus}><LayoutDashboard size={17} aria-hidden="true" />แดชบอร์ด</Link>
+                    <Link role="menuitem" className="account-link" href="/files" aria-current={here("/files")} onClick={closeMenus}><FolderOpen size={17} aria-hidden="true" />ไฟล์ของฉัน</Link>
+                    <a role="menuitem" className="account-link" href={profileHref} aria-current={here(profileHref)} onClick={closeMenus}><UserRound size={17} aria-hidden="true" />โปรไฟล์</a>
                     {(sessionUser.role === "admin" || sessionUser.role === "superadmin") && (
-                      <Link role="menuitem" className="account-link" href="/admin" onClick={() => { setMenuOpen(false); setAccountOpen(false); }}><ShieldCheck size={17} />แดชบอร์ดผู้ดูแล</Link>
+                      <Link role="menuitem" className="account-link" href="/admin" aria-current={here("/admin")} onClick={closeMenus}><ShieldCheck size={17} aria-hidden="true" />ระบบแอดมิน</Link>
                     )}
                     <div className="account-divider" />
-                    <button type="button" role="menuitem" className="account-logout" onClick={() => { void logout(); }}><LogOut size={17} />ออกจากระบบ</button>
+                    <button type="button" role="menuitem" className="account-logout" onClick={() => { void logout(); }}><LogOut size={17} aria-hidden="true" />ออกจากระบบ</button>
                   </div>
                 )}
               </div>

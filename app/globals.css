@@ -271,7 +271,8 @@ input[type="checkbox"],input[type="radio"],input[type="range"]{accent-color:var(
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 0 13px;
+  max-width: 220px;
+  padding: 0 10px 0 7px;
   border: 1px solid rgba(255,255,255,.1);
   border-radius: 10px;
   background: rgba(255,255,255,.03);
@@ -288,9 +289,12 @@ input[type="checkbox"],input[type="radio"],input[type="range"]{accent-color:var(
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  border-radius: 8px;
-  color: var(--success);
-  background: rgba(0,208,132,.08);
+  border-radius: 50%;
+  color: var(--primary-ink, var(--primary));
+  background: var(--primary-soft);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
 }
 .user-pill-name {
   min-width: 0;
@@ -310,26 +314,35 @@ input[type="checkbox"],input[type="radio"],input[type="range"]{accent-color:var(
   top: calc(100% + 10px);
   right: 0;
   z-index: 60;
-  width: min(280px, calc(100vw - 40px));
-  padding: 8px;
-  border: 1px solid rgba(255,255,255,.1);
+  display: grid;
+  gap: 1px;
+  width: min(240px, calc(100vw - 24px));
+  max-height: calc(100dvh - 88px);
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--control-line);
   border-radius: 12px;
-  background: rgba(13,10,10,.98);
-  box-shadow: 0 16px 40px rgba(0,0,0,.5);
-  backdrop-filter: blur(16px);
-  animation: dropdown-in .18s ease-out;
+  background: var(--theme-elevated);
+  box-shadow: 0 16px 40px var(--theme-shadow);
+  animation: dropdown-in .16s ease-out;
 }
-.account-summary { display: flex; align-items: center; gap: 11px; padding: 8px; }
-.account-avatar { width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid rgba(0,208,132,.24); border-radius: 10px; color: var(--success); background: rgba(0,208,132,.07); }
-.account-summary div { min-width: 0; display: grid; gap: 3px; }
-.account-summary strong { overflow: hidden; color: var(--strong-ink, #f5f5f5); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.account-summary small { display: flex; align-items: center; gap: 5px; color: var(--soft-ink, #999); font-size: 12px; }
-.account-summary small svg { color: var(--primary); }
-.account-divider { height: 1px; margin: 5px 0; background: rgba(255,255,255,.07); }
-.account-logout,.account-link { width: 100%; min-height: 42px; display: flex; align-items: center; gap: 9px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--soft-ink, #bbb); font: inherit; font-size: 13px; cursor: pointer; transition: color var(--transition-fast), background-color var(--transition-fast); }
-.account-logout:hover,.account-link:hover { color: #fff; background: rgb(var(--danger-rgb) / 0.1); }
-.account-logout svg { color: var(--danger); }
-.account-link svg { color: var(--soft-ink, #aaa); }
+.account-summary { display: flex; align-items: center; gap: 10px; padding: 8px 8px 7px; }
+.account-summary .user-pill-avatar { width: 34px; height: 34px; font-size: 14px; }
+.account-summary div { min-width: 0; display: grid; gap: 1px; line-height: 1.35; }
+.account-summary strong { overflow: hidden; color: var(--theme-text-strong); font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.account-summary small { color: var(--theme-text-soft); font-size: 12px; }
+.account-divider { height: 1px; margin: 5px 2px; background: var(--theme-line-soft); }
+.account-logout,.account-link { width: 100%; min-height: 38px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--theme-text-strong); font: inherit; font-size: 14px; font-weight: 500; text-align: left; text-decoration: none; cursor: pointer; transition: color var(--transition-fast), background-color var(--transition-fast); }
+.account-link svg { flex: 0 0 auto; color: var(--theme-text-soft); }
+.account-link:hover, .account-link:focus-visible { background: var(--theme-hover); color: var(--theme-text-strong); }
+.account-dropdown .account-link[aria-current="page"], .account-dropdown .account-link[aria-current="page"] svg { color: var(--primary-ink, var(--primary)); }
+.account-logout { color: var(--danger); }
+.account-logout svg { flex: 0 0 auto; color: var(--danger); }
+.account-logout:hover, .account-logout:focus-visible { background: rgb(var(--danger-rgb) / 0.1); color: var(--danger); }
+.account-link:focus-visible, .account-logout:focus-visible, .user-pill:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+/* Fingers need more room than a mouse */
+@media (pointer: coarse) { .account-link, .account-logout { min-height: 44px; } }
 .button {
   min-height: 44px;
   border: 1px solid transparent;
@@ -1549,9 +1562,7 @@ footer { border-top: 1px solid rgba(255,255,255,.07); color: var(--muted); font-
   .mobile-account-head .user-pill-avatar {
     width: 36px;
     height: 36px;
-    border-radius: 10px;
-    color: var(--soft-ink, #c8c8cc);
-    background: rgba(255,255,255,.06);
+    font-size: 14px;
   }
   .mobile-account-meta {
     min-width: 0;
@@ -1576,6 +1587,8 @@ footer { border-top: 1px solid rgba(255,255,255,.07); color: var(--muted); font-
     left: auto;
     right: auto;
     width: auto;
+    max-height: none;
+    overflow: visible;
     margin: 0;
     padding: 0;
     border: 0;

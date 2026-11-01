@@ -25,6 +25,15 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.5",
+    date: "2026-11-01",
+    changes: [
+      { type: "changed", th: "จัดเมนูบัญชีมุมขวาบนใหม่ เล็กลง อ่านง่ายขึ้น ใช้สีหลักของเว็บ และบอกว่าตอนนี้อยู่หน้าไหน", en: "A tidier account menu: smaller, easier to read, in the site's main colour, and it shows which page you're on" },
+      { type: "changed", th: "เมนูบัญชีใช้คีย์บอร์ดได้ กดลูกศรเลื่อนและกด Esc เพื่อปิด บนจอเตี้ยเลื่อนดูได้ และบนมือถือแตะง่ายขึ้น", en: "The account menu works from the keyboard (arrows to move, Esc to close), scrolls on short screens and is easier to tap on phones" },
+      { type: "fixed", th: "เอาเมาส์ชี้รายการธรรมดาในเมนูบัญชีแล้วขึ้นพื้นสีแดงเหมือนปุ่มอันตราย ตอนนี้สีแดงเหลือเฉพาะออกจากระบบ", en: "Ordinary items in the account menu turned red on hover like a danger button; only Sign out is red now" },
+    ],
+  },
+  {
     version: "1.2.4",
     date: "2026-11-01",
     changes: [
