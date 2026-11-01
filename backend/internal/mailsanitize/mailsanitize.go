@@ -3,6 +3,8 @@
 package mailsanitize
 
 import (
+	"encoding/base64"
+	"html"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -12,11 +14,17 @@ import (
 
 const MaxHTMLBytes = 1024 * 1024
 
-const remoteImagePlaceholder = `<span data-remote-image-blocked="true">[รูปภาพภายนอกถูกบล็อก]</span>`
+// ImageProxyPath is the API route that fetches a remote mail image on the reader's behalf.
+const ImageProxyPath = "/api/mail/image?u="
 
-// remoteImagePattern matches normalized (bluemonday-quoted) img tags pointing
-// at remote http(s) resources so they can be replaced with a placeholder.
-var remoteImagePattern = regexp.MustCompile(`(?is)<img\b[^>]*\bsrc\s*=\s*"(?:https?:)?//[^"]*"[^>]*>`)
+var (
+	// remoteImagePattern matches the src of normalized (bluemonday-quoted) img tags
+	// pointing at remote http(s) resources.
+	remoteImagePattern = regexp.MustCompile(`(?is)(<img\b[^>]*\bsrc\s*=\s*")((?:https?:)?//[^"]*)(")`)
+	// proxiedImagePattern matches a src made by ProxyRemoteImages, which comes back
+	// in the HTML of a reply, a forward or a draft.
+	proxiedImagePattern = regexp.MustCompile(`\bsrc="` + regexp.QuoteMeta(ImageProxyPath) + `([A-Za-z0-9_-]+)"`)
+)
 
 var policy = buildPolicy()
 
@@ -30,8 +38,8 @@ func buildPolicy() *bluemonday.Policy {
 	p.AllowAttrs("align").OnElements("p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "center")
 
 	// img src: standard http(s)/relative URLs, strict data:image/* URIs and
-	// cid: (inline attachments). Remote http(s) images survive this pass but
-	// are replaced with a placeholder below.
+	// cid: (inline attachments). Remote http(s) images survive this pass; what
+	// goes to a browser must also pass through ProxyRemoteImages.
 	p.AllowImages()
 	p.AllowDataURIImages()
 	p.AllowURLSchemes("cid")
@@ -39,17 +47,41 @@ func buildPolicy() *bluemonday.Policy {
 	return p
 }
 
-// Sanitize returns a version of the email HTML that is safe to inject into the
-// webmail viewer's DOM.
+// Sanitize returns a version of the email HTML free of active content, for storing
+// and sending. Remote images keep their real URLs, so the webmail viewer must also
+// call ProxyRemoteImages before showing it.
 func Sanitize(value string) string {
 	value = strings.TrimSpace(value)
 	value = truncateUTF8(value, MaxHTMLBytes)
 	if value == "" {
 		return ""
 	}
-	safe := policy.Sanitize(value)
-	safe = remoteImagePattern.ReplaceAllString(safe, remoteImagePlaceholder)
-	return truncateUTF8(safe, MaxHTMLBytes)
+	return truncateUTF8(policy.Sanitize(restoreRemoteImages(value)), MaxHTMLBytes)
+}
+
+// ProxyRemoteImages points the remote images of sanitized HTML at the image proxy,
+// so that opening a mail never connects the reader's browser to the sender's servers.
+func ProxyRemoteImages(safe string) string {
+	return remoteImagePattern.ReplaceAllStringFunc(safe, func(tag string) string {
+		parts := remoteImagePattern.FindStringSubmatch(tag)
+		target := html.UnescapeString(parts[2])
+		if strings.HasPrefix(target, "//") {
+			target = "https:" + target
+		}
+		return parts[1] + ImageProxyPath + base64.RawURLEncoding.EncodeToString([]byte(target)) + parts[3]
+	})
+}
+
+// restoreRemoteImages undoes ProxyRemoteImages: quoted in a reply, a proxy path would
+// point at nothing on the recipient's side.
+func restoreRemoteImages(value string) string {
+	return proxiedImagePattern.ReplaceAllStringFunc(value, func(attribute string) string {
+		target, err := base64.RawURLEncoding.DecodeString(proxiedImagePattern.FindStringSubmatch(attribute)[1])
+		if err != nil {
+			return attribute
+		}
+		return `src="` + html.EscapeString(string(target)) + `"`
+	})
 }
 
 func truncateUTF8(value string, limit int) string {

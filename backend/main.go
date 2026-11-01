@@ -474,6 +474,7 @@ func main() {
 	mailAPI.Post("/mailboxes/:id/device-passwords", s.createMailDevicePassword)
 	mailAPI.Delete("/mailboxes/:id/device-passwords/:credentialId", s.revokeMailDevicePassword)
 	mailAPI.Get("/mailboxes/:id/blob", s.downloadStalwartBlob)
+	mailAPI.Get("/image", s.rateLimit("mail_image", 600, 10*time.Minute), s.proxyMailImage)
 	mailAPI.Get("/messages", s.listMailMessages)
 	mailAPI.Get("/messages/:id", s.getMailMessage)
 	mailAPI.Get("/threads/:id", s.getMailThread)

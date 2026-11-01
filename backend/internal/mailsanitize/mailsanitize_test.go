@@ -1,6 +1,7 @@
 package mailsanitize
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 )
@@ -86,16 +87,35 @@ func TestSanitizeStripsDangerousContent(t *testing.T) {
 	}
 }
 
-func TestSanitizeRemoteImagePlaceholder(t *testing.T) {
-	got := Sanitize(`<p>a</p><img src="https://tracker.example/pixel"><img src="cid:part1@example">`)
-	if !strings.Contains(got, "รูปภาพภายนอกถูกบล็อก") {
-		t.Fatalf("remote image was not replaced: %q", got)
+func TestProxyRemoteImages(t *testing.T) {
+	got := ProxyRemoteImages(Sanitize(`<p>a</p><img src="https://tracker.example/pixel?a=1&amp;b=2" alt="x"><img src="//cdn.example/p.png"><img src="cid:part1@example">`))
+	if strings.Contains(got, "tracker.example") || strings.Contains(got, "cdn.example") {
+		t.Fatalf("browser would still connect to the remote host: %q", got)
 	}
-	if strings.Contains(got, "tracker.example") {
-		t.Fatalf("remote image URL survived: %q", got)
+	if want := ImageProxyPath + base64.RawURLEncoding.EncodeToString([]byte("https://tracker.example/pixel?a=1&b=2")); !strings.Contains(got, want) {
+		t.Fatalf("missing %q in %q", want, got)
 	}
-	if !strings.Contains(got, "cid:part1@example") {
-		t.Fatalf("inline cid image was stripped: %q", got)
+	if want := ImageProxyPath + base64.RawURLEncoding.EncodeToString([]byte("https://cdn.example/p.png")); !strings.Contains(got, want) {
+		t.Fatalf("protocol-relative image not proxied over https: %q", got)
+	}
+	if !strings.Contains(got, `alt="x"`) || !strings.Contains(got, "cid:part1@example") {
+		t.Fatalf("other image data was lost: %q", got)
+	}
+}
+
+func TestSanitizeRestoresProxiedImagesForSending(t *testing.T) {
+	viewed := ProxyRemoteImages(Sanitize(`<img src="https://cdn.example/p.png?a=1&amp;b=2">`))
+	got := Sanitize(`<p>reply</p><blockquote>` + viewed + `</blockquote>`)
+	if strings.Contains(got, ImageProxyPath) || !strings.Contains(got, `src="https://cdn.example/p.png?a=1&amp;b=2"`) {
+		t.Fatalf("reply should carry the real image URL: %q", got)
+	}
+}
+
+func TestSanitizeRestoredImageCannotInjectMarkup(t *testing.T) {
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(`https://x.example/"><script>alert(1)</script>`))
+	got := Sanitize(`<img src="` + ImageProxyPath + encoded + `">`)
+	if strings.Contains(strings.ToLower(got), "<script") {
+		t.Fatalf("decoded URL broke out of its attribute: %q", got)
 	}
 }
 

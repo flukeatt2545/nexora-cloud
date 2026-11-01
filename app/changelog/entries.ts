@@ -25,6 +25,13 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.3",
+    date: "2026-11-01",
+    changes: [
+      { type: "fixed", th: "รูปในอีเมลที่เคยขึ้นว่า [รูปภาพภายนอกถูกบล็อก] แสดงได้แล้ว โดยเซิร์ฟเวอร์ของเราเป็นคนดึงรูปให้ ผู้ส่งจึงไม่เห็น IP ของผู้อ่าน และเมื่อตอบกลับหรือส่งต่อ ผู้รับก็เห็นรูปด้วย", en: "Images in emails that showed [external image blocked] now appear. Our server fetches them, so senders don't see the reader's IP address, and they stay visible to recipients when you reply or forward" },
+    ],
+  },
+  {
     version: "1.2.2",
     date: "2026-10-30",
     changes: [

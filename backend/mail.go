@@ -119,7 +119,7 @@ func sanitizeMailHTML(value string) string {
 
 func safeMailBodyHTML(htmlBody, textBody string) string {
 	if strings.TrimSpace(htmlBody) != "" {
-		return sanitizeMailHTML(htmlBody)
+		return mailsanitize.ProxyRemoteImages(sanitizeMailHTML(htmlBody))
 	}
 	escaped := html.EscapeString(textBody)
 	return "<p>" + strings.ReplaceAll(escaped, "\n", "<br>") + "</p>"

@@ -4,10 +4,14 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"nexora-cloud-api/internal/mailsanitize"
 )
 
 func TestNormalizeMailDomainAndRecipient(t *testing.T) {
@@ -26,14 +30,54 @@ func TestNormalizeMailDomainAndRecipient(t *testing.T) {
 
 func TestSanitizeMailHTML(t *testing.T) {
 	unsafe := `<p onclick="alert(1)">ok</p><script>alert(2)</script><img src="https://tracker.test/pixel"><a href="javascript:alert(3)">x</a>`
-	got := sanitizeMailHTML(unsafe)
+	got := safeMailBodyHTML(unsafe, "")
 	for _, forbidden := range []string{"onclick", "<script", "tracker.test", "javascript:"} {
 		if strings.Contains(strings.ToLower(got), forbidden) {
 			t.Fatalf("sanitizer retained %q in %q", forbidden, got)
 		}
 	}
-	if !strings.Contains(got, "รูปภาพภายนอกถูกบล็อก") {
-		t.Fatalf("remote image was not replaced: %q", got)
+	if !strings.Contains(got, mailsanitize.ImageProxyPath) {
+		t.Fatalf("remote image was not proxied: %q", got)
+	}
+}
+
+func TestMailImageTarget(t *testing.T) {
+	encode := func(value string) string { return base64.RawURLEncoding.EncodeToString([]byte(value)) }
+	for _, good := range []string{"https://cdn.example/p.png?a=1", "http://cdn.example/p.png", "https://cdn.example:443/p.png"} {
+		if _, err := mailImageTarget(encode(good)); err != nil {
+			t.Fatalf("%s rejected: %v", good, err)
+		}
+	}
+	for _, bad := range []string{"file:///etc/passwd", "ftp://cdn.example/p.png", "https://user:pw@cdn.example/p.png", "http://cdn.example:6379/", "https://", "not a url"} {
+		if _, err := mailImageTarget(encode(bad)); err == nil {
+			t.Fatalf("%s accepted", bad)
+		}
+	}
+	if _, err := mailImageTarget("!!!"); err == nil {
+		t.Fatal("invalid encoding accepted")
+	}
+}
+
+func TestMailImageClientRefusesPrivateAddresses(t *testing.T) {
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("request reached a loopback server")
+	}))
+	defer remote.Close()
+	if resp, err := mailImageClient.Get(remote.URL); err == nil {
+		resp.Body.Close()
+		t.Fatal("loopback address was fetched")
+	}
+}
+
+func TestMailImageType(t *testing.T) {
+	png := "\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR"
+	if got := mailImageType([]byte(png)); got != "image/png" {
+		t.Fatalf("png detected as %q", got)
+	}
+	for _, bad := range []string{`<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`, "<html><script>alert(1)</script></html>", ""} {
+		if got := mailImageType([]byte(bad)); got != "" {
+			t.Fatalf("%q served as %q", bad, got)
+		}
 	}
 }
 
