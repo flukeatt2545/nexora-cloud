@@ -4,13 +4,14 @@ import { type ChangeEvent, type DragEvent, type FormEvent, useEffect, useRef, us
 import { API_BASE } from "../runtime";
 import "./admin-terminal.css";
 
-type Line = { kind: "plain" | "ok" | "bad"; text: string };
+type Status = { kind: "plain" | "ok" | "bad"; text: string };
 
 const KEY_PATTERN = /nxk_[A-Za-z0-9_-]{43}/;
 const MAX_KEY_FILE_BYTES = 4096;
+const READY: Status = { kind: "plain", text: "วางคีย์ หรือเลือกไฟล์คีย์" };
 
 export default function AdminTerminal({ onClose }: { onClose: () => void }) {
-  const [lines, setLines] = useState<Line[]>([{ kind: "plain", text: "ใส่คีย์ หรือเลือกไฟล์คีย์ แล้วกด Enter" }]);
+  const [status, setStatus] = useState<Status>(READY);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -21,19 +22,22 @@ export default function AdminTerminal({ onClose }: { onClose: () => void }) {
     const opener = document.activeElement as HTMLElement | null;
     // On a phone the keyboard would cover the buttons, so it waits until the field is tapped.
     if (!window.matchMedia("(pointer: coarse)").matches) inputRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
+    // Caught first and stopped, so Esc closes this and not the dialog underneath as well.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopImmediatePropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
     return () => {
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey, true);
       opener?.focus?.();
     };
   }, [onClose]);
 
-  const say = (kind: Line["kind"], text: string) => setLines((current) => [...current.slice(-6), { kind, text }]);
-
   async function signIn(key: string) {
     setBusy(true);
-    say("plain", "กำลังตรวจคีย์");
+    setStatus({ kind: "plain", text: "กำลังตรวจ" });
     try {
       const response = await fetch(`${API_BASE}/api/auth/emergency`, {
         method: "POST",
@@ -42,13 +46,13 @@ export default function AdminTerminal({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({ key }),
       });
       if (response.ok) {
-        say("ok", "คีย์ถูกต้อง กำลังเข้าหน้าแอดมิน");
+        setStatus({ kind: "ok", text: "เข้าได้แล้ว กำลังไปหน้าแอดมิน" });
         window.location.assign("/admin");
         return;
       }
-      say("bad", response.status === 429 ? "ลองหลายครั้งเกินไป รอ 15 นาทีแล้วลองใหม่" : "คีย์ใช้ไม่ได้");
+      setStatus({ kind: "bad", text: response.status === 429 ? "ลองผิดหลายครั้ง รอ 15 นาทีแล้วลองใหม่" : "คีย์ไม่ถูกต้อง" });
     } catch {
-      say("bad", "เชื่อมต่อไม่ได้ ลองใหม่อีกครั้ง");
+      setStatus({ kind: "bad", text: "เชื่อมต่อไม่ได้ ลองใหม่อีกครั้ง" });
     }
     setBusy(false);
     setValue("");
@@ -57,16 +61,11 @@ export default function AdminTerminal({ onClose }: { onClose: () => void }) {
 
   async function readKeyFile(file: File | undefined) {
     if (!file) return;
-    if (file.size > MAX_KEY_FILE_BYTES) {
-      say("bad", "ไฟล์นี้ไม่ใช่ไฟล์คีย์");
-      return;
-    }
-    const match = (await file.text()).match(KEY_PATTERN);
+    const match = file.size <= MAX_KEY_FILE_BYTES ? (await file.text()).match(KEY_PATTERN) : null;
     if (!match) {
-      say("bad", "ไฟล์นี้ไม่ใช่ไฟล์คีย์");
+      setStatus({ kind: "bad", text: "ไฟล์นี้ไม่มีคีย์" });
       return;
     }
-    say("plain", `อ่านไฟล์ ${file.name}`);
     await signIn(match[0]);
   }
 
@@ -74,12 +73,12 @@ export default function AdminTerminal({ onClose }: { onClose: () => void }) {
     try {
       const match = (await navigator.clipboard.readText()).match(KEY_PATTERN);
       if (!match) {
-        say("bad", "สิ่งที่คัดลอกไว้ไม่ใช่คีย์");
+        setStatus({ kind: "bad", text: "สิ่งที่คัดลอกไว้ไม่ใช่คีย์" });
         return;
       }
       await signIn(match[0]);
     } catch {
-      say("bad", "วางอัตโนมัติไม่ได้ แตะค้างที่ช่องคีย์แล้วเลือกวาง");
+      setStatus({ kind: "bad", text: "วางให้ไม่ได้ แตะค้างที่ช่องคีย์แล้วเลือกวาง" });
     }
   }
 
@@ -115,29 +114,30 @@ export default function AdminTerminal({ onClose }: { onClose: () => void }) {
           <span>nexora@admin</span>
           <button type="button" onClick={onClose}>ปิด</button>
         </header>
-        <div className="admin-term-body" aria-live="polite">
-          {lines.map((line, index) => <p key={index} className={`is-${line.kind}`}>{line.text}</p>)}
-        </div>
-        <form className="admin-term-prompt" onSubmit={submit}>
-          <label htmlFor="admin-term-key">key &gt;</label>
-          <input
-            ref={inputRef}
-            id="admin-term-key"
-            type="password"
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-            disabled={busy}
-          />
+        <form onSubmit={submit}>
+          <div className="admin-term-prompt">
+            <label htmlFor="admin-term-key">key &gt;</label>
+            <input
+              ref={inputRef}
+              id="admin-term-key"
+              type="password"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              readOnly={busy}
+            />
+          </div>
+          <p className={`admin-term-status is-${status.kind}`} role="status">{status.text}</p>
+          <div className="admin-term-foot">
+            <span className="admin-term-hint">ลากไฟล์มาวางได้</span>
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={busy}>เลือกไฟล์</button>
+            <button type="button" onClick={() => void pasteKey()} disabled={busy}>วาง</button>
+            <button type="submit" className="admin-term-go" disabled={busy || !value.trim()}>เข้าระบบ</button>
+            {/* No accept filter: phones grey out .key files. The contents are checked instead. */}
+            <input ref={fileRef} type="file" hidden onChange={onFile} />
+          </div>
         </form>
-        <footer className="admin-term-foot">
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={busy}>เลือกไฟล์คีย์</button>
-          <button type="button" onClick={() => void pasteKey()} disabled={busy}>วางคีย์</button>
-          <span className="admin-term-hint">หรือลากไฟล์มาวางตรงนี้</span>
-          {/* No accept filter: phones grey out .key files. The contents are checked instead. */}
-          <input ref={fileRef} type="file" hidden onChange={onFile} />
-        </footer>
       </section>
     </div>
   );

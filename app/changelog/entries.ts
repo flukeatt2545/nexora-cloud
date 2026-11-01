@@ -25,26 +25,31 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.3.2",
+    date: "2026-11-01",
+    changes: [
+      { type: "fixed", th: "แก้การแสดงผลซ้อนกันของหน้าต่างบนเว็บ", en: "Fixed overlapping windows on the site" },
+    ],
+  },
+  {
     version: "1.3.1",
     date: "2026-11-01",
     changes: [
-      { type: "fixed", th: "กดสร้างคีย์เข้าระบบสำรองแล้วหน้าโหลดใหม่และไม่ได้คีย์", en: "Creating an emergency key reloaded the page and made no key" },
+      { type: "fixed", th: "แก้ปัญหาในหน้าตั้งค่าของแอดมิน", en: "Fixed a problem on the admin settings page" },
     ],
   },
   {
     version: "1.3.0",
     date: "2026-11-01",
     changes: [
-      { type: "added", th: "คีย์เข้าระบบสำรองสำหรับแอดมินสูงสุด สร้างได้ที่หน้าตั้งค่าเข้าสู่ระบบหรือคำสั่ง /adminkey ใน Discord ใช้เข้าระบบได้แม้ปิดการเข้าสู่ระบบทุกทาง", en: "Emergency sign-in keys for the top admin, made in the sign-in settings or with /adminkey in Discord; they work even with every sign-in method off" },
-      { type: "changed", th: "ปิดการเข้าสู่ระบบทุกทางได้เมื่อแอดมินมีคีย์สำรองที่ใช้ได้ พร้อมคำเตือนก่อนบันทึก และยกเลิกคีย์สุดท้ายระหว่างปิดทุกทางไม่ได้", en: "All sign-in methods can be turned off once the admin holds a working emergency key, with a warning first; the last key cannot be revoked meanwhile" },
-      { type: "added", th: "ใช้คีย์เข้าระบบสำรองบนมือถือได้แล้ว และมีปุ่มวางคีย์", en: "Emergency keys now work on phones, with a paste button" },
+      { type: "security", th: "ปรับปรุงความปลอดภัยของระบบเข้าสู่ระบบ", en: "Sign-in security improvements" },
     ],
   },
   {
     version: "1.2.11",
     date: "2026-11-01",
     changes: [
-      { type: "fixed", th: "ปิดการเข้าสู่ระบบครบทุกทางได้จนแอดมินเข้าเว็บไม่ได้ ตอนนี้ระบบไม่ให้บันทึกถ้าไม่เหลือทางเข้าเลย", en: "Every sign-in method could be turned off, locking admins out; saving is now refused unless at least one stays on" },
+      { type: "fixed", th: "ปรับปรุงการตรวจการตั้งค่าเข้าสู่ระบบในหน้าแอดมิน", en: "Better checks on the sign-in settings in the admin area" },
     ],
   },
   {
