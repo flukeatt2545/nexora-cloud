@@ -525,7 +525,7 @@ function AuthModal({
           <Bell size={18} /><div><strong>{announcements[0].title}</strong><p>{announcements[0].message}</p>{announcements[0].buttonUrl && <a href={announcements[0].buttonUrl}>{announcements[0].buttonLabel || "ดูรายละเอียด"}</a>}</div>
           <button type="button" onClick={() => setAnnouncementOpen(false)} aria-label="ปิดประกาศ"><X size={15} /></button>
         </div>}
-        {!hasForm && <p className="auth-note">{socialProviders.length > 0 ? "ตอนนี้เข้าได้ผ่านบัญชีเหล่านี้เท่านั้น" : "ตอนนี้ปิดการเข้าสู่ระบบอยู่ ติดต่อผู้ดูแลเว็บ"}</p>}
+        {!hasForm && <p className="auth-note"><Info size={17} aria-hidden="true" /><span>{socialProviders.length > 0 ? <>ตอนนี้เข้าได้ผ่าน<wbr /><span className="auth-note-phrase">ช่องทางเหล่านี้เท่านั้น</span></> : "ตอนนี้ปิดการเข้าสู่ระบบอยู่ ติดต่อผู้ดูแลเว็บ"}</span></p>}
         {hasForm && <form onSubmit={submit} method="post" action={`/api/auth/${mode}`} noValidate
           onChange={(event) => {
             const name = (event.target as unknown as HTMLInputElement).name;
