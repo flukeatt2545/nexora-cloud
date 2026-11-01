@@ -489,6 +489,11 @@ func (s *server) adminSettings(c *fiber.Ctx) error {
 	return c.JSON(settings)
 }
 
+// hasSignInMethod is false when saving these settings would leave nobody, admins included, a way in.
+func hasSignInMethod(settings publicSettings) bool {
+	return settings.LocalLoginEnabled || settings.DiscordEnabled || settings.GoogleEnabled || settings.GitHubEnabled
+}
+
 func (s *server) updateAdminSettings(c *fiber.Ctx) error {
 	actor := current(c)
 	var body publicSettings
@@ -561,6 +566,9 @@ func (s *server) updateAdminSettings(c *fiber.Ctx) error {
 	}
 	body.WebhookEvents = sanitizeWebhookEvents(body.WebhookEvents)
 	rawEvents, _ := json.Marshal(body.WebhookEvents)
+	if !hasSignInMethod(body) {
+		return c.Status(fiber.StatusBadRequest).JSON(apiError{Error: "ต้องเปิดการเข้าสู่ระบบไว้อย่างน้อยหนึ่งทาง ไม่อย่างนั้นแอดมินจะเข้าระบบไม่ได้", Code: "no_sign_in_method"})
+	}
 	if err := s.saveOAuthSettings(c.Context(), actor.ID, body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(apiError{Error: "กรุณากรอก Client ID และ Client Secret ให้ครบ"})
 	}

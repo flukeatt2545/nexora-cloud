@@ -25,6 +25,13 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.11",
+    date: "2026-11-01",
+    changes: [
+      { type: "fixed", th: "ปิดการเข้าสู่ระบบครบทุกทางได้จนแอดมินเข้าเว็บไม่ได้ ตอนนี้ระบบไม่ให้บันทึกถ้าไม่เหลือทางเข้าเลย", en: "Every sign-in method could be turned off, locking admins out; saving is now refused unless at least one stays on" },
+    ],
+  },
+  {
     version: "1.2.10",
     date: "2026-11-01",
     changes: [
