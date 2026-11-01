@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { createElement, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ArrowRight, CheckCircle2, ChevronRight, Cloud, Database, ExternalLink, KeyRound, Megaphone,
-  Package, RefreshCw, Store, Users, WalletCards,
+  Activity, ArrowRight, Bot, CheckCircle2, ChevronRight, Cloud, Database, ExternalLink, KeyRound, Mail, Megaphone,
+  History, LogIn, Package, RadioTower, ReceiptText, RefreshCw, ShieldAlert, Store, TrendingUp, Users, WalletCards, Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { API_BASE } from "../runtime";
@@ -69,12 +69,11 @@ const baht = (value: number) => new Intl.NumberFormat("th-TH", { minimumFraction
 function ago(value: string, now: number) {
   const time = new Date(value).getTime();
   if (Number.isNaN(time)) return "";
-  const seconds = Math.round((time - now) / 1000);
-  const format = new Intl.RelativeTimeFormat("th", { numeric: "auto" });
-  if (Math.abs(seconds) < 60) return "เมื่อสักครู่";
-  if (Math.abs(seconds) < 3600) return format.format(Math.round(seconds / 60), "minute");
-  if (Math.abs(seconds) < 86400) return format.format(Math.round(seconds / 3600), "hour");
-  if (Math.abs(seconds) < 86400 * 7) return format.format(Math.round(seconds / 86400), "day");
+  const seconds = Math.round((now - time) / 1000);
+  if (seconds < 60) return "เมื่อสักครู่";
+  if (seconds < 3600) return `${Math.round(seconds / 60)} นาทีที่แล้ว`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)} ชม.ที่แล้ว`;
+  if (seconds < 86400 * 7) return `${Math.round(seconds / 86400)} วันที่แล้ว`;
   return new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short" }).format(new Date(time));
 }
 
@@ -134,6 +133,15 @@ function groupLogs(items: LogItem[], maxRows: number, now: number): LogDay[] {
     rows++;
   }
   return days;
+}
+
+/** The kind of thing that happened, from the first part of the action name. */
+function logIcon(action: string) {
+  const icons: Record<string, typeof Store> = {
+    auth: LogIn, mail: Mail, discord: Bot, bot: Bot, topup: WalletCards, product: Package,
+    user: Users, sessions: KeyRound, hosting: Cloud, announcement: Megaphone,
+  };
+  return icons[action.split(".")[0]] || History;
 }
 
 function topupState(status: string) {
@@ -240,22 +248,22 @@ export default function AdminOverview({ role, actionText, storeOpen = true }: { 
 
       <section className="aov-kpis" aria-label="สรุปตัวเลข">
         <div className="aov-kpi">
-          <span className="aov-kpi-label">ผู้ใช้ทั้งหมด</span>
+          <span className="aov-kpi-label"><span className="aov-kpi-icon" aria-hidden="true"><Users size={16} /></span>ผู้ใช้ทั้งหมด</span>
           <strong>{s ? number(s.totalUsers) : <i className="aov-skel" />}</strong>
           <span className="aov-kpi-note">{s ? <>ใช้งาน {number(s.activeUsers)}{s.suspendedUsers > 0 && <> · <b className="is-wait">ระงับ {number(s.suspendedUsers)}</b></>}</> : summary.failed ? "โหลดไม่ได้" : " "}</span>
         </div>
         <div className="aov-kpi">
-          <span className="aov-kpi-label">ล็อกอินค้างอยู่</span>
+          <span className="aov-kpi-label"><span className="aov-kpi-icon" aria-hidden="true"><RadioTower size={16} /></span>ล็อกอินค้างอยู่</span>
           <strong>{s ? number(s.activeSessions) : <i className="aov-skel" />}</strong>
           <span className="aov-kpi-note">{s ? "นับแยกทุกอุปกรณ์" : " "}</span>
         </div>
         <div className="aov-kpi">
-          <span className="aov-kpi-label">เข้าสู่ระบบ 24 ชม.</span>
+          <span className="aov-kpi-label"><span className="aov-kpi-icon" aria-hidden="true"><LogIn size={16} /></span>เข้าสู่ระบบ 24 ชม.</span>
           <strong>{s ? number(s.logins24h) : <i className="aov-skel" />}</strong>
           <span className="aov-kpi-note">{s ? (s.failedLogins24h > 0 ? <b className={failRate >= 30 ? "is-bad" : "is-wait"}>ไม่สำเร็จ {number(s.failedLogins24h)} ({failRate}%)</b> : s.logins24h > 0 ? "สำเร็จทุกครั้ง" : "ยังไม่มีใครเข้า") : " "}</span>
         </div>
         <div className="aov-kpi">
-          <span className="aov-kpi-label">เติมเงินวันนี้</span>
+          <span className="aov-kpi-label"><span className="aov-kpi-icon" aria-hidden="true"><WalletCards size={16} /></span>เติมเงินวันนี้</span>
           <strong>{t ? <>{baht(t.todayAmount)}<small> บาท</small></> : topups.failed ? "—" : <i className="aov-skel" />}</strong>
           <span className="aov-kpi-note">{t ? `${number(t.todayTransactions)} รายการ · เดือนนี้ ${baht(t.monthAmount)} บาท` : " "}</span>
         </div>
@@ -264,7 +272,7 @@ export default function AdminOverview({ role, actionText, storeOpen = true }: { 
       <div className="aov-grid">
         <section className="aov-panel aov-sales">
           <header>
-            <h2>ยอดขายร้านค้า <span>7 วันล่าสุด</span></h2>
+            <h2><TrendingUp size={17} aria-hidden="true" className="aov-h-icon" />ยอดขายร้านค้า <span>7 วันล่าสุด</span></h2>
             <Link href="/admin/store/sales">ดูรายงาน<ChevronRight size={14} aria-hidden="true" /></Link>
           </header>
           {sales.failed ? <PanelError onRetry={load} /> : <>
@@ -301,7 +309,7 @@ export default function AdminOverview({ role, actionText, storeOpen = true }: { 
 
         <section className="aov-panel aov-topups">
           <header>
-            <h2>เติมเงินล่าสุด</h2>
+            <h2><ReceiptText size={17} aria-hidden="true" className="aov-h-icon" />เติมเงินล่าสุด</h2>
             <Link href="/admin/topups/transactions">ดูทั้งหมด<ChevronRight size={14} aria-hidden="true" /></Link>
           </header>
           {topups.failed ? <PanelError onRetry={load} /> : !t ? <ul className="aov-list">{[0, 1, 2].map((i) => <li key={i}><i className="aov-skel wide" /></li>)}</ul>
@@ -326,7 +334,7 @@ export default function AdminOverview({ role, actionText, storeOpen = true }: { 
         {isSuper && (
           <section className="aov-panel aov-logs">
             <header>
-              <h2>กิจกรรมล่าสุด</h2>
+              <h2><History size={17} aria-hidden="true" className="aov-h-icon" />กิจกรรมล่าสุด</h2>
               <Link href="/admin/logs">ดูทั้งหมด<ChevronRight size={14} aria-hidden="true" /></Link>
             </header>
             {logs.failed ? <PanelError onRetry={load} /> : !logs.data ? <ul className="aov-list">{[0, 1, 2].map((i) => <li key={i}><i className="aov-skel wide" /></li>)}</ul>
@@ -338,11 +346,11 @@ export default function AdminOverview({ role, actionText, storeOpen = true }: { 
                     <ul className="aov-list">
                       {day.rows.map((row) => (
                         <li key={row.key}>
-                          <span className={`aov-dot is-${row.outcome === "success" ? "ok" : "bad"}`} title={row.outcome === "success" ? "สำเร็จ" : "ไม่สำเร็จ"} aria-hidden="true" />
+                          {createElement(logIcon(row.action), { size: 16, "aria-hidden": true, className: `aov-log-icon${row.outcome === "success" ? "" : " is-bad"}` })}
                           <span className="aov-list-main">
                             <strong>
                               {actionText(row.action)}
-                              {row.count > 1 && <span className="aov-count" aria-label={`${row.count} ครั้ง`}>×{number(row.count)}</span>}
+                              {row.count > 1 && <span className="aov-count">{number(row.count)} ครั้ง</span>}
                               {row.outcome !== "success" && <b className="is-bad"> · ไม่สำเร็จ</b>}
                             </strong>
                             <small>{row.actor || "ไม่ระบุผู้ใช้"}</small>
@@ -360,7 +368,7 @@ export default function AdminOverview({ role, actionText, storeOpen = true }: { 
         )}
 
         <section className={`aov-panel aov-side${isSuper ? "" : " is-wide"}`}>
-          <header><h2>ทางลัด</h2></header>
+          <header><h2><Zap size={17} aria-hidden="true" className="aov-h-icon" />ทางลัด</h2></header>
           <nav className="aov-shortcuts" aria-label="ทางลัด">
             {shortcuts.map((item) => (
               <a key={item.href} href={item.href}>
@@ -373,10 +381,10 @@ export default function AdminOverview({ role, actionText, storeOpen = true }: { 
           <div className="aov-system">
             <h3>สถานะระบบ</h3>
             <dl>
-              <div><dt>ฐานข้อมูล</dt><dd>{health.data ? <><span className="aov-dot is-ok" aria-hidden="true" />ปกติ{health.data.databaseSize && <small> · {health.data.databaseSize}</small>}</> : health.failed ? <><span className="aov-dot is-bad" aria-hidden="true" />ตรวจไม่ได้</> : "…"}</dd></div>
-              <div><dt>แคช (Redis)</dt><dd>{health.data ? <><span className="aov-dot is-ok" aria-hidden="true" />ปกติ</> : health.failed ? <><span className="aov-dot is-bad" aria-hidden="true" />ตรวจไม่ได้</> : "…"}</dd></div>
-              <div><dt>ระบบเติมเงิน</dt><dd>{t ? (t.configured && t.enabled ? <><span className="aov-dot is-ok" aria-hidden="true" />เปิดอยู่</> : <><span className={`aov-dot is-${t.configured ? "wait" : "bad"}`} aria-hidden="true" />{t.configured ? "ปิดอยู่" : "ตั้งค่าไม่ครบ"}</>) : "…"}</dd></div>
-              {s && <div><dt>บัญชีที่ระงับ</dt><dd>{number(s.suspendedUsers)}</dd></div>}
+              <div><dt><Database size={14} aria-hidden="true" />ฐานข้อมูล</dt><dd>{health.data ? <><span className="aov-dot is-ok" aria-hidden="true" />ปกติ{health.data.databaseSize && <small> · {health.data.databaseSize}</small>}</> : health.failed ? <><span className="aov-dot is-bad" aria-hidden="true" />ตรวจไม่ได้</> : "…"}</dd></div>
+              <div><dt><Activity size={14} aria-hidden="true" />แคช (Redis)</dt><dd>{health.data ? <><span className="aov-dot is-ok" aria-hidden="true" />ปกติ</> : health.failed ? <><span className="aov-dot is-bad" aria-hidden="true" />ตรวจไม่ได้</> : "…"}</dd></div>
+              <div><dt><WalletCards size={14} aria-hidden="true" />ระบบเติมเงิน</dt><dd>{t ? (t.configured && t.enabled ? <><span className="aov-dot is-ok" aria-hidden="true" />เปิดอยู่</> : <><span className={`aov-dot is-${t.configured ? "wait" : "bad"}`} aria-hidden="true" />{t.configured ? "ปิดอยู่" : "ตั้งค่าไม่ครบ"}</>) : "…"}</dd></div>
+              {s && <div><dt><ShieldAlert size={14} aria-hidden="true" />บัญชีที่ระงับ</dt><dd>{number(s.suspendedUsers)}</dd></div>}
             </dl>
           </div>
         </section>
