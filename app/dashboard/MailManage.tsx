@@ -94,7 +94,7 @@ export default function MailManage({ mailbox, notify, onChanged, onClose }: {
     const ok = await run("domain", async () => {
       await api("/api/mail/domains", { method: "POST", body: JSON.stringify({ domain: domainName.trim(), kind: "custom" }) });
       await loadDomains();
-    }, "เพิ่มโดเมนแล้ว ขั้นต่อไปคือเพิ่มระเบียน DNS ตามตารางด้านล่าง");
+    }, "เพิ่มโดเมนแล้ว เอาค่า DNS ด้านล่างไปใส่ที่ผู้ให้บริการโดเมนได้เลย");
     if (ok) setDomainName("");
   }
   async function createMailbox(event: FormEvent) {
@@ -122,13 +122,13 @@ export default function MailManage({ mailbox, notify, onChanged, onClose }: {
     const result = await api<{ password: string }>(`/api/mail/mailboxes/${mailbox.id}/device-passwords`, { method: "POST", body: JSON.stringify({ description: "iPhone" }) });
     setDevicePassword(result.password);
     setDevice(await api<DeviceSettings>(`/api/mail/mailboxes/${mailbox.id}/device-settings`));
-  }, "สร้างรหัสผ่านแล้ว คัดลอกเก็บไว้ ระบบจะแสดงครั้งเดียว");
+  }, "สร้างรหัสผ่านแล้ว รหัสนี้ดูได้ครั้งเดียว");
   const revokePassword = (id: string) => mailbox && run("device", async () => {
     await api(`/api/mail/mailboxes/${mailbox.id}/device-passwords/${id}`, { method: "DELETE" });
     setDevicePassword("");
     setRevoking("");
     setDevice(await api<DeviceSettings>(`/api/mail/mailboxes/${mailbox.id}/device-settings`));
-  }, "ยกเลิกรหัสผ่านแล้ว อุปกรณ์ที่ใช้รหัสนี้จะรับส่งเมลไม่ได้");
+  }, "ยกเลิกรหัสผ่านแล้ว อุปกรณ์ที่ใช้รหัสนี้จะรับส่งอีเมลไม่ได้อีก");
   const verify = (item: Domain) => run(`verify:${item.id}`, async () => {
     await api(`/api/mail/domains/${item.id}/verify`, { method: "POST" });
     await loadDomains();
@@ -165,10 +165,10 @@ export default function MailManage({ mailbox, notify, onChanged, onClose }: {
                 <header className="wm-section-head">
                   <div>
                     <h3>ใช้ในแอปอีเมลบนมือถือ</h3>
-                    <p>เช่น Mail บน iPhone หรือ Outlook ใส่ค่าด้านล่างตอนเพิ่มบัญชีแบบ IMAP</p>
+                    <p>เช่น Mail บน iPhone หรือ Outlook ตอนเพิ่มบัญชีให้เลือก IMAP แล้วใส่ค่าเหล่านี้</p>
                   </div>
                   <button type="button" className="wm-btn" onClick={() => void loadDevice()} disabled={busy === "device"}>
-                    <RefreshCw size={15} aria-hidden="true" className={busy === "device" ? "wm-spin" : ""} /> {device ? "โหลดใหม่" : "ดูค่าที่ต้องใส่"}
+                    <RefreshCw size={15} aria-hidden="true" className={busy === "device" ? "wm-spin" : ""} /> {device ? "โหลดใหม่" : "ดูค่าตั้งค่า"}
                   </button>
                 </header>
                 {device && (
@@ -182,14 +182,14 @@ export default function MailManage({ mailbox, notify, onChanged, onClose }: {
                     </div>
                     {devicePassword && (
                       <div className="wm-secret" role="status">
-                        <span>รหัสผ่านสำหรับอุปกรณ์ คัดลอกตอนนี้ ปิดหน้านี้แล้วจะดูอีกไม่ได้</span>
+                        <span>คัดลอกรหัสนี้เก็บไว้ ปิดหน้านี้แล้วจะดูอีกไม่ได้</span>
                         <div className="wm-setting">
                           <code className="wm-setting-value">{devicePassword}</code>
                           <CopyButton value={devicePassword} label="รหัสผ่าน" withText onError={copyFailed} />
                         </div>
                       </div>
                     )}
-                    {!device.ready && <p className="wm-error-text">{device.lastError || "กล่องนี้ยังเชื่อมกับเซิร์ฟเวอร์รับเมลไม่สำเร็จ จึงยังสร้างรหัสผ่านไม่ได้"}</p>}
+                    {!device.ready && <p className="wm-error-text">{device.lastError || "กล่องนี้ยังไม่พร้อม จึงยังสร้างรหัสผ่านไม่ได้"}</p>}
                     <div className="wm-row-actions">
                       <button type="button" className="wm-btn wm-btn-primary" onClick={() => void createPassword()} disabled={busy === "device" || !device.ready}>
                         <KeyRound size={15} aria-hidden="true" /> สร้างรหัสผ่านอุปกรณ์
@@ -222,8 +222,8 @@ export default function MailManage({ mailbox, notify, onChanged, onClose }: {
               <section className="wm-section">
                 <header className="wm-section-head">
                   <div>
-                    <h3><Users size={16} aria-hidden="true" /> ให้คนอื่นใช้กล่องนี้ด้วย</h3>
-                    <p>ใส่ชื่อผู้ใช้ NEXORA ของคนนั้น เขาจะเห็นกล่องนี้ในหน้าอีเมลของเขา</p>
+                    <h3><Users size={16} aria-hidden="true" /> แชร์กล่องนี้</h3>
+                    <p>ใส่ชื่อผู้ใช้ NEXORA ของคนที่จะแชร์ให้ กล่องนี้จะไปขึ้นในหน้าอีเมลของคนนั้น</p>
                   </div>
                 </header>
                 <form className="wm-inline-form" onSubmit={(event) => void addMember(event)}>
@@ -237,7 +237,7 @@ export default function MailManage({ mailbox, notify, onChanged, onClose }: {
                 <header className="wm-section-head">
                   <div>
                     <h3>ชื่ออีเมลเพิ่มเติม (Alias)</h3>
-                    <p>อีเมลที่ส่งมาที่ชื่อนี้จะเข้ากล่อง {mailbox.address}</p>
+                    <p>อีเมลที่ส่งถึงชื่อนี้จะเข้ากล่อง {mailbox.address}</p>
                   </div>
                 </header>
                 <form className="wm-inline-form" onSubmit={(event) => void addAlias(event)}>
@@ -255,7 +255,7 @@ export default function MailManage({ mailbox, notify, onChanged, onClose }: {
           {tab === "new" && (
             <form className="wm-section wm-form" onSubmit={(event) => void createMailbox(event)}>
               {domains && !activeDomains.length ? (
-                <p className="wm-note">ยังไม่มีโดเมนที่ใช้งานได้ เพิ่มโดเมนและตั้งค่า DNS ในแท็บ <button type="button" className="wm-link" onClick={() => setTab("domains")}>โดเมน</button> ก่อน</p>
+                <p className="wm-note">ยังไม่มีโดเมนที่ใช้ได้ เพิ่มก่อนได้ที่แท็บ <button type="button" className="wm-link" onClick={() => setTab("domains")}>โดเมน</button></p>
               ) : null}
               <div className="wm-form-field">
                 <label htmlFor="wm-new-local">ที่อยู่อีเมล</label>
@@ -289,7 +289,7 @@ export default function MailManage({ mailbox, notify, onChanged, onClose }: {
               {domains === null ? (
                 <p className="wm-note">กำลังโหลด...</p>
               ) : !domains.length ? (
-                <p className="wm-note">ยังไม่มีโดเมน ใส่ชื่อโดเมนด้านบน แล้วระบบจะบอกค่า DNS ที่ต้องเพิ่ม</p>
+                <p className="wm-note">ยังไม่มีโดเมน เพิ่มจากช่องด้านบนได้เลย</p>
               ) : (
                 <ul className="wm-domains">
                   {domains.map((item) => {
@@ -309,7 +309,7 @@ export default function MailManage({ mailbox, notify, onChanged, onClose }: {
                         </div>
                         {records.length > 0 && (
                           <details className="wm-dns" open={item.status !== "active"}>
-                            <summary>ระเบียน DNS {records.length} รายการ</summary>
+                            <summary>ค่า DNS {records.length} รายการ</summary>
                             <ul>
                               {records.map((record, index) => {
                                 const name = text(record.name) || "@";

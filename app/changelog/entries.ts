@@ -25,6 +25,17 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.4",
+    date: "2026-11-01",
+    changes: [
+      { type: "fixed", th: "ตัวเลขอีเมลที่ยังไม่อ่านในรายการกล่องอีเมลเบี้ยวเป็นทรงเฉียง และไม่ตรงแถวกัน ตอนนี้เรียงตรงกันทุกแถวแล้ว", en: "Unread counts in the mailbox list were skewed and out of line; they now line up on every row" },
+      { type: "changed", th: "ปุ่มเลือกกล่องอีเมลแสดงที่อยู่ได้ยาวขึ้น และจุดแจ้งว่ากล่องอื่นมีอีเมลใหม่ย้ายไปอยู่บนรูปกล่อง", en: "The mailbox button has more room for the address, and the dot for unread mail in other mailboxes now sits on the avatar" },
+      { type: "changed", th: "ปรับคำในหน้าอีเมลให้สั้นและอ่านง่ายขึ้น", en: "Shorter, plainer wording across the mail page" },
+      { type: "fixed", th: "ป้ายตัวเลขและป้าย ใหม่ บนเมนูข้างเบี้ยวเป็นทรงเฉียงตอนใช้หน้าตาแบบเหลี่ยม ตอนนี้แสดงปกติแล้ว", en: "The count and New labels in the sidebar were skewed in square mode; they now look right" },
+      { type: "fixed", th: "เมนูโปรไฟล์มุมขวาบนมองทะลุเห็นเนื้อหาด้านหลัง ตอนนี้พื้นหลังทึบแล้ว และปุ่มออกจากระบบดูเรียบขึ้น", en: "The profile menu let the page show through; it now has a solid background and a quieter sign-out button" },
+    ],
+  },
+  {
     version: "1.2.3",
     date: "2026-11-01",
     changes: [

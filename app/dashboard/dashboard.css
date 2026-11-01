@@ -10938,7 +10938,7 @@ textarea.premium-input{resize:none;min-height:104px;line-height:1.6}
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: 99px;
   border: 1px solid var(--theme-line-soft);
   background: transparent;
   color: var(--theme-text-soft);

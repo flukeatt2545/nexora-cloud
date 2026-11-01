@@ -20,8 +20,8 @@ import "./webmail.css";
 const PREVIEW_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 const FOLDERS = [
-  { id: "inbox", label: "กล่องขาเข้า", icon: Inbox, empty: "ยังไม่มีอีเมลเข้ามา" },
-  { id: "sent", label: "ส่งแล้ว", icon: Send, empty: "ยังไม่ได้ส่งอีเมลจากกล่องนี้" },
+  { id: "inbox", label: "กล่องขาเข้า", icon: Inbox, empty: "ยังไม่มีอีเมล" },
+  { id: "sent", label: "ส่งแล้ว", icon: Send, empty: "ยังไม่ได้ส่งอีเมล" },
   { id: "draft", label: "ฉบับร่าง", icon: File, empty: "ไม่มีฉบับร่าง" },
   { id: "trash", label: "ถังขยะ", icon: Trash2, empty: "ถังขยะว่าง" },
 ] as const;
@@ -139,7 +139,7 @@ export default function MailView({ notify }: { notify: Notice }) {
     const wanted = linkedMailbox.current;
     linkedMailbox.current = "";
     if (wanted && !list.some((item) => item.id === wanted)) {
-      notify({ kind: "error", text: "เปิดกล่องนั้นไม่ได้ เพราะบัญชีนี้ไม่ได้เป็นเจ้าของหรือสมาชิกของกล่อง" });
+      notify({ kind: "error", text: "บัญชีนี้ไม่มีสิทธิ์เปิดกล่องนั้น" });
     }
     setMailboxes(list);
     setMailboxId((current) => {
@@ -270,7 +270,7 @@ export default function MailView({ notify }: { notify: Notice }) {
   }
   const moveSelected = (target: "trash" | "inbox") =>
     patchSelected({ folder: target }, target === "trash" ? "ย้ายไปถังขยะแล้ว" : "ย้ายกลับไปกล่องขาเข้าแล้ว");
-  const markUnread = () => patchSelected({ read: false }, "ทำเครื่องหมายว่ายังไม่อ่านแล้ว");
+  const markUnread = () => patchSelected({ read: false }, "ทำเป็นยังไม่อ่านแล้ว");
 
   function reply(mode: "reply" | "all" | "forward") {
     if (!selected) return;
@@ -333,7 +333,7 @@ export default function MailView({ notify }: { notify: Notice }) {
     <header className="wm-head">
       <div className="wm-head-text">
         <h1>อีเมล</h1>
-        <p>อ่าน ตอบ และส่งอีเมลจากกล่องอีเมลโดเมนของคุณ</p>
+        <p>ทุกกล่องของคุณอยู่ที่นี่</p>
       </div>
       <div className="wm-head-actions">
         <button type="button" className="wm-btn" onClick={() => setManageOpen(true)}>
@@ -390,8 +390,8 @@ export default function MailView({ notify }: { notify: Notice }) {
         <div className="wm-start">
           <span className="wm-start-icon" aria-hidden="true"><Mail size={24} /></span>
           <h2>ยังไม่มีกล่องอีเมล</h2>
-          <p>ถ้ามีโดเมนของตัวเอง เพิ่มโดเมนแล้วสร้างกล่องได้ที่ปุ่มจัดการ ถ้าใช้กล่องของทีม ให้เจ้าของกล่องเพิ่มชื่อผู้ใช้ของคุณเข้าไป</p>
-          <button type="button" className="wm-btn wm-btn-primary" onClick={() => setManageOpen(true)}><MailPlus size={16} aria-hidden="true" /> เพิ่มโดเมนหรือสร้างกล่อง</button>
+          <p>มีโดเมนอยู่แล้วก็เพิ่มแล้วสร้างกล่องได้เลย ถ้าจะใช้กล่องของทีม บอกเจ้าของกล่องให้เพิ่มชื่อผู้ใช้ของคุณ</p>
+          <button type="button" className="wm-btn wm-btn-primary" onClick={() => setManageOpen(true)}><MailPlus size={16} aria-hidden="true" /> สร้างกล่องอีเมล</button>
         </div>
         {dialogs}
       </section>
@@ -458,7 +458,7 @@ export default function MailView({ notify }: { notify: Notice }) {
             ) : listError && !items.length ? (
               <div className="wm-list-empty is-error" role="alert">
                 <CircleAlert size={28} aria-hidden="true" />
-                <p>โหลดอีเมลไม่สำเร็จ · {listError}</p>
+                <p>โหลดอีเมลไม่สำเร็จ: {listError}</p>
                 <button type="button" className="wm-link" onClick={() => void loadMessages()}>ลองใหม่</button>
               </div>
             ) : !items.length ? (
@@ -474,7 +474,7 @@ export default function MailView({ notify }: { notify: Notice }) {
                     <p>{currentFolder.empty}</p>
                     {folder === "inbox" && mailbox && (
                       <span className="wm-list-empty-hint">
-                        ให้คนอื่นส่งมาที่ <b>{mailbox.address}</b>
+                        ที่อยู่ของกล่องนี้คือ <b>{mailbox.address}</b>
                         <CopyButton value={mailbox.address} withText onError={copyFailed} />
                       </span>
                     )}
@@ -518,7 +518,7 @@ export default function MailView({ notify }: { notify: Notice }) {
                 {nextCursor > 0 && (
                   <li className="wm-more">
                     <button type="button" className="wm-btn" onClick={() => void loadMore()} disabled={loadingMore}>
-                      {loadingMore ? "กำลังโหลด..." : "โหลดอีเมลเก่ากว่านี้"}
+                      {loadingMore ? "กำลังโหลด..." : "โหลดเพิ่ม"}
                     </button>
                   </li>
                 )}
@@ -557,7 +557,7 @@ export default function MailView({ notify }: { notify: Notice }) {
 
               <header className="wm-read-head">
                 <h2>{selected.subject || "(ไม่มีหัวข้อ)"}</h2>
-                {threadMessages.length > 1 && <span className="wm-thread-count">{threadMessages.length} ข้อความในบทสนทนานี้</span>}
+                {threadMessages.length > 1 && <span className="wm-thread-count">{threadMessages.length} ฉบับในเรื่องนี้</span>}
               </header>
 
               {threadMessages.length > 1 ? (
@@ -663,7 +663,7 @@ export default function MailView({ notify }: { notify: Notice }) {
           ) : (
             <div className="wm-read-empty">
               <Mail size={32} aria-hidden="true" />
-              <p>เลือกอีเมลจากรายการเพื่ออ่าน</p>
+              <p>เลือกอีเมลที่จะอ่าน</p>
             </div>
           )}
         </article>

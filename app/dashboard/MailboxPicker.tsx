@@ -97,20 +97,18 @@ export default function MailboxPicker({ mailboxes, current, onChoose }: { mailbo
         aria-haspopup={many ? "listbox" : undefined}
         aria-expanded={many ? open : undefined}
         aria-controls={many ? listId : undefined}
-        title={many ? "เปลี่ยนกล่องอีเมล" : current.address}
+        title={many ? `${current.address} (กดเพื่อเปลี่ยนกล่อง)` : current.address}
         disabled={!many}
       >
-        <span className="wm-avatar wm-box-avatar" aria-hidden="true">{initial(current.displayName || current.address)}</span>
+        <span className="wm-picker-face">
+          <span className="wm-avatar wm-box-avatar" aria-hidden="true">{initial(current.displayName || current.address)}</span>
+          {many && otherUnread > 0 && <b className="wm-picker-dot" aria-label={`กล่องอื่นมีอีเมลยังไม่อ่าน ${otherUnread} ฉบับ`} />}
+        </span>
         <span className="wm-box-text">
           <strong>{current.displayName || localPart(current.address)}</strong>
           <span className="wm-addr">{current.address}</span>
         </span>
-        {many && (
-          <span className="wm-picker-end">
-            {otherUnread > 0 && <b className="wm-picker-dot" aria-label={`กล่องอื่นมีอีเมลยังไม่อ่าน ${otherUnread} ฉบับ`} />}
-            <ChevronDown size={16} aria-hidden="true" />
-          </span>
-        )}
+        {many && <span className="wm-picker-end"><ChevronDown size={16} aria-hidden="true" /></span>}
       </button>
 
       {open && createPortal(
@@ -121,8 +119,8 @@ export default function MailboxPicker({ mailboxes, current, onChoose }: { mailbo
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหากล่อง" aria-label="ค้นหากล่องอีเมล" autoFocus />
             </label>
           )}
-          <div className="wm-picker-scroll" role="listbox" aria-label="กล่องอีเมลของคุณ">
-            {groups.length === 0 && <p className="wm-picker-none">ไม่พบกล่องที่ค้น</p>}
+          <div className="wm-picker-scroll" role="listbox" aria-label="กล่องอีเมล">
+            {groups.length === 0 && <p className="wm-picker-none">ไม่พบกล่องนี้</p>}
             {groups.map(([domain, items]) => (
               <div key={domain} className="wm-picker-group" role="group" aria-label={domain}>
                 <p className="wm-picker-domain">@{domain}</p>
@@ -141,7 +139,7 @@ export default function MailboxPicker({ mailboxes, current, onChoose }: { mailbo
                       <span className="wm-avatar" aria-hidden="true">{initial(item.displayName || item.address)}</span>
                       <span className="wm-picker-text">
                         <b>{localPart(item.address)}</b>
-                        {item.displayName && item.displayName !== localPart(item.address) && <small>{item.displayName}</small>}
+                        {item.displayName && item.displayName.toLowerCase() !== localPart(item.address).toLowerCase() && <small>{item.displayName}</small>}
                       </span>
                       {item.unread > 0 && <span className="wm-picker-count" aria-label={`ยังไม่อ่าน ${item.unread} ฉบับ`}>{item.unread > 99 ? "99+" : item.unread}</span>}
                       {active && <Check size={16} className="wm-picker-check" aria-hidden="true" />}

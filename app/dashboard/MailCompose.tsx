@@ -34,7 +34,7 @@ export default function MailCompose({ start, mailboxId, from, notify, onClose, o
   const initialHtml = useRef(start.html);
 
   const isReply = Boolean(start.inReplyTo) || /^(Re|Fwd): /.test(start.subject);
-  const title = start.draftId ? "แก้ไขฉบับร่าง" : isReply ? (start.subject.startsWith("Fwd: ") ? "ส่งต่อ" : "ตอบกลับ") : "ข้อความใหม่";
+  const title = start.draftId ? "แก้ไขฉบับร่าง" : isReply ? (start.subject.startsWith("Fwd: ") ? "ส่งต่อ" : "ตอบกลับ") : "เขียนอีเมล";
   const attachedBytes = compose.attachments.reduce((sum, file) => sum + decodedSize(file.content), 0);
 
   useScrollLock(true);
@@ -93,7 +93,7 @@ export default function MailCompose({ start, mailboxId, from, notify, onClose, o
           body: JSON.stringify({ folder: "trash" }),
         });
       }
-      notify({ kind: "success", text: draft ? "บันทึกร่างแล้ว" : "เข้าคิวส่งอีเมลแล้ว" });
+      notify({ kind: "success", text: draft ? "บันทึกร่างแล้ว" : "กำลังส่งอีเมล" });
       onDone(draft ? "draft" : "sent");
     } catch (error) {
       notify({ kind: "error", text: (error as Error).message });
@@ -219,7 +219,7 @@ export default function MailCompose({ start, mailboxId, from, notify, onClose, o
 
         {confirmClose ? (
           <footer className="wm-dialog-foot wm-discard" role="alert">
-            <span>ปิดหน้านี้แล้วข้อความที่เขียนจะหาย</span>
+            <span>ถ้าปิดตอนนี้ ข้อความที่เขียนจะหาย</span>
             <button type="button" className="wm-btn" onClick={() => setConfirmClose(false)}>เขียนต่อ</button>
             <button type="button" className="wm-btn" onClick={() => void submit(null, true)} disabled={Boolean(sending)}>บันทึกร่าง</button>
             <button type="button" className="wm-btn wm-btn-danger" onClick={onClose}>ทิ้งข้อความ</button>

@@ -420,9 +420,8 @@ body.user-nav-locked .user-app-main {
   padding: 10px;
   border: 1px solid var(--primary-border);
   border-radius: 14px;
-  background: color-mix(in srgb, var(--theme-elevated) 96%, transparent);
+  background: var(--theme-elevated);
   box-shadow: 0 22px 60px var(--theme-shadow);
-  backdrop-filter: blur(16px);
   animation: utb-dropdown-in .18s ease-out;
 }
 
@@ -442,6 +441,7 @@ body.user-nav-locked .user-app-main {
   min-width: 0;
   display: grid;
   gap: 2px;
+  line-height: 1.35;
 }
 
 .utb-dropdown-user > div strong {
@@ -481,19 +481,18 @@ body.user-nav-locked .user-app-main {
 
 .utb-dropdown-logout {
   width: 100%;
-  min-height: 44px;
+  min-height: 42px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 14px;
-  border: 1px solid rgb(var(--danger-rgb) / .32);
+  gap: 10px;
+  padding: 0 10px;
+  border: 1px solid transparent;
   border-radius: 9px;
-  background: rgb(var(--danger-rgb) / .08);
+  background: none;
   color: var(--danger);
   font: inherit;
   font-size: 0.9rem;
-  font-weight: 650;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
@@ -505,8 +504,7 @@ body.user-nav-locked .user-app-main {
 }
 
 .utb-dropdown-logout:hover {
-  border-color: rgb(var(--danger-rgb) / .48);
-  background: rgb(var(--danger-rgb) / .14);
+  background: rgb(var(--danger-rgb) / .1);
   color: var(--danger);
 }
 
