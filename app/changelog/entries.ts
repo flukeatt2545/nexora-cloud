@@ -25,6 +25,13 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.9",
+    date: "2026-11-01",
+    changes: [
+      { type: "fixed", th: "ข้อความตอนปิดการเข้าด้วยรหัสผ่านยาวจนตกบรรทัด ตอนนี้สั้นลงและไม่มีไอคอนกุญแจสีเหลือง", en: "The notice shown when password sign-in is off was long enough to wrap; it is now shorter, without the yellow lock" },
+    ],
+  },
+  {
     version: "1.2.8",
     date: "2026-11-01",
     changes: [
