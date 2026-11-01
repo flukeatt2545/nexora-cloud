@@ -25,6 +25,7 @@ import { onRoleCheckButton } from "./rolecheck";
 import { announceRestore, onAuditLogEntry, onSecurityJoin, onSecurityMessage, startSiteSecurityFeed } from "./security";
 import { loadSettings, settings, updateSettings } from "./settings";
 import { onProtectCommand } from "./guard";
+import { onAdminKeyCommand } from "./adminkey";
 import { onPurgeButton, onPurgeCommand, onPurgeModal } from "./purge";
 import { isRoomChannel } from "./legacy/voice/rooms";
 import { noteChannelDeleted, onChannelRestored } from "./trust";
@@ -236,6 +237,7 @@ async function route(interaction: Interaction) {
     else if (interaction.commandName === "protect") await onProtectCommand(interaction);
     else if (interaction.commandName === "clear") await onPurgeCommand(interaction);
     else if (interaction.commandName === "ticket") await onTicketCommand(interaction);
+    else if (interaction.commandName === "adminkey") await onAdminKeyCommand(interaction);
     return;
   }
   if (interaction.isModalSubmit()) {

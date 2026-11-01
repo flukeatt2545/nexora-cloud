@@ -20,6 +20,7 @@ import { asciiInputProps, filterAsciiInput, filterLatinAlphanumeric, hasNonAscii
 import { TopupOverviewView, TopupSettingsView, TopupTransactionsView, StoreOrdersView, StoreSalesView } from "./TopupAdminViews";
 import FileLibraryView from "./FileLibraryView";
 import AdminOverview from "./AdminOverview";
+import AdminKeysPanel from "./AdminKeysPanel";
 import { UserFileCategoriesView } from "./UserFileViews";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { API_BASE } from "../runtime";
@@ -284,7 +285,7 @@ const actionLabel: Record<string, string> = {
 
   // ===== ผู้ใช้ / ความปลอดภัย / Discord =====
   "user.created": "สร้างบัญชีผู้ใช้", "user.password_reset": "รีเซ็ตรหัสผ่านผู้ใช้",
-  "lockdown.enabled": "ล็อกเว็บไซต์", "lockdown.disabled": "ปลดล็อกเว็บไซต์",
+  "admin_key.created": "สร้างคีย์เข้าระบบสำรอง", "admin_key.revoked": "ยกเลิกคีย์เข้าระบบสำรอง", "admin_key.login": "เข้าระบบด้วยคีย์สำรอง", "lockdown.enabled": "ล็อกเว็บไซต์", "lockdown.disabled": "ปลดล็อกเว็บไซต์",
   "lockdown.state_read_failed": "อ่านสถานะล็อกเว็บไซต์ไม่สำเร็จ",
   "discord.bot.activity": "กิจกรรมบอท Discord", "discord.presence.updated": "เปลี่ยนสถานะบอท Discord",
   "discord.bot_token.updated": "เปลี่ยน token บอท Discord", "discord.bot_token.removed": "ลบ token บอท Discord",
@@ -396,6 +397,8 @@ const webhookCategories = [
       { key: "ip.banned_access", label: "IP ที่ถูกแบนพยายามเข้าเว็บ", desc: "แจ้งไม่เกินทุก 10 นาทีต่อ IP" },
       { key: "ip.banned", label: "แบน IP", desc: "เพิ่ม IP ในรายการแบน" },
       { key: "ip.unbanned", label: "ปลดแบน IP", desc: "เอา IP ออกจากรายการแบน" },
+      { key: "admin_key.login", label: "เข้าระบบด้วยคีย์สำรอง", desc: "มีคนใช้คีย์สำรองเข้าระบบ หรือใส่คีย์ผิด" },
+      { key: "admin_key.created", label: "สร้างคีย์เข้าระบบสำรอง", desc: "มีการสร้างคีย์ใหม่จากเว็บหรือ Discord" },
       { key: "lockdown.enabled", label: "ล็อกเว็บไซต์", desc: "ล็อกจากหน้าเว็บหรือบอท Discord" },
       { key: "lockdown.disabled", label: "ปลดล็อกเว็บไซต์", desc: "ปลดล็อกแล้ว" },
       { key: "workspace.security_alert", label: "เว็บโฮสติ้งบล็อกคำขอน่าสงสัย", desc: "ไฟร์วอลล์ของเว็บลูกค้าบล็อกการโจมตี" },
@@ -4207,6 +4210,22 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
       document.querySelector<HTMLInputElement>(".ttl-field input")?.focus();
       return;
     }
+    const allOff = (s: Pick<SettingsData, "localLoginEnabled" | "discordEnabled" | "googleEnabled" | "githubEnabled">) => !s.localLoginEnabled && !s.discordEnabled && !s.googleEnabled && !s.githubEnabled;
+    if (allOff(settings) && !allOff(JSON.parse(savedSettings || "{}"))) {
+      ask({
+        title: "ปิดการเข้าสู่ระบบทุกทาง?",
+        message: "จะเหลือแค่คีย์เข้าระบบสำรองของแอดมินสูงสุด ผู้ใช้และแอดมินคนอื่นจะล็อกอินใหม่ไม่ได้ ลองเข้าด้วยคีย์ให้สำเร็จก่อนปิด และอย่าให้คีย์หมดอายุหรือหาย",
+        confirmLabel: "ปิดทุกทาง",
+        danger: true,
+        action: persist,
+      });
+      return;
+    }
+    await persist();
+  }
+
+  async function persist() {
+    if (!settings) return;
     setSaveState("saving");
     try {
       // The shape has its own route; the form's PATCH below returns it with everything else.
@@ -4738,6 +4757,7 @@ function SettingsView({ notify, ask }: { notify: (notice: { kind: "success" | "e
 
             {activeTab === "auth" && (
               <div style={{ display: 'grid', gap: '24px' }}>
+                <AdminKeysPanel notify={notify} ask={ask} />
                 {/* Section 1: การเข้าสู่ระบบ (Login Settings) */}
                 <div className="premium-settings-card">
                   <div className="settings-card-header">

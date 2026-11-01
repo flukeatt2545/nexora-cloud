@@ -1,0 +1,33 @@
+/* Emergency sign-in. A terminal looks the same in both themes on purpose, so these colours are its own. */
+.admin-term-backdrop { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, .78); }
+.admin-term {
+  --term-bg: #0a0b0d; --term-line: #2a2d33; --term-text: #d7dbe0; --term-soft: #8a9098; --term-ok: #4ade80; --term-bad: #f87171;
+  width: min(100%, 620px); display: grid; border: 1px solid var(--term-line); border-radius: 10px; background: var(--term-bg); color: var(--term-text);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Kanit, monospace; font-size: 14.5px; line-height: 1.6;
+}
+.admin-term.is-dragging { border-color: var(--term-ok); }
+.admin-term button { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.admin-term button:focus-visible, .admin-term input:focus-visible { outline: 1px solid var(--term-soft); outline-offset: 2px; }
+.admin-term-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--term-line); color: var(--term-soft); font-size: 13.5px; }
+.admin-term-bar button { padding: 2px 6px; color: var(--term-soft); }
+.admin-term-bar button:hover { color: var(--term-text); }
+.admin-term-body { display: grid; gap: 2px; min-height: 96px; align-content: start; padding: 14px 14px 6px; }
+.admin-term-body p { margin: 0; overflow-wrap: anywhere; }
+.admin-term-body p.is-plain { color: var(--term-soft); }
+.admin-term-body p.is-ok { color: var(--term-ok); }
+.admin-term-body p.is-bad { color: var(--term-bad); }
+.admin-term-prompt { display: flex; align-items: center; gap: 10px; padding: 4px 14px 14px; }
+.admin-term-prompt label { flex: 0 0 auto; color: var(--term-ok); }
+.admin-term-prompt input { flex: 1; min-width: 0; min-height: 32px; padding: 0; border: 0; outline: 0; background: none; color: var(--term-text); font: inherit; caret-color: var(--term-ok); }
+.admin-term-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 10px 14px; border-top: 1px solid var(--term-line); color: var(--term-soft); font-size: 13.5px; }
+.admin-term-foot button { min-height: 32px; padding: 0 10px; border: 1px solid var(--term-line); border-radius: 6px; color: var(--term-text); }
+.admin-term-foot button:hover:not(:disabled) { border-color: var(--term-soft); }
+.admin-term-foot button:disabled { cursor: wait; opacity: .6; }
+@media (pointer: coarse) {
+  /* Near the top, so the on-screen keyboard does not cover the field. */
+  .admin-term-backdrop { align-items: start; padding-top: max(16px, env(safe-area-inset-top)); overflow-y: auto; }
+  .admin-term-hint { display: none; }
+  .admin-term-bar button { min-height: 44px; min-width: 44px; }
+  .admin-term-prompt input { min-height: 44px; font-size: 16px; }
+  .admin-term-foot button { flex: 1 1 130px; min-height: 44px; }
+}

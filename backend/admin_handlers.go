@@ -567,7 +567,13 @@ func (s *server) updateAdminSettings(c *fiber.Ctx) error {
 	body.WebhookEvents = sanitizeWebhookEvents(body.WebhookEvents)
 	rawEvents, _ := json.Marshal(body.WebhookEvents)
 	if !hasSignInMethod(body) {
-		return c.Status(fiber.StatusBadRequest).JSON(apiError{Error: "ต้องเปิดการเข้าสู่ระบบไว้อย่างน้อยหนึ่งทาง ไม่อย่างนั้นแอดมินจะเข้าระบบไม่ได้", Code: "no_sign_in_method"})
+		keys, err := s.activeAdminKeys(c.Context(), actor.ID)
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError)
+		}
+		if keys == 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(apiError{Error: "ปิดทุกทางได้เมื่อมีคีย์เข้าระบบสำรองแล้ว สร้างคีย์ก่อน หรือเปิดไว้อย่างน้อยหนึ่งทาง", Code: "no_sign_in_method"})
+		}
 	}
 	if err := s.saveOAuthSettings(c.Context(), actor.ID, body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(apiError{Error: "กรุณากรอก Client ID และ Client Secret ให้ครบ"})

@@ -98,6 +98,21 @@ export const commands = [
     )),
 
   new SlashCommandBuilder()
+    .setName("adminkey")
+    .setNameLocalizations({ th: "คีย์แอดมิน" })
+    .setDescription("สร้างคีย์เข้าระบบสำรองของเว็บ (แอดมินสูงสุดเท่านั้น)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .setIntegrationTypes(ApplicationIntegrationType.GuildInstall)
+    .setContexts(InteractionContextType.Guild)
+    .addStringOption((option) => option.setName("name").setNameLocalizations({ th: "ชื่อ" }).setDescription("ชื่อคีย์ เช่น โน้ตบุ๊กที่บ้าน").setRequired(true).setMaxLength(60))
+    .addStringOption((option) => option.setName("expires").setNameLocalizations({ th: "อายุ" }).setDescription("อายุคีย์ (เริ่มต้น 90 วัน)").addChoices(
+      { name: "30 วัน", value: "30" },
+      { name: "90 วัน", value: "90" },
+      { name: "1 ปี", value: "365" },
+      { name: "ไม่หมดอายุ", value: "0" },
+    )),
+
+  new SlashCommandBuilder()
     .setName("ticket")
     .setDescription("จัดการ Ticket (ใช้ในห้อง Ticket)")
     .setIntegrationTypes(ApplicationIntegrationType.GuildInstall)

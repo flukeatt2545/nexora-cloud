@@ -79,6 +79,8 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+import AdminTerminalHotkey from "./components/AdminTerminalHotkey";
+
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
@@ -95,6 +97,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body>
         <ThemeLoader />
         <ConsoleWarning />
+        <AdminTerminalHotkey />
         {children}
       </body>
     </html>
