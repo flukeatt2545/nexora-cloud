@@ -25,6 +25,16 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.6",
+    date: "2026-11-01",
+    changes: [
+      { type: "changed", th: "จัดหน้าภาพรวมแอดมินใหม่ ปรับคำให้สั้นและตรงขึ้น เอาไอคอนที่ไม่จำเป็นออก และแจ้งเตือนกว้างเต็มแถว", en: "A cleaner admin overview: shorter, plainer wording, fewer decorative icons and full-width alerts" },
+      { type: "changed", th: "บัญชีที่ถูกระงับไม่ขึ้นเป็นแจ้งเตือนแล้ว ดูจำนวนได้ที่ตัวเลขผู้ใช้และสถานะระบบ", en: "Suspended accounts are no longer an alert; the count stays in the user figure and system status" },
+      { type: "fixed", th: "การ์ดทางลัด สถานะระบบ และกราฟยอดขายในหน้าภาพรวมแอดมินมีที่ว่างเหลือด้านล่าง ตอนนี้เนื้อหาเต็มการ์ดแล้ว", en: "The shortcuts, system status and sales cards on the admin overview left empty space at the bottom; their content now fills the card" },
+      { type: "fixed", th: "แอดมินทั่วไปเห็นการ์ดทางลัดกินแค่ครึ่งแถวและมีช่องว่างข้าง ๆ ตอนนี้เต็มแถวแล้ว", en: "For regular admins the shortcuts card filled only half its row; it now spans the full width" },
+    ],
+  },
+  {
     version: "1.2.5",
     date: "2026-11-01",
     changes: [

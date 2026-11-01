@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity, ArrowRight, Ban, CheckCircle2, ChevronRight, Cloud, Database, ExternalLink, KeyRound, Megaphone,
-  History, LogIn, Package, RadioTower, ReceiptText, RefreshCw, ShieldAlert, Store, TrendingUp, Users, WalletCards, Zap,
+  ArrowRight, CheckCircle2, ChevronRight, Cloud, Database, ExternalLink, KeyRound, Megaphone,
+  Package, RefreshCw, Store, Users, WalletCards,
 } from "lucide-react";
 import Link from "next/link";
 import { API_BASE } from "../runtime";
@@ -146,7 +146,7 @@ function PanelError({ onRetry }: { onRetry: () => void }) {
   return <div className="aov-empty">โหลดข้อมูลไม่ได้ <button type="button" onClick={onRetry}>ลองอีกครั้ง</button></div>;
 }
 
-export default function AdminOverview({ role, name, actionText, storeOpen = true }: { role: Role; name: string; actionText: (action: string) => string; storeOpen?: boolean }) {
+export default function AdminOverview({ role, actionText, storeOpen = true }: { role: Role; actionText: (action: string) => string; storeOpen?: boolean }) {
   const isSuper = role === "superadmin";
   const [summary, setSummary] = useState<Slot<Summary>>(empty);
   const [topups, setTopups] = useState<Slot<TopupSummary>>(empty);
@@ -189,19 +189,18 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
   const failRate = s && s.logins24h + s.failedLogins24h > 0 ? Math.round((s.failedLogins24h / (s.logins24h + s.failedLogins24h)) * 100) : 0;
 
   const alerts = useMemo(() => {
-    const items: { key: string; tone: "bad" | "wait"; icon: typeof Ban; text: string; href?: string; cta?: string }[] = [];
+    const items: { key: string; tone: "bad" | "wait"; icon: typeof Store; text: string; href?: string; cta?: string }[] = [];
     if (s && s.failedLogins24h > 0) items.push({ key: "failed", tone: s.failedLogins24h >= 10 ? "bad" : "wait", icon: KeyRound, text: `เข้าสู่ระบบไม่สำเร็จ ${number(s.failedLogins24h)} ครั้งใน 24 ชม.`, href: isSuper ? "/admin/logs" : undefined, cta: "ดูบันทึก" });
-    if (s && s.suspendedUsers > 0) items.push({ key: "suspended", tone: "wait", icon: Ban, text: `มีบัญชีถูกระงับ ${number(s.suspendedUsers)} บัญชี`, href: "/admin/users", cta: "จัดการผู้ใช้" });
     if (!storeOpen) items.push({ key: "store-closed", tone: "wait", icon: Store, text: "ร้านค้าปิดอยู่ ลูกค้าซื้อสินค้าและเติมเงินไม่ได้", href: isSuper ? "/admin/settings?tab=general#store-switch" : undefined, cta: "เปิดร้านค้า" });
     else if (t && !t.configured) items.push({ key: "topup-config", tone: "bad", icon: WalletCards, text: "ระบบเติมเงินยังตั้งค่าไม่ครบ ลูกค้าเติมเงินไม่ได้", href: isSuper ? "/admin/topups/settings" : undefined, cta: "ตั้งค่า" });
-    else if (t && !t.enabled) items.push({ key: "topup-off", tone: "wait", icon: WalletCards, text: "ระบบเติมเงินปิดอยู่", href: isSuper ? "/admin/topups/settings" : undefined, cta: "เปิดใช้งาน" });
+    else if (t && !t.enabled) items.push({ key: "topup-off", tone: "wait", icon: WalletCards, text: "ระบบเติมเงินปิดอยู่", href: isSuper ? "/admin/topups/settings" : undefined, cta: "ไปเปิด" });
     if (health.failed) items.push({ key: "health", tone: "bad", icon: Database, text: "ตรวจสถานะฐานข้อมูลไม่ได้" });
     return items;
   }, [s, t, health.failed, isSuper, storeOpen]);
 
   const today = new Intl.DateTimeFormat("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
   const shortcuts = [
-    { href: "/admin/users", label: "จัดการผู้ใช้", icon: Users },
+    { href: "/admin/users", label: "ผู้ใช้", icon: Users },
     { href: "/admin/store/products", label: "สินค้า", icon: Package },
     { href: "/admin/announcements", label: "ประกาศ", icon: Megaphone },
     { href: "/admin/hosting", label: "เว็บไซต์", icon: Cloud },
@@ -211,24 +210,24 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
     <div className="aov" aria-busy={loading}>
       <header className="aov-head">
         <div>
-          <h1>สวัสดี {name}</h1>
+          <h1>ภาพรวม</h1>
           <p className="aov-sub">{today}{updatedAt && <> · อัปเดต {new Intl.DateTimeFormat("th-TH", { timeStyle: "short" }).format(updatedAt)}</>}</p>
         </div>
         <div className="aov-head-actions">
-          <button type="button" className="aov-btn" onClick={load} disabled={loading} aria-label="รีเฟรชข้อมูล" title="รีเฟรชข้อมูล">
+          <button type="button" className="aov-btn" onClick={load} disabled={loading} aria-label="โหลดใหม่" title="โหลดใหม่">
             <RefreshCw size={16} className={loading ? "spin" : ""} aria-hidden="true" />
           </button>
           <a href="/" className="aov-btn aov-btn-label" target="_blank" rel="noopener">
-            <ExternalLink size={16} aria-hidden="true" /> เปิดหน้าเว็บ
+            <ExternalLink size={16} aria-hidden="true" /> ดูหน้าเว็บ
           </a>
         </div>
       </header>
 
-      <section className={`aov-status${alerts.length ? "" : " is-calm"}`} aria-label="สิ่งที่ต้องดูแล">
+      <section className={`aov-status${alerts.length ? "" : " is-calm"}`} aria-label="เรื่องที่ต้องจัดการ">
         {alerts.length === 0 ? (
           <p className="aov-status-calm">
             <CheckCircle2 size={17} aria-hidden="true" />
-            {loading && !updatedAt ? "กำลังตรวจสถานะ..." : "ไม่มีเรื่องที่ต้องจัดการตอนนี้"}
+            {loading && !updatedAt ? "กำลังโหลด" : "ตอนนี้ไม่มีเรื่องค้าง"}
           </p>
         ) : alerts.map((alert) => (
           <div className={`aov-alert is-${alert.tone}`} key={alert.key}>
@@ -239,24 +238,24 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
         ))}
       </section>
 
-      <section className="aov-kpis" aria-label="ตัวเลขสำคัญ">
+      <section className="aov-kpis" aria-label="สรุปตัวเลข">
         <div className="aov-kpi">
-          <span className="aov-kpi-label"><span className="aov-kpi-icon" aria-hidden="true"><Users size={16} /></span>ผู้ใช้ทั้งหมด</span>
+          <span className="aov-kpi-label">ผู้ใช้ทั้งหมด</span>
           <strong>{s ? number(s.totalUsers) : <i className="aov-skel" />}</strong>
           <span className="aov-kpi-note">{s ? <>ใช้งาน {number(s.activeUsers)}{s.suspendedUsers > 0 && <> · <b className="is-wait">ระงับ {number(s.suspendedUsers)}</b></>}</> : summary.failed ? "โหลดไม่ได้" : " "}</span>
         </div>
         <div className="aov-kpi">
-          <span className="aov-kpi-label"><span className="aov-kpi-icon" aria-hidden="true"><RadioTower size={16} /></span>ออนไลน์ตอนนี้</span>
+          <span className="aov-kpi-label">ล็อกอินค้างอยู่</span>
           <strong>{s ? number(s.activeSessions) : <i className="aov-skel" />}</strong>
-          <span className="aov-kpi-note">{s ? "session ที่ยังไม่หมดอายุ" : " "}</span>
+          <span className="aov-kpi-note">{s ? "นับแยกทุกอุปกรณ์" : " "}</span>
         </div>
         <div className="aov-kpi">
-          <span className="aov-kpi-label"><span className="aov-kpi-icon" aria-hidden="true"><LogIn size={16} /></span>เข้าสู่ระบบ 24 ชม.</span>
+          <span className="aov-kpi-label">เข้าสู่ระบบ 24 ชม.</span>
           <strong>{s ? number(s.logins24h) : <i className="aov-skel" />}</strong>
-          <span className="aov-kpi-note">{s ? (s.failedLogins24h > 0 ? <b className={failRate >= 30 ? "is-bad" : "is-wait"}>ไม่สำเร็จ {number(s.failedLogins24h)} ({failRate}%)</b> : "ไม่มีครั้งที่ล้มเหลว") : " "}</span>
+          <span className="aov-kpi-note">{s ? (s.failedLogins24h > 0 ? <b className={failRate >= 30 ? "is-bad" : "is-wait"}>ไม่สำเร็จ {number(s.failedLogins24h)} ({failRate}%)</b> : s.logins24h > 0 ? "สำเร็จทุกครั้ง" : "ยังไม่มีใครเข้า") : " "}</span>
         </div>
         <div className="aov-kpi">
-          <span className="aov-kpi-label"><span className="aov-kpi-icon" aria-hidden="true"><WalletCards size={16} /></span>เติมเงินวันนี้</span>
+          <span className="aov-kpi-label">เติมเงินวันนี้</span>
           <strong>{t ? <>{baht(t.todayAmount)}<small> บาท</small></> : topups.failed ? "—" : <i className="aov-skel" />}</strong>
           <span className="aov-kpi-note">{t ? `${number(t.todayTransactions)} รายการ · เดือนนี้ ${baht(t.monthAmount)} บาท` : " "}</span>
         </div>
@@ -265,8 +264,8 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
       <div className="aov-grid">
         <section className="aov-panel aov-sales">
           <header>
-            <h2><TrendingUp size={17} aria-hidden="true" className="aov-h-icon" />ยอดขายร้านค้า <span>7 วันล่าสุด</span></h2>
-            <Link href="/admin/store/sales">รายงาน<ChevronRight size={14} aria-hidden="true" /></Link>
+            <h2>ยอดขายร้านค้า <span>7 วันล่าสุด</span></h2>
+            <Link href="/admin/store/sales">ดูรายงาน<ChevronRight size={14} aria-hidden="true" /></Link>
           </header>
           {sales.failed ? <PanelError onRetry={load} /> : <>
             <div className="aov-sales-figure" aria-live="polite">
@@ -279,7 +278,7 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
               </>}
             </div>
             <div className="aov-bars-wrap">
-              {sales.data && peak === 0 && <p className="aov-bars-note">ยังไม่มียอดขายในช่วง 7 วันนี้</p>}
+              {sales.data && peak === 0 && <p className="aov-bars-note">ยังไม่มียอดขาย</p>}
               <div className="aov-bars" onMouseLeave={() => setActiveDay(null)}>
               {(series.length ? series : Array.from({ length: 7 }, (_, i) => ({ date: String(i), revenue: 0, orders: 0 }))).map((point, index) => {
                 const date = new Date(`${point.date}T00:00:00`);
@@ -302,8 +301,8 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
 
         <section className="aov-panel aov-topups">
           <header>
-            <h2><ReceiptText size={17} aria-hidden="true" className="aov-h-icon" />เติมเงินล่าสุด</h2>
-            <Link href="/admin/topups/transactions">ทั้งหมด<ChevronRight size={14} aria-hidden="true" /></Link>
+            <h2>เติมเงินล่าสุด</h2>
+            <Link href="/admin/topups/transactions">ดูทั้งหมด<ChevronRight size={14} aria-hidden="true" /></Link>
           </header>
           {topups.failed ? <PanelError onRetry={load} /> : !t ? <ul className="aov-list">{[0, 1, 2].map((i) => <li key={i}><i className="aov-skel wide" /></li>)}</ul>
             : t.recentTransactions.length === 0 ? <div className="aov-empty">ยังไม่มีรายการเติมเงิน</div>
@@ -327,8 +326,8 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
         {isSuper && (
           <section className="aov-panel aov-logs">
             <header>
-              <h2><History size={17} aria-hidden="true" className="aov-h-icon" />กิจกรรมล่าสุด</h2>
-              <Link href="/admin/logs">บันทึกทั้งหมด<ChevronRight size={14} aria-hidden="true" /></Link>
+              <h2>กิจกรรมล่าสุด</h2>
+              <Link href="/admin/logs">ดูทั้งหมด<ChevronRight size={14} aria-hidden="true" /></Link>
             </header>
             {logs.failed ? <PanelError onRetry={load} /> : !logs.data ? <ul className="aov-list">{[0, 1, 2].map((i) => <li key={i}><i className="aov-skel wide" /></li>)}</ul>
               : logDays.length === 0 ? <div className="aov-empty">ยังไม่มีกิจกรรม</div>
@@ -360,8 +359,8 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
           </section>
         )}
 
-        <section className="aov-panel aov-side">
-          <header><h2><Zap size={17} aria-hidden="true" className="aov-h-icon" />ทางลัด</h2></header>
+        <section className={`aov-panel aov-side${isSuper ? "" : " is-wide"}`}>
+          <header><h2>ทางลัด</h2></header>
           <nav className="aov-shortcuts" aria-label="ทางลัด">
             {shortcuts.map((item) => (
               <a key={item.href} href={item.href}>
@@ -374,10 +373,10 @@ export default function AdminOverview({ role, name, actionText, storeOpen = true
           <div className="aov-system">
             <h3>สถานะระบบ</h3>
             <dl>
-              <div><dt><Database size={14} aria-hidden="true" />ฐานข้อมูล</dt><dd>{health.data ? <><span className="aov-dot is-ok" aria-hidden="true" />ปกติ{health.data.databaseSize && <small> · {health.data.databaseSize}</small>}</> : health.failed ? <><span className="aov-dot is-bad" aria-hidden="true" />ตรวจไม่ได้</> : "…"}</dd></div>
-              <div><dt><Activity size={14} aria-hidden="true" />แคช (Redis)</dt><dd>{health.data ? <><span className="aov-dot is-ok" aria-hidden="true" />ปกติ</> : health.failed ? <><span className="aov-dot is-bad" aria-hidden="true" />ตรวจไม่ได้</> : "…"}</dd></div>
-              <div><dt><WalletCards size={14} aria-hidden="true" />ระบบเติมเงิน</dt><dd>{t ? (t.configured && t.enabled ? <><span className="aov-dot is-ok" aria-hidden="true" />เปิดอยู่</> : <><span className={`aov-dot is-${t.configured ? "wait" : "bad"}`} aria-hidden="true" />{t.configured ? "ปิดอยู่" : "ตั้งค่าไม่ครบ"}</>) : "…"}</dd></div>
-              {s && <div><dt><ShieldAlert size={14} aria-hidden="true" />บัญชีถูกระงับ</dt><dd>{number(s.suspendedUsers)}</dd></div>}
+              <div><dt>ฐานข้อมูล</dt><dd>{health.data ? <><span className="aov-dot is-ok" aria-hidden="true" />ปกติ{health.data.databaseSize && <small> · {health.data.databaseSize}</small>}</> : health.failed ? <><span className="aov-dot is-bad" aria-hidden="true" />ตรวจไม่ได้</> : "…"}</dd></div>
+              <div><dt>แคช (Redis)</dt><dd>{health.data ? <><span className="aov-dot is-ok" aria-hidden="true" />ปกติ</> : health.failed ? <><span className="aov-dot is-bad" aria-hidden="true" />ตรวจไม่ได้</> : "…"}</dd></div>
+              <div><dt>ระบบเติมเงิน</dt><dd>{t ? (t.configured && t.enabled ? <><span className="aov-dot is-ok" aria-hidden="true" />เปิดอยู่</> : <><span className={`aov-dot is-${t.configured ? "wait" : "bad"}`} aria-hidden="true" />{t.configured ? "ปิดอยู่" : "ตั้งค่าไม่ครบ"}</>) : "…"}</dd></div>
+              {s && <div><dt>บัญชีที่ระงับ</dt><dd>{number(s.suspendedUsers)}</dd></div>}
             </dl>
           </div>
         </section>
