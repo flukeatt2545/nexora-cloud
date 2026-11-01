@@ -25,6 +25,13 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.3.1",
+    date: "2026-11-01",
+    changes: [
+      { type: "fixed", th: "กดสร้างคีย์เข้าระบบสำรองแล้วหน้าโหลดใหม่และไม่ได้คีย์", en: "Creating an emergency key reloaded the page and made no key" },
+    ],
+  },
+  {
     version: "1.3.0",
     date: "2026-11-01",
     changes: [

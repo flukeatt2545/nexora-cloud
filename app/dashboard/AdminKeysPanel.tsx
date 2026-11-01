@@ -1,7 +1,7 @@
 "use client";
 
 import { Copy, Download, KeySquare } from "lucide-react";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { API_BASE } from "../runtime";
 
 type AdminKey = {
@@ -45,8 +45,8 @@ export default function AdminKeysPanel({ notify, ask }: { notify: Notify; ask: A
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  async function create(event: FormEvent) {
-    event.preventDefault();
+  async function create() {
+    if (busy || !label.trim()) return;
     setBusy(true);
     try {
       const response = await fetch(`${API_BASE}/api/admin/emergency-keys`, {
@@ -127,10 +127,11 @@ export default function AdminKeysPanel({ notify, ask }: { notify: Notify; ask: A
           </div>
         </div>
       ) : (
-        <form className="akp-form" onSubmit={create}>
+        // This panel sits inside the settings page's form, and forms cannot nest: a <form> here would reload the page.
+        <div className="akp-form">
           <label>
             <span>ชื่อคีย์</span>
-            <input className="premium-input" value={label} onChange={(event) => setLabel(event.target.value)} maxLength={60} placeholder="โน้ตบุ๊กที่บ้าน" />
+            <input className="premium-input" value={label} onChange={(event) => setLabel(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void create(); } }} maxLength={60} placeholder="โน้ตบุ๊กที่บ้าน" />
           </label>
           <label>
             <span>อายุ</span>
@@ -141,8 +142,8 @@ export default function AdminKeysPanel({ notify, ask }: { notify: Notify; ask: A
               <option value="0">ไม่หมดอายุ</option>
             </select>
           </label>
-          <button type="submit" className="akp-btn akp-primary" disabled={busy || !label.trim()}>{busy ? "กำลังสร้าง" : "สร้างคีย์"}</button>
-        </form>
+          <button type="button" className="akp-btn akp-primary" onClick={() => void create()} disabled={busy || !label.trim()}>{busy ? "กำลังสร้าง" : "สร้างคีย์"}</button>
+        </div>
       )}
 
       {failed ? <p className="akp-note">โหลดรายการไม่ได้ <button type="button" className="akp-link" onClick={() => void load()}>ลองอีกครั้ง</button></p>
