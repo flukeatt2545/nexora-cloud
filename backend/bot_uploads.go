@@ -24,7 +24,7 @@ import (
 const botUploadPublicBase = "https://nkn02.com/assets"
 
 const (
-	botUploadMaxFiles = 5
+	botUploadMaxFiles = 10
 	botUploadMaxBytes = 25 * 1024 * 1024 // 25MB per file, matches Discord's attachment limit
 	botUploadPrefix   = "uploads"
 

@@ -4,9 +4,13 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  FileUploadBuilder,
+  LabelBuilder,
+  ModalBuilder,
   SlashCommandBuilder,
   type Attachment,
   type ChatInputCommandInteraction,
+  type ModalSubmitInteraction,
 } from "discord.js";
 import type { AxiosProgressEvent } from "axios";
 import { recordActivity } from "./activity-log";
@@ -15,8 +19,12 @@ import { apiErrorField, describeError, errorStatus } from "./errors";
 const API_URL = (process.env.NEXORA_API_URL || "http://api:8080").replace(/\/+$/, "");
 const BOT_SECRET = (process.env.BOT_INTERNAL_SECRET || "").trim();
 
-export const MAX_FILES = 5;
+export const OPTION_FILES = 5; // a slash command takes one file per option, so the form is the main way in
+export const MAX_FILES = 10; // the most a modal's file picker allows; matches the backend limit
 export const MAX_FILE_BYTES = 25 * 1024 * 1024; // matches the backend limit
+export const MAX_TOTAL_BYTES = 100 * 1024 * 1024; // every picture is held in memory until it is sent
+export const UPLOAD_MODAL_ID = "modal_upload";
+const UPLOAD_FILES_ID = "upload_files";
 const COOLDOWN_MS = 15_000;
 
 // Progress UI: download phase counts as 0–50%, upload phase as 50–100%.
@@ -37,19 +45,52 @@ export const uploadCommand = (() => {
   const command = new SlashCommandBuilder()
     .setName("upload")
     .setNameLocalizations({ th: "อัปโหลด" })
-    .setDescription("อัปโหลดรูปขึ้น nkn02.com แล้วรับลิงก์ (JPG, PNG, GIF, WebP ไม่เกิน 25MB)")
+    .setDescription("อัปโหลดรูปขึ้น nkn02.com ได้ทีละหลายรูป แล้วรับลิงก์ (JPG, PNG, GIF, WebP ไม่เกิน 25MB)")
     .setDMPermission(false);
-  for (let i = 1; i <= MAX_FILES; i++) {
+  for (let i = 1; i <= OPTION_FILES; i++) {
     command.addAttachmentOption((opt) =>
       opt
         .setName(`image${i}`)
         .setNameLocalizations({ th: `รูป${i}` })
-        .setDescription(i === 1 ? "รูปที่ต้องการอัปโหลด" : `รูปที่ ${i} (ไม่บังคับ)`)
-        .setRequired(i === 1)
+        .setDescription(`รูปที่ ${i} (ไม่แนบก็ได้ จะขึ้นหน้าต่างให้เลือกหลายรูป)`)
     );
   }
   return command;
 })();
+
+/** The form with a file picker, where several pictures can be chosen at once. */
+export function uploadModal() {
+  return new ModalBuilder()
+    .setCustomId(UPLOAD_MODAL_ID)
+    .setTitle("อัปโหลดรูป")
+    .addLabelComponents(
+      new LabelBuilder()
+        .setLabel(`เลือกรูป ได้สูงสุด ${MAX_FILES} รูป`)
+        .setDescription("JPG, PNG, GIF, WebP รูปละไม่เกิน 25MB")
+        .setFileUploadComponent(new FileUploadBuilder().setCustomId(UPLOAD_FILES_ID).setMinValues(1).setMaxValues(MAX_FILES))
+    );
+}
+
+/** The pictures attached to the slash command itself; none means the form should open. */
+export function commandAttachments(interaction: ChatInputCommandInteraction): Attachment[] {
+  const attachments: Attachment[] = [];
+  for (let i = 1; i <= OPTION_FILES; i++) {
+    const att = interaction.options.getAttachment(`image${i}`);
+    if (att) attachments.push(att);
+  }
+  return attachments;
+}
+
+export function modalAttachments(interaction: ModalSubmitInteraction): Attachment[] {
+  return [...(interaction.fields.getUploadedFiles(UPLOAD_FILES_ID) ?? new Map<string, Attachment>()).values()];
+}
+
+/** Why this set of pictures cannot go together, or "". */
+export function batchProblem(attachments: Pick<Attachment, "size">[]): string {
+  if (attachments.length > MAX_FILES) return `เลือกได้ไม่เกิน ${MAX_FILES} รูปต่อครั้ง`;
+  const total = attachments.reduce((sum, att) => sum + (Number(att.size) || 0), 0);
+  return total > MAX_TOTAL_BYTES ? `รูปรวมกันต้องไม่เกิน ${MAX_TOTAL_BYTES / 1024 / 1024}MB ต่อครั้ง` : "";
+}
 
 type UploadedItem = { url: string; filename: string; size: number };
 
@@ -157,22 +198,18 @@ export function resultMessage(items: UploadedItem[], username: string) {
   summary.setURL(gridUrl).setImage(preview[0].url);
   const grid = preview.slice(1).map((item) => new EmbedBuilder().setURL(gridUrl).setImage(item.url).setColor(GREEN));
 
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    items.slice(0, MAX_FILES).map((item, i) =>
-      new ButtonBuilder().setLabel(items.length === 1 ? "เปิดรูปเต็ม" : `เปิดรูป ${i + 1}`).setStyle(ButtonStyle.Link).setURL(item.url)
-    )
+  // Discord fits five buttons on a row.
+  const buttons = items.slice(0, MAX_FILES).map((item, i) =>
+    new ButtonBuilder().setLabel(items.length === 1 ? "เปิดรูปเต็ม" : `เปิดรูป ${i + 1}`).setStyle(ButtonStyle.Link).setURL(item.url)
   );
-  return { embeds: [summary, ...grid], components: [row] };
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  for (let i = 0; i < buttons.length; i += 5) rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + 5)));
+  return { embeds: [summary, ...grid], components: rows };
 }
 
-export async function handleUploadCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-  // NOTE: index.ts must route commandName === "upload" here WITHOUT admin/scope
+export async function handleUpload(interaction: ChatInputCommandInteraction | ModalSubmitInteraction, attachments: Attachment[]): Promise<void> {
+  // NOTE: index.ts must route /upload and its form here WITHOUT admin/scope
   // gating (everyone in the guild may use it), after beginPrivateReply().
-  const attachments: Attachment[] = [];
-  for (let i = 1; i <= MAX_FILES; i++) {
-    const att = interaction.options.getAttachment(`image${i}`);
-    if (att) attachments.push(att);
-  }
   if (!attachments.length) {
     await interaction.editReply({ embeds: [notice("แนบรูปก่อน", "เลือกรูปอย่างน้อย 1 รูป")] });
     return;
@@ -188,6 +225,11 @@ export async function handleUploadCommand(interaction: ChatInputCommandInteracti
   }
 
   // Validate before downloading anything.
+  const tooMuch = batchProblem(attachments);
+  if (tooMuch) {
+    await interaction.editReply({ embeds: [notice("อัปโหลดไม่ได้", tooMuch)] });
+    return;
+  }
   for (const att of attachments) {
     const problem = attachmentProblem(att);
     if (problem) {
@@ -271,7 +313,7 @@ export async function handleUploadCommand(interaction: ChatInputCommandInteracti
         "X-Bot-Actor-Discord-Id": userId,
       },
       timeout: 120000,
-      maxBodyLength: MAX_FILES * MAX_FILE_BYTES + 1024 * 1024,
+      maxBodyLength: MAX_TOTAL_BYTES + 1024 * 1024,
       onUploadProgress: (e: AxiosProgressEvent) => {
         const total = Number(e?.total) || 0;
         const frac = total > 0 ? Number(e?.loaded || 0) / total : 0;

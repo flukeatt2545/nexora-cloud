@@ -25,6 +25,13 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.3.3",
+    date: "2026-11-02",
+    changes: [
+      { type: "changed", th: "คำสั่ง /อัปโหลด ในบอท Discord เลือกรูปได้ทีละหลายรูป สูงสุด 10 รูปต่อครั้ง", en: "The /upload command in the Discord bot can pick several pictures at once, up to 10" },
+    ],
+  },
+  {
     version: "1.3.2",
     date: "2026-11-01",
     changes: [

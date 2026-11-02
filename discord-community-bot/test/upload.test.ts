@@ -2,16 +2,16 @@ import "./support";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ApplicationCommandOptionType } from "discord.js";
-import { attachmentProblem, displayName, isDiscordCdnUrl, MAX_FILES, resultMessage, sniffImage, uploadCommand } from "../src/legacy/nexora/features/upload";
+import { attachmentProblem, batchProblem, displayName, isDiscordCdnUrl, MAX_FILES, MAX_TOTAL_BYTES, OPTION_FILES, resultMessage, sniffImage, uploadCommand, uploadModal } from "../src/legacy/nexora/features/upload";
 
 const cdn = "https://cdn.discordapp.com/attachments/1/2/photo.png";
 const image = { name: "photo.png", contentType: "image/png", size: 1000, url: cdn };
 
-test("/upload has one required picture and a few optional ones, in Thai and English", () => {
+test("/upload needs no attachment, so it can open the picker, in Thai and English", () => {
   const json = uploadCommand.toJSON();
-  assert.equal(json.options!.length, MAX_FILES);
+  assert.equal(json.options!.length, OPTION_FILES);
   assert.ok(json.options!.every((option) => option.type === ApplicationCommandOptionType.Attachment));
-  assert.deepEqual(json.options!.map((option) => option.required ?? false), [true, ...Array(MAX_FILES - 1).fill(false)]);
+  assert.ok(json.options!.every((option) => !option.required));
   assert.equal(json.name_localizations?.th, "อัปโหลด");
   assert.equal(json.options![0].name_localizations?.th, "รูป1");
   assert.equal(json.dm_permission, false);
@@ -48,6 +48,26 @@ test("file names cannot break out of the markdown link they are shown in", () =>
   assert.ok(!/[\[\]()‮]/.test(name), name);
   assert.equal(displayName(""), "รูปภาพ");
   assert.ok(displayName("a".repeat(200)).length <= 40);
+});
+
+test("the picker takes up to the most files the bot accepts", () => {
+  const json = JSON.parse(JSON.stringify(uploadModal().toJSON()));
+  const picker = json.components[0].component;
+  assert.equal(picker.max_values, MAX_FILES);
+  assert.equal(picker.min_values, 1);
+  assert.ok(MAX_FILES <= 10);
+});
+
+test("a batch that is too many or too big is refused before anything is downloaded", () => {
+  assert.equal(batchProblem([{ size: 1000 }, { size: 1000 }]), "");
+  assert.notEqual(batchProblem(Array.from({ length: MAX_FILES + 1 }, () => ({ size: 1 }))), "");
+  assert.notEqual(batchProblem([{ size: MAX_TOTAL_BYTES }, { size: 1 }]), "");
+});
+
+test("ten pictures get ten buttons on rows of five", () => {
+  const items = Array.from({ length: 10 }, (_, i) => ({ url: `https://nkn02.com/assets/uploads/${i}.png`, filename: `p${i}.png`, size: 1000 }));
+  const message = resultMessage(items, "somchai");
+  assert.deepEqual(message.components.map((row) => row.components.length), [5, 5]);
 });
 
 test("the result is one card with every link, a grid of up to four pictures and a button each", () => {

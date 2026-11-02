@@ -44,7 +44,7 @@ import { observeBotActivity, recordActivity } from "./features/activity-log";
 import { apiErrorField, describeError, errorStatus } from "./features/errors";
 import { botControlScope, botMemberRoleIds, canUseBotScope } from "./features/bot-control";
 import { handleLockdownCommand } from "./features/lockdown";
-import { handleUploadCommand } from "./features/upload";
+import { commandAttachments, handleUpload, modalAttachments, UPLOAD_MODAL_ID, uploadModal } from "./features/upload";
 import { handleMyUploadsCommand } from "./features/my-uploads";
 import { handleGalleryCommand } from "./features/gallery";
 import { LegacyBot } from "../host";
@@ -811,6 +811,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // 2. Modal Submit Interaction
   if (interaction.isModalSubmit()) {
+    if (interaction.customId === UPLOAD_MODAL_ID) {
+      await beginPrivateReply(interaction);
+      try {
+        await handleUpload(interaction, modalAttachments(interaction));
+      } catch (error) {
+        console.error("[ERROR] /upload:", describeError(error));
+        await interaction.editReply({ content: "อัปโหลดไม่สำเร็จ ลองใหม่อีกครั้ง" }).catch(() => {});
+      }
+      return;
+    }
     if (interaction.customId === "modal_student_db") {
       await beginPrivateReply(interaction);
 
@@ -965,9 +975,15 @@ if (commandName === "my-uploads") {
     }
 
 if (commandName === "upload") {
+      // Nothing attached: open the picker. A form must be the first response, so this comes before the private reply.
+      const attachments = commandAttachments(interaction);
+      if (!attachments.length) {
+        await interaction.showModal(uploadModal());
+        return;
+      }
       await beginPrivateReply(interaction);
       try {
-        await handleUploadCommand(interaction);
+        await handleUpload(interaction, attachments);
       } catch (error) {
         console.error("[ERROR] /upload:", describeError(error));
         await interaction.editReply({ content: "อัปโหลดไม่สำเร็จ ลองใหม่อีกครั้ง" });
