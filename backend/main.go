@@ -725,6 +725,7 @@ func main() {
 	app.Post("/api/gallery/session", s.galleryRedeemSession)
 	app.Get("/api/gallery/uploads", s.galleryListUploads)
 	app.Delete("/api/gallery/uploads/:id", s.galleryDeleteUpload)
+	app.Post("/api/gallery/download", s.rateLimit("gallery_download", 20, time.Hour), s.galleryDownload)
 	app.Post("/api/internal/bot/lockdown", s.botUpdateLockdown)
 	app.Post("/api/internal/bot/lockdown/access", s.botLockdownAccess)
 	app.Get("/api/lockdown-control/t/:ticket", s.consumeLockdownAccessTicket)

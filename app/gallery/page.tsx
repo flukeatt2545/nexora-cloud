@@ -521,6 +521,7 @@ export default function GalleryPage() {
   const [pendingDelete, setPendingDelete] = useState<GalleryItem[] | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteDone, setDeleteDone] = useState(0);
+  const [downloading, setDownloading] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [query, setQuery] = useState("");
@@ -914,6 +915,45 @@ export default function GalleryPage() {
   };
 
   const copyLink = (item: GalleryItem) => copyText(absoluteUrl(item.url), "คัดลอกลิงก์แล้ว");
+  // One zip of the chosen pictures. A single picture just downloads as itself.
+  const downloadPictures = async (list: GalleryItem[]) => {
+    if (downloading || list.length === 0) return;
+    const save = (href: string, name: string) => {
+      const link = document.createElement("a");
+      link.href = href;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    };
+    if (list.length === 1) {
+      save(list[0].url, list[0].filename);
+      return;
+    }
+    setDownloading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/gallery/download`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: list.map((it) => it.id) }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null) as { error?: string } | null;
+        showToast(data?.error || "โหลดไม่สำเร็จ ลองใหม่อีกครั้ง", "error");
+        return;
+      }
+      const url = URL.createObjectURL(await res.blob());
+      save(url, "nexora-gallery.zip");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      showToast(`โหลด ${list.length.toLocaleString("th-TH")} รูปแล้ว`);
+    } catch {
+      showToast("โหลดไม่สำเร็จ ลองใหม่อีกครั้ง", "error");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const copySelected = () =>
     copyText(
       selectedItems.map((it) => absoluteUrl(it.url)).join("\n"),
@@ -1024,7 +1064,7 @@ export default function GalleryPage() {
                 ยังไม่มีรูป เริ่มจาก <span className="gl-mark">/upload</span>
               </h1>
               <p className="gl-lede">
-                พิมพ์ <code>/upload</code> ใน Discord แล้วแนบรูปได้ครั้งละ 5 รูป (JPG, PNG, GIF, WebP ไม่เกิน 25MB) บอทจะส่งลิงก์กลับมา และรูปจะมารวมอยู่ที่หน้านี้
+                พิมพ์ <code>/upload</code> ใน Discord แล้วแนบรูปได้ครั้งละ 10 รูป (JPG, PNG, GIF, WebP ไม่เกิน 25MB) บอทจะส่งลิงก์กลับมา และรูปจะมารวมอยู่ที่หน้านี้
               </p>
               <div className="gl-intro-actions">
                 <button type="button" className="gl-btn" onClick={() => copyText("/upload", "คัดลอกคำสั่งแล้ว ไปวางใน Discord ได้เลย")}>
@@ -1064,7 +1104,7 @@ export default function GalleryPage() {
         <div className="gl-howto">
           <p className="gl-howto-title">เพิ่มรูป</p>
           <p className="gl-howto-text">
-            พิมพ์ <code>/upload</code> ใน Discord แนบได้ครั้งละ 5 รูป
+            พิมพ์ <code>/upload</code> ใน Discord แนบได้ครั้งละ 10 รูป
           </p>
           <button type="button" className="gl-btn sm" onClick={() => copyText("/upload", "คัดลอกคำสั่งแล้ว ไปวางใน Discord ได้เลย")}>
             <IconCopy size={14} /> คัดลอกคำสั่ง
@@ -1094,6 +1134,10 @@ export default function GalleryPage() {
                 {allSelected ? "ไม่เลือกทั้งหมด" : "เลือกทั้งหมด"}
               </button>
               <div className="gl-bar-actions">
+                <button type="button" className="gl-btn" onClick={() => void downloadPictures(selectedItems)} disabled={selectedItems.length === 0 || downloading}>
+                  <IconDownload size={16} />
+                  <span>{downloading ? "กำลังโหลด" : "โหลด"}</span>
+                </button>
                 <button type="button" className="gl-btn" onClick={copySelected} disabled={selectedItems.length === 0}>
                   <IconCopy size={16} />
                   <span>คัดลอกลิงก์</span>
@@ -1164,6 +1208,12 @@ export default function GalleryPage() {
                     <DensityGlyph density={density} />
                   </button>
                 </>
+              )}
+              {canSelect && visible.length > 0 && (
+                <button type="button" className="gl-btn gl-get-all" onClick={() => void downloadPictures(visible)} disabled={downloading} title={query ? "โหลดรูปที่ค้นเจอทั้งหมด" : "โหลดทั้งหมด"} aria-label={query ? "โหลดรูปที่ค้นเจอทั้งหมด" : "โหลดทั้งหมด"}>
+                  <IconDownload size={16} />
+                  <span>{downloading ? "กำลังโหลด" : query ? "โหลดที่ค้นเจอ" : "โหลดทั้งหมด"}</span>
+                </button>
               )}
               {canSelect && visible.length > 0 && (
                 <button type="button" className="gl-btn gl-pick" onClick={() => startSelecting()} title="เลือกหลายรูปเพื่อลบหรือคัดลอกลิงก์">

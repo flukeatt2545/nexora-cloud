@@ -25,6 +25,13 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.3.4",
+    date: "2026-11-02",
+    changes: [
+      { type: "added", th: "หน้าแกลเลอรีเลือกบางรูปแล้วโหลด หรือโหลดทั้งหมดเป็นไฟล์ zip ได้", en: "The gallery can download chosen pictures, or all of them, as a zip" },
+    ],
+  },
+  {
     version: "1.3.3",
     date: "2026-11-02",
     changes: [

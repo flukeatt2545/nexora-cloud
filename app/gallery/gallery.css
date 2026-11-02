@@ -561,6 +561,15 @@
   display: none;
 }
 
+/* The first of the two buttons takes the free space, pushing both to the right. */
+.gl-get-all {
+  margin-left: auto;
+}
+
+.gl-get-all + .gl-pick {
+  margin-left: 0;
+}
+
 .gl-pick {
   margin-left: auto;
 }
@@ -1837,6 +1846,23 @@
     background: transparent;
   }
 
+  /* Icons only here: the toolbar is one row and the search box needs the room. */
+  .gl-bar .gl-get-all {
+    flex: 0 0 40px;
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    margin-left: 0;
+  }
+
+  .gl-bar .gl-get-all span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
   .gl-bar:has(.gl-search) .gl-pick span {
     display: none;
   }
@@ -1858,7 +1884,7 @@
     bottom: 0;
     z-index: 40;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 8px;
     margin: 0;
     padding: 10px max(12px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
