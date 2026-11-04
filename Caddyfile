@@ -47,6 +47,20 @@
 
 
 
+	# ปิดเว็บแบบตัดการเชื่อมต่อ สั่งจากบอทด้วย /website close และ /website open
+	# API ตอบ 423 = ปิดอยู่ ทุก host ถูกตัด ยกเว้น API, health และบริการที่ต้องเปิดตลอด (db, mail, lock)
+	@site_offline_gate {
+		not host api.nkn02.com db.nkn02.com db.localhost mail.nkn02.com lock.nove666.pro lock.localhost nove666.pro www.nove666.pro nknnull.sbs www.nknnull.sbs
+		not path /api/* /health
+	}
+	forward_auth @site_offline_gate api:8080 {
+		uri /api/internal/site-offline/gate
+		@site_offline status 423
+		handle_response @site_offline {
+			abort
+		}
+	}
+
 	@lockdown_gate {
 		host nkn02.com www.nkn02.com api.nkn02.com localhost 127.0.0.1
 		not path /health /_next/* /assets/* /favicon.ico /logo-v2.png /cdn-cgi/*

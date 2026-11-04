@@ -44,6 +44,7 @@ import { observeBotActivity, recordActivity } from "./features/activity-log";
 import { apiErrorField, describeError, errorStatus } from "./features/errors";
 import { botControlScope, botMemberRoleIds, canUseBotScope } from "./features/bot-control";
 import { handleLockdownCommand } from "./features/lockdown";
+import { handleWebsiteCommand } from "./features/website";
 import { commandAttachments, handleUpload, modalAttachments, UPLOAD_MODAL_ID, uploadModal } from "./features/upload";
 import { handleMyUploadsCommand } from "./features/my-uploads";
 import { handleGalleryCommand } from "./features/gallery";
@@ -1335,6 +1336,22 @@ if (["db","code"].includes(commandName) && !await canUseBotScope(interaction,com
         await handleLockdownCommand(interaction);
       } catch (error) {
         console.error("[ERROR] /lockdown:", errorStatus(error) || "", describeError(error));
+        await interaction.editReply({ content:apiErrorField(error, "error") || (error instanceof Error && error.message) || "ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง",embeds:[] });
+      }
+      return;
+    }
+
+    if (commandName === "website") {
+      const scope = interaction.options.getSubcommand() === "status" ? "lockdown.status" : "lockdown.manage";
+      if (!(await canUseBotScope(interaction, scope, isAdmin))) {
+        await replyPrivilegedOnly(interaction);
+        return;
+      }
+      await beginPrivateReply(interaction);
+      try {
+        await handleWebsiteCommand(interaction);
+      } catch (error) {
+        console.error("[ERROR] /website:", errorStatus(error) || "", describeError(error));
         await interaction.editReply({ content:apiErrorField(error, "error") || (error instanceof Error && error.message) || "ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง",embeds:[] });
       }
       return;

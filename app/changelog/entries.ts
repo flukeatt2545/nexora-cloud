@@ -25,6 +25,13 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.3.5",
+    date: "2026-11-04",
+    changes: [
+      { type: "added", th: "ผู้ดูแลปิดหรือเปิดเว็บไซต์ได้จากบอท Discord", en: "Admins can close or reopen the website from the Discord bot" },
+    ],
+  },
+  {
     version: "1.3.4",
     date: "2026-11-02",
     changes: [

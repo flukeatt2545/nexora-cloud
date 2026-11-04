@@ -103,6 +103,11 @@ type server struct {
 	lockdownLast      lockdownState
 	lockdownKnown     bool
 	lockdownAlertedAt time.Time
+
+	siteOfflineMu        sync.RWMutex
+	siteOfflineLast      siteOfflineState
+	siteOfflineKnown     bool
+	siteOfflineCheckedAt time.Time
 }
 
 type authRequest struct {
@@ -296,9 +301,9 @@ func main() {
 
 	// /api/internal/* is for the bots and phpMyAdmin, which call the API directly. A request that
 	// came through the edge carries X-Forwarded-For; refuse it here as well, so these routes stay
-	// closed even if the edge's own block is bypassed. Caddy's gate check is the one exception.
+	// closed even if the edge's own block is bypassed. Caddy's gate checks are the exception.
 	app.Use(func(c *fiber.Ctx) error {
-		if strings.HasPrefix(c.Path(), "/api/internal/") && c.Path() != "/api/internal/lockdown/gate" && c.Get("X-Forwarded-For") != "" {
+		if strings.HasPrefix(c.Path(), "/api/internal/") && !isEdgeGatePath(c.Path()) && c.Get("X-Forwarded-For") != "" {
 			return c.SendStatus(fiber.StatusNotFound)
 		}
 		return c.Next()
@@ -310,6 +315,7 @@ func main() {
 	app.Get("/api/uptime-worker/config", s.uptimeWorkerConfig)
 	app.Post("/api/uptime-worker/report", s.uptimeWorkerReport)
 	app.Get("/api/internal/lockdown/gate", s.lockdownGate)
+	app.Get("/api/internal/site-offline/gate", s.siteOfflineGate)
 	app.Get("/api/status-page", s.apiStatusPage)
 	app.Get("/api/settings/public", s.publicSettingsHandler)
 	app.Get("/api/announcements", s.publicAnnouncements)
@@ -728,6 +734,8 @@ func main() {
 	app.Post("/api/gallery/download", s.rateLimit("gallery_download", 20, time.Hour), s.galleryDownload)
 	app.Post("/api/internal/bot/lockdown", s.botUpdateLockdown)
 	app.Post("/api/internal/bot/lockdown/access", s.botLockdownAccess)
+	app.Get("/api/internal/bot/site-offline", s.botSiteOfflineStatus)
+	app.Post("/api/internal/bot/site-offline", s.botUpdateSiteOffline)
 	app.Get("/api/lockdown-control/t/:ticket", s.consumeLockdownAccessTicket)
 	app.Get("/api/lockdown-control", s.lockdownControlPage)
 	app.Post("/api/lockdown-control/disable", s.lockdownControlDisable)

@@ -3,6 +3,7 @@ import { crowdSecCommand } from "./features/crowdsec";
 import { botControlCommand } from "./features/bot-control";
 import { botPanelCommand } from "./features/bot-panel";
 import { lockdownCommand } from "./features/lockdown";
+import { websiteCommand } from "./features/website";
 import { uploadCommand } from "./features/upload";
 import { myUploadsCommand } from "./features/my-uploads";
 import { galleryCommand } from "./features/gallery";
@@ -84,6 +85,7 @@ export const commands = [
   botControlCommand,
   botPanelCommand,
   lockdownCommand,
+  websiteCommand,
   uploadCommand,
   myUploadsCommand,
   galleryCommand,
