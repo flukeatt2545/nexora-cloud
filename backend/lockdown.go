@@ -181,6 +181,14 @@ func (s *server) setLockdownState(ctx context.Context, input lockdownUpdateInput
 		return lockdownState{}, err
 	}
 	s.cacheLockdown(ctx, state)
+	// Unlocking means "open the website" to whoever asks, so it also lifts /website close.
+	if !input.Enabled {
+		if offline, err := s.loadSiteOfflineState(ctx, true); err == nil && offline.Enabled {
+			if _, err := s.setSiteOfflineState(ctx, lockdownUpdateInput{Enabled: false}, source, actor); err != nil {
+				log.Printf("[WARN] Unlock could not reopen the closed sites: %v", err)
+			}
+		}
+	}
 	return state, nil
 }
 
