@@ -25,6 +25,15 @@ export const CHANGE_TYPES: ChangeType[] = ["added", "changed", "deprecated", "re
 
 export const RELEASES: Release[] = [
   {
+    version: "1.3.6",
+    date: "2026-11-04",
+    changes: [
+      { type: "changed", th: "เกม Blocko Duel หน้าตาใหม่ เล่นได้ทุกขนาดจอ เล่นต่อจากที่ค้างไว้ได้ และสรุปสถิติตอนจบเกม", en: "Blocko Duel has a new look, fits every screen size, resumes an unfinished game and shows stats at the end" },
+      { type: "added", th: "เกม Blocko Duel มีปุ่มออกจากเกมกลับเมนู โดยเกมที่ค้างไว้ไม่หาย", en: "Blocko Duel has an exit button back to the menu that keeps the unfinished game" },
+      { type: "fixed", th: "เกม Blocko Duel บางครั้งกระดานว่างเปล่าตอนเปิดหน้า", en: "Blocko Duel sometimes showed an empty board when the page opened" },
+    ],
+  },
+  {
     version: "1.3.5",
     date: "2026-11-04",
     changes: [
